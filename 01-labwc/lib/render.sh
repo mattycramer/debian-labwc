@@ -1,0 +1,435 @@
+#!/usr/bin/env bash
+
+render_user_file() {
+  local destination="$1"
+  local content="$2"
+  local temp_file
+  temp_file="$(mktemp)"
+  printf '%s' "$content" >"$temp_file"
+  install -D -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$temp_file" "$destination"
+  rm -f -- "$temp_file"
+}
+
+render_user_script() {
+  local destination="$1"
+  local content="$2"
+  local temp_file
+  temp_file="$(mktemp)"
+  printf '%s' "$content" >"$temp_file"
+  install -D -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$temp_file" "$destination"
+  rm -f -- "$temp_file"
+}
+
+render_runtime_env() {
+  local runtime_dir="$LABWC_TARGET_HOME/.config/debian-labwc"
+  install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$runtime_dir"
+  install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$1" "$runtime_dir/runtime.env"
+}
+
+render_labwc_rc_xml() {
+  local raise_on_click_bind=""
+  if [[ "${LABWC_RAISE_ON_CLICK}" == "yes" ]]; then
+    raise_on_click_bind="$(cat <<'EOF'
+    <context name="Frame">
+      <mousebind button="Left" action="Click">
+        <action name="Focus" />
+        <action name="Raise" />
+      </mousebind>
+    </context>
+    <context name="Client">
+      <mousebind button="Left" action="Click">
+        <action name="Focus" />
+        <action name="Raise" />
+      </mousebind>
+    </context>
+    <context name="Title">
+      <mousebind button="Left" action="DoubleClick">
+        <action name="ToggleMaximize" />
+      </mousebind>
+    </context>
+EOF
+)"
+  else
+    raise_on_click_bind="$(cat <<'EOF'
+    <context name="Frame">
+      <mousebind button="Left" action="Click">
+        <action name="Focus" />
+      </mousebind>
+    </context>
+    <context name="Client">
+      <mousebind button="Left" action="Click">
+        <action name="Focus" />
+      </mousebind>
+    </context>
+    <context name="Title">
+      <mousebind button="Left" action="DoubleClick">
+        <action name="ToggleMaximize" />
+      </mousebind>
+    </context>
+EOF
+)"
+  fi
+  local rc_xml
+  rc_xml="$(cat <<EOF
+<?xml version="1.0"?>
+<labwc_config>
+  <focus>
+    <followMouse>${LABWC_FOLLOW_MOUSE}</followMouse>
+    <followMouseRequiresMovement>no</followMouseRequiresMovement>
+    <raiseOnFocus>${LABWC_RAISE_ON_FOCUS}</raiseOnFocus>
+    <focusDelay>${LABWC_FOCUS_DELAY_MS}</focusDelay>
+  </focus>
+  <windowSwitcher preview="yes" outlines="yes" unshade="yes" order="focus">
+    <osd show="yes" style="classic" output="focused" />
+    <fields>
+      <field content="icon" width="8%" />
+      <field content="desktop_entry_name" width="30%" />
+      <field content="title" width="62%" />
+    </fields>
+  </windowSwitcher>
+  <mouse>
+    <default />
+    <doubleClickTime>${LABWC_DOUBLECLICK_TIME_MS}</doubleClickTime>
+    <context name="Root">
+      <mousebind button="Left" action="Press">
+        <action name="Unfocus" />
+      </mousebind>
+    </context>
+${raise_on_click_bind}
+  </mouse>
+  <keyboard>
+    <default />
+    <keybind key="A-Tab">
+      <action name="NextWindow" />
+    </keybind>
+    <keybind key="A-S-Tab">
+      <action name="PreviousWindow" />
+    </keybind>
+    <keybind key="W-Return">
+      <action name="Execute"><command>${LABWC_TERMINAL}</command></action>
+    </keybind>
+    <keybind key="W-d">
+      <action name="Execute"><command>${LABWC_LAUNCHER_CMD}</command></action>
+    </keybind>
+    <keybind key="W-e">
+      <action name="Execute"><command>thunar</command></action>
+    </keybind>
+    <keybind key="W-q">
+      <action name="Close" />
+    </keybind>
+    <keybind key="W-l">
+      <action name="Execute"><command>swaylock -f</command></action>
+    </keybind>
+    <keybind key="Print">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-screenshot-full</command></action>
+    </keybind>
+    <keybind key="S-Print">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-screenshot-region</command></action>
+    </keybind>
+    <keybind key="W-S-r">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-record-toggle</command></action>
+    </keybind>
+    <keybind key="W-S-e">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-power-menu</command></action>
+    </keybind>
+  </keyboard>
+</labwc_config>
+EOF
+)"
+  render_user_file "$LABWC_TARGET_HOME/.config/labwc/rc.xml" "$rc_xml"
+}
+
+render_labwc_menu_xml() {
+  local menu_xml
+  menu_xml="$(cat <<'EOF'
+<?xml version="1.0"?>
+<openbox_menu xmlns="http://openbox.org/3.4/menu">
+  <menu id="root-menu" label="Applications">
+    <item label="Terminal">
+      <action name="Execute"><command>footclient</command></action>
+    </item>
+    <item label="Launcher">
+      <action name="Execute"><command>wofi --show drun</command></action>
+    </item>
+    <item label="Files">
+      <action name="Execute"><command>thunar</command></action>
+    </item>
+    <item label="NNN">
+      <action name="Execute"><command>footclient -e nnn</command></action>
+    </item>
+    <item label="Audio">
+      <action name="Execute"><command>pavucontrol</command></action>
+    </item>
+    <item label="Power">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-power-menu</command></action>
+    </item>
+  </menu>
+</openbox_menu>
+EOF
+)"
+  render_user_file "$LABWC_TARGET_HOME/.config/labwc/menu.xml" "$menu_xml"
+}
+
+render_labwc_autostart() {
+  local wallpaper_path="$LABWC_TARGET_HOME/.local/share/debian-labwc/labwall2-1920x1080.png"
+  local autostart
+  autostart="$(cat <<EOF
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=\$'\\n\\t'
+
+export XDG_CURRENT_DESKTOP=wlroots
+dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=wlroots || true
+
+pgrep -x foot >/dev/null 2>&1 || foot --server &
+pgrep -x swaybg >/dev/null 2>&1 || swaybg -i "$wallpaper_path" -m "${LABWC_WALLPAPER_MODE}" &
+pgrep -x waybar >/dev/null 2>&1 || waybar &
+pgrep -x kanshi >/dev/null 2>&1 || kanshi &
+pgrep -x mako >/dev/null 2>&1 || mako &
+pgrep -x lxpolkit >/dev/null 2>&1 || lxpolkit &
+pgrep -x swayidle >/dev/null 2>&1 || swayidle \
+  timeout "${LABWC_IDLE_LOCK_SECONDS}" 'swaylock -f' \
+  timeout "${LABWC_IDLE_DPMS_SECONDS}" '/usr/local/bin/debian-labwc-dpms off' \
+  resume '/usr/local/bin/debian-labwc-dpms on' \
+  before-sleep 'swaylock -f' &
+
+if [[ ! -f "$LABWC_TARGET_HOME/.config/debian-labwc/.outputs-refined" ]]; then
+  /usr/local/bin/debian-labwc-refresh-outputs >/dev/null 2>&1 &
+fi
+EOF
+)"
+  render_user_script "$LABWC_TARGET_HOME/.config/labwc/autostart" "$autostart"
+}
+
+render_waybar_config() {
+  local waybar
+  waybar="$(cat <<'EOF'
+{
+  "layer": "top",
+  "position": "top",
+  "modules-left": ["wlr/workspaces", "wlr/taskbar"],
+  "modules-center": ["clock"],
+  "modules-right": ["tray", "network", "pulseaudio", "battery", "backlight", "cpu", "memory", "custom/player", "custom/power"],
+  "wlr/workspaces": {
+    "format": "{name}"
+  },
+  "wlr/taskbar": {
+    "format": "{icon}"
+  },
+  "clock": {
+    "format": "{:%a %Y-%m-%d %H:%M}"
+  },
+  "tray": {
+    "spacing": 8
+  },
+  "network": {
+    "format-wifi": "  {essid}",
+    "format-ethernet": "󰈀  wired",
+    "format-disconnected": "󰖪  offline"
+  },
+  "pulseaudio": {
+    "format": "{icon}  {volume}%",
+    "format-muted": "󰖁  muted",
+    "format-icons": {
+      "default": ["", "", ""]
+    }
+  },
+  "battery": {
+    "format": "{icon}  {capacity}%",
+    "format-icons": ["", "", "", "", ""]
+  },
+  "backlight": {
+    "format": "󰃠  {percent}%"
+  },
+  "cpu": {
+    "format": "󰍛  {usage}%"
+  },
+  "memory": {
+    "format": "󰘚  {}%"
+  },
+  "custom/player": {
+    "exec": "playerctl metadata --format '{{ artist }} - {{ title }}' 2>/dev/null || printf 'idle'",
+    "interval": 2,
+    "return-type": "text"
+  },
+  "custom/power": {
+    "format": "",
+    "on-click": "/usr/local/bin/debian-labwc-power-menu"
+  }
+}
+EOF
+)"
+  render_user_file "$LABWC_TARGET_HOME/.config/waybar/config.jsonc" "$waybar"
+}
+
+render_waybar_style() {
+  local css
+  css="$(cat <<'EOF'
+* {
+  font-family: "Noto Sans", "Font Awesome 6 Free", "Material Design Icons";
+  font-size: 13px;
+}
+
+window#waybar {
+  background: rgba(17, 17, 17, 0.92);
+  color: #f5f5f5;
+}
+
+#workspaces button {
+  color: #f5f5f5;
+  padding: 0 10px;
+}
+
+#clock,
+#network,
+#pulseaudio,
+#battery,
+#backlight,
+#cpu,
+#memory,
+#custom-player,
+#custom-power,
+#tray {
+  margin: 0 8px;
+  padding: 0 6px;
+}
+EOF
+)"
+  render_user_file "$LABWC_TARGET_HOME/.config/waybar/style.css" "$css"
+}
+
+kanshi_output_line() {
+  local output_name="$1"
+  local mode_name="$2"
+  local hz="$3"
+  local position="$4"
+  local enabled_state="$5"
+  local line
+
+  line="  output \"$output_name\""
+  if [[ -n "$mode_name" && -n "$hz" ]]; then
+    line+=" mode ${mode_name}@${hz}Hz"
+  fi
+  if [[ -n "$position" ]]; then
+    line+=" position ${position}"
+  fi
+  line+=" ${enabled_state}"
+  printf '%s\n' "$line"
+}
+
+render_kanshi_config() {
+  local internal_output="${LABWC_INTERNAL_OUTPUT:-}"
+  local external_output="${LABWC_EXTERNAL_OUTPUT:-}"
+  local internal_profile=""
+  local external_clause=""
+
+  if [[ -n "$internal_output" ]]; then
+    local internal_line
+    internal_line="$(kanshi_output_line "$internal_output" "${LABWC_INTERNAL_MODE}" "${LABWC_INTERNAL_HZ}" "0,0" "enable")"
+    internal_profile="$(cat <<EOF
+profile internal {
+${internal_line}
+}
+EOF
+)"
+  fi
+
+  if [[ -n "$external_output" ]]; then
+    if [[ -n "$internal_output" ]]; then
+      local external_line dual_external_line dual_internal_line
+      external_line="$(kanshi_output_line "$external_output" "${LABWC_EXTERNAL_MODE}" "${LABWC_EXTERNAL_HZ}" "0,0" "enable")"
+      dual_external_line="$(kanshi_output_line "$external_output" "${LABWC_EXTERNAL_MODE}" "${LABWC_EXTERNAL_HZ}" "0,0" "enable")"
+      dual_internal_line="$(kanshi_output_line "$internal_output" "${LABWC_INTERNAL_MODE}" "${LABWC_INTERNAL_HZ}" "1920,0" "enable")"
+      external_clause="$(cat <<EOF
+profile external {
+${external_line}
+  output "$internal_output" disable
+}
+
+profile dual {
+${dual_external_line}
+${dual_internal_line}
+}
+EOF
+)"
+    else
+      local external_only_line
+      external_only_line="$(kanshi_output_line "$external_output" "${LABWC_EXTERNAL_MODE}" "${LABWC_EXTERNAL_HZ}" "0,0" "enable")"
+      external_clause="$(cat <<EOF
+profile external {
+${external_only_line}
+}
+EOF
+)"
+    fi
+  fi
+
+  local config
+  config="$(cat <<EOF
+$internal_profile
+$external_clause
+EOF
+)"
+  render_user_file "$LABWC_TARGET_HOME/.config/kanshi/config" "$config"
+}
+
+render_wofi() {
+  render_user_file "$LABWC_TARGET_HOME/.config/wofi/config" $'show=drun\nwidth=36%\nheight=40%\nprompt=Run\nallow_images=true\n'
+  render_user_file "$LABWC_TARGET_HOME/.config/wofi/style.css" $'window {\n  margin: 0;\n  border: 2px solid #444;\n  background-color: rgba(20, 20, 20, 0.95);\n}\n#input {\n  margin: 8px;\n}\n#entry:selected {\n  background-color: #2d5a88;\n}\n'
+}
+
+render_mako() {
+  render_user_file "$LABWC_TARGET_HOME/.config/mako/config" $'font=Noto Sans 11\nborder-size=2\npadding=12\ndefault-timeout=5000\nbackground-color=#1b1b1bff\ntext-color=#f5f5f5ff\nborder-color=#4a89dcff\n'
+}
+
+render_swaylock() {
+  render_user_file "$LABWC_TARGET_HOME/.config/swaylock/config" $'daemonize\nclock\nfont=Noto Sans\nindicator\ncolor=111111\ninside-color=202020\nring-color=4a89dc\nline-color=111111\nkey-hl-color=88c0d0\n'
+}
+
+render_foot() {
+  render_user_file "$LABWC_TARGET_HOME/.config/foot/foot.ini" $'[main]\nfont=Noto Sans Mono:size=11\npad=8x8\n\n[colors]\nbackground=111111\nforeground=f5f5f5\n'
+}
+
+render_gammastep() {
+  render_user_file "$LABWC_TARGET_HOME/.config/gammastep/config" $'[general]\nadjustment-method=wayland\n[manual]\nlat=0.0\nlon=0.0\n'
+}
+
+render_portals() {
+  render_user_file "$LABWC_TARGET_HOME/.config/xdg-desktop-portal/portals.conf" $'[preferred]\ndefault=gtk\norg.freedesktop.impl.portal.ScreenCast=wlr\norg.freedesktop.impl.portal.Screenshot=wlr\norg.freedesktop.impl.portal.FileChooser=gtk\n'
+}
+
+install_wallpaper() {
+  install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.local/share/debian-labwc"
+  install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$SCRIPT_DIR/wallpaper/labwall2-1920x1080.png" "$LABWC_TARGET_HOME/.local/share/debian-labwc/labwall2-1920x1080.png"
+}
+
+render_all_configs() {
+  local env_file="$1"
+  local config_root="$LABWC_TARGET_HOME/.config"
+  install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
+    "$config_root/labwc" \
+    "$config_root/waybar" \
+    "$config_root/kanshi" \
+    "$config_root/wofi" \
+    "$config_root/mako" \
+    "$config_root/swaylock" \
+    "$config_root/foot" \
+    "$config_root/gammastep" \
+    "$config_root/xdg-desktop-portal" \
+    "$config_root/debian-labwc"
+
+  render_runtime_env "$env_file"
+  install_wallpaper
+  render_labwc_rc_xml
+  render_labwc_menu_xml
+  render_labwc_autostart
+  render_waybar_config
+  render_waybar_style
+  render_kanshi_config
+  render_wofi
+  render_mako
+  render_swaylock
+  render_foot
+  render_gammastep
+  render_portals
+}
