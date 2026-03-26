@@ -55,6 +55,7 @@ readonly BACKPORTS_PACKAGES=(
 )
 
 readonly GRAPHICS_PACKAGES=(
+  bash-completion
   libgl1-mesa-dri
   mesa-vulkan-drivers
   mesa-utils
@@ -65,28 +66,9 @@ readonly GRAPHICS_PACKAGES=(
   libvulkan1
 )
 
-readonly NVIDIA_PACKAGES=(
-  build-essential
-  "linux-headers-$(uname -r)"
-  linux-headers-amd64
-  nvidia-driver
-  nvidia-kernel-dkms
-  nvidia-vaapi-driver
-  nvidia-vulkan-icd
-)
-
 readonly INTEL_PACKAGES=(
   intel-media-va-driver
 )
-
-nvidia_install_enabled() {
-  case "${NVIDIA_INSTALL:-}" in
-    1) return 0 ;;
-    0) return 1 ;;
-    "") [[ "${LABWC_HAS_NVIDIA_GPU:-no}" == "yes" ]] ;;
-    *) die "NVIDIA_INSTALL must be empty, 0, or 1" ;;
-  esac
-}
 
 retry_cmd() {
   local attempts="$1"
@@ -118,9 +100,6 @@ apt_update() {
 resolved_requested_packages() {
   printf '%s\n' "${BACKPORTS_PACKAGES[@]}"
   printf '%s\n' "${GRAPHICS_PACKAGES[@]}"
-  if nvidia_install_enabled; then
-    printf '%s\n' "${NVIDIA_PACKAGES[@]}"
-  fi
   if [[ "${LABWC_HAS_INTEL_GPU:-no}" == "yes" ]]; then
     printf '%s\n' "${INTEL_PACKAGES[@]}"
   fi
@@ -133,9 +112,6 @@ install_requested_packages() {
   local -a apt_args=()
   mapfile -t backports_package_list < <(printf '%s\n' "${BACKPORTS_PACKAGES[@]}")
   mapfile -t graphics_package_list < <(printf '%s\n' "${GRAPHICS_PACKAGES[@]}")
-  if nvidia_install_enabled; then
-    mapfile -O "${#graphics_package_list[@]}" -t graphics_package_list < <(printf '%s\n' "${NVIDIA_PACKAGES[@]}")
-  fi
   if [[ "${LABWC_HAS_INTEL_GPU:-no}" == "yes" ]]; then
     mapfile -O "${#graphics_package_list[@]}" -t graphics_package_list < <(printf '%s\n' "${INTEL_PACKAGES[@]}")
   fi

@@ -92,6 +92,13 @@ enable_user_services() {
   enable_target_user_unit pipewire-pulse.service
   enable_target_user_unit pipewire-pulse.socket
   enable_target_user_unit wireplumber.service
+  if command -v chsh >/dev/null 2>&1; then
+    local current_shell
+    current_shell="$(getent passwd "$LABWC_TARGET_USER" | awk -F: '{print $7}')"
+    if [[ "$current_shell" != "/usr/bin/zsh" && "$current_shell" != "/bin/zsh" ]]; then
+      chsh -s "$(command -v zsh)" "$LABWC_TARGET_USER" >/dev/null 2>&1 || true
+    fi
+  fi
 }
 
 enable_system_services_only() {
@@ -133,7 +140,12 @@ nuke_all_state() {
   remove_if_present "$LABWC_TARGET_HOME/.config/gammastep"
   remove_if_present "$LABWC_TARGET_HOME/.config/xdg-desktop-portal"
   remove_if_present "$LABWC_TARGET_HOME/.config/debian-labwc"
+  remove_if_present "$LABWC_TARGET_HOME/.config/starship.toml"
   remove_if_present "$LABWC_TARGET_HOME/.local/share/debian-labwc"
+  remove_if_present "$LABWC_TARGET_HOME/.bashrc"
+  remove_if_present "$LABWC_TARGET_HOME/.profile"
+  remove_if_present "$LABWC_TARGET_HOME/.zshrc"
+  remove_if_present "$LABWC_TARGET_HOME/.zprofile"
 
   log_info "removing installed helper scripts and session files"
   remove_if_present "/usr/local/bin/debian-labwc-session"

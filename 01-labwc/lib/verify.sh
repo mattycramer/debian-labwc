@@ -29,12 +29,20 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.config/kanshi/config"
   require_file "$LABWC_TARGET_HOME/.config/xdg-desktop-portal/portals.conf"
   require_file "$LABWC_TARGET_HOME/.config/debian-labwc/runtime.env"
+  require_file "$LABWC_TARGET_HOME/.config/starship.toml"
+  require_file "$LABWC_TARGET_HOME/.bashrc"
+  require_file "$LABWC_TARGET_HOME/.profile"
+  require_file "$LABWC_TARGET_HOME/.zshrc"
+  require_file "$LABWC_TARGET_HOME/.zprofile"
   require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/pipewire.service"
   require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/pipewire.socket"
   require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/pipewire-pulse.service"
   require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/pipewire-pulse.socket"
   require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/wireplumber.service"
   require_file "$LABWC_TARGET_HOME/.local/share/debian-labwc/labwall2-1920x1080.png"
+  require_file "$LABWC_TARGET_HOME/Music"
+  require_file "$LABWC_TARGET_HOME/Videos"
+  require_file "$LABWC_TARGET_HOME/Documents"
 }
 
 verify_services_enabled() {
@@ -59,20 +67,8 @@ verify_labwc_config_semantics() {
   grep -F '<action name="NextWindow" />' "$rc_path" >/dev/null || die "rc.xml missing explicit Alt+Tab next window action"
   grep -F '<action name="PreviousWindow" />' "$rc_path" >/dev/null || die "rc.xml missing explicit Alt+Tab previous window action"
   grep -F '<windowSwitcher preview="yes" outlines="yes" unshade="yes" order="focus">' "$rc_path" >/dev/null || die "rc.xml missing window switcher config"
-  grep -F '<context name="Client">' "$rc_path" >/dev/null || die "rc.xml missing client mouse context"
-  grep -F '<context name="Frame">' "$rc_path" >/dev/null || die "rc.xml missing frame mouse context"
   grep -F '<context name="Title">' "$rc_path" >/dev/null || die "rc.xml missing title mouse context"
   grep -F '<action name="ToggleMaximize" />' "$rc_path" >/dev/null || die "rc.xml missing titlebar double-click maximize"
-  if [[ "${LABWC_RAISE_ON_CLICK}" == "yes" ]]; then
-    grep -F '<action name="Raise" />' "$rc_path" >/dev/null || die "rc.xml missing raise-on-click action"
-  fi
-}
-
-verify_nvidia_build_state() {
-  if nvidia_install_enabled; then
-    [[ -e "/lib/modules/$(uname -r)/build" ]] || die "missing kernel build directory for $(uname -r)"
-    command -v gcc >/dev/null 2>&1 || die "gcc is not installed for NVIDIA DKMS builds"
-  fi
 }
 
 verify_install() {
@@ -82,6 +78,5 @@ verify_install() {
   verify_greeter_user
   verify_ownership
   verify_labwc_config_semantics
-  verify_nvidia_build_state
   log_info "verification completed"
 }

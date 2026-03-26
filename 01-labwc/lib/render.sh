@@ -26,22 +26,89 @@ render_runtime_env() {
   install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$1" "$runtime_dir/runtime.env"
 }
 
+render_home_dirs() {
+  local -a dirs=(
+    "$LABWC_TARGET_HOME/Desktop"
+    "$LABWC_TARGET_HOME/Downloads"
+    "$LABWC_TARGET_HOME/Templates"
+    "$LABWC_TARGET_HOME/Public"
+    "$LABWC_TARGET_HOME/Documents"
+    "$LABWC_TARGET_HOME/Music"
+    "$LABWC_TARGET_HOME/Pictures"
+    "$LABWC_TARGET_HOME/Videos"
+  )
+  local dir
+  for dir in "${dirs[@]}"; do
+    install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$dir"
+  done
+  render_user_file "$LABWC_TARGET_HOME/.config/user-dirs.dirs" $'XDG_DESKTOP_DIR="$HOME/Desktop"\nXDG_DOWNLOAD_DIR="$HOME/Downloads"\nXDG_TEMPLATES_DIR="$HOME/Templates"\nXDG_PUBLICSHARE_DIR="$HOME/Public"\nXDG_DOCUMENTS_DIR="$HOME/Documents"\nXDG_MUSIC_DIR="$HOME/Music"\nXDG_PICTURES_DIR="$HOME/Pictures"\nXDG_VIDEOS_DIR="$HOME/Videos"\n'
+  render_user_file "$LABWC_TARGET_HOME/.config/user-dirs.locale" $'en_US.UTF-8\n'
+}
+
+render_shell_startup_files() {
+  local bashrc profile zshrc zprofile starship
+  bashrc="$(cat <<'EOF'
+# Managed by debian-labwc
+if [[ -f /etc/bash_completion ]]; then
+  # shellcheck disable=SC1091
+  source /etc/bash_completion
+elif [[ -f /usr/share/bash-completion/bash_completion ]]; then
+  # shellcheck disable=SC1091
+  source /usr/share/bash-completion/bash_completion
+fi
+
+if command -v starship >/dev/null 2>&1; then
+  eval "$(starship init bash)"
+fi
+EOF
+)"
+  profile="$(cat <<'EOF'
+# Managed by debian-labwc
+if [[ -f "$HOME/.bashrc" ]]; then
+  # shellcheck disable=SC1090
+  source "$HOME/.bashrc"
+fi
+EOF
+)"
+  zshrc="$(cat <<'EOF'
+# Managed by debian-labwc
+autoload -Uz compinit
+compinit
+
+if command -v starship >/dev/null 2>&1; then
+  eval "$(starship init zsh)"
+fi
+EOF
+)"
+  zprofile="$(cat <<'EOF'
+# Managed by debian-labwc
+if [[ -f "$HOME/.profile" ]]; then
+  source "$HOME/.profile"
+fi
+EOF
+)"
+  starship="$(cat <<'EOF'
+format = "$directory$git_branch$git_status$character"
+
+[character]
+success_symbol = "[>](bold green)"
+error_symbol = "[>](bold red)"
+
+[directory]
+truncation_length = 3
+truncate_to_repo = false
+EOF
+)"
+  render_user_file "$LABWC_TARGET_HOME/.bashrc" "$bashrc"
+  render_user_file "$LABWC_TARGET_HOME/.profile" "$profile"
+  render_user_file "$LABWC_TARGET_HOME/.zshrc" "$zshrc"
+  render_user_file "$LABWC_TARGET_HOME/.zprofile" "$zprofile"
+  render_user_file "$LABWC_TARGET_HOME/.config/starship.toml" "$starship"
+}
+
 render_labwc_rc_xml() {
-  local raise_on_click_bind=""
-  if [[ "${LABWC_RAISE_ON_CLICK}" == "yes" ]]; then
-    raise_on_click_bind="$(cat <<'EOF'
-    <context name="Frame">
-      <mousebind button="Left" action="Click">
-        <action name="Focus" />
-        <action name="Raise" />
-      </mousebind>
-    </context>
-    <context name="Client">
-      <mousebind button="Left" action="Click">
-        <action name="Focus" />
-        <action name="Raise" />
-      </mousebind>
-    </context>
+  local title_bind
+  title_bind="$(cat <<'EOF'
     <context name="Title">
       <mousebind button="Left" action="DoubleClick">
         <action name="ToggleMaximize" />
@@ -49,26 +116,6 @@ render_labwc_rc_xml() {
     </context>
 EOF
 )"
-  else
-    raise_on_click_bind="$(cat <<'EOF'
-    <context name="Frame">
-      <mousebind button="Left" action="Click">
-        <action name="Focus" />
-      </mousebind>
-    </context>
-    <context name="Client">
-      <mousebind button="Left" action="Click">
-        <action name="Focus" />
-      </mousebind>
-    </context>
-    <context name="Title">
-      <mousebind button="Left" action="DoubleClick">
-        <action name="ToggleMaximize" />
-      </mousebind>
-    </context>
-EOF
-)"
-  fi
   local rc_xml
   rc_xml="$(cat <<EOF
 <?xml version="1.0"?>
@@ -95,7 +142,7 @@ EOF
         <action name="Unfocus" />
       </mousebind>
     </context>
-${raise_on_click_bind}
+${title_bind}
   </mouse>
   <keyboard>
     <default />
@@ -418,9 +465,13 @@ render_all_configs() {
     "$config_root/foot" \
     "$config_root/gammastep" \
     "$config_root/xdg-desktop-portal" \
-    "$config_root/debian-labwc"
+    "$config_root/debian-labwc" \
+    "$config_root/systemd/user/default.target.wants" \
+    "$config_root"
 
   render_runtime_env "$env_file"
+  render_home_dirs
+  render_shell_startup_files
   install_wallpaper
   render_labwc_rc_xml
   render_labwc_menu_xml
