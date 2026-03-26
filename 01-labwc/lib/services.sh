@@ -6,7 +6,7 @@ ensure_greeter_user() {
   fi
   run_cmd useradd \
     --system \
-    --home-dir /nonexistent \
+    --home-dir /var/cache/tuigreet \
     --no-create-home \
     --shell /usr/sbin/nologin \
     greeter
