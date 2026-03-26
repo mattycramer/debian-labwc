@@ -107,3 +107,59 @@ enable_all_services() {
   enable_system_services_only
   enable_user_services
 }
+
+remove_if_present() {
+  local path="$1"
+  if [[ -e "$path" || -L "$path" ]]; then
+    rm -rf -- "$path"
+  fi
+}
+
+disable_target_user_unit() {
+  local unit_name="$1"
+  local wants_path="$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/$unit_name"
+  remove_if_present "$wants_path"
+}
+
+nuke_all_state() {
+  log_info "removing generated user config"
+  remove_if_present "$LABWC_TARGET_HOME/.config/labwc"
+  remove_if_present "$LABWC_TARGET_HOME/.config/waybar"
+  remove_if_present "$LABWC_TARGET_HOME/.config/kanshi"
+  remove_if_present "$LABWC_TARGET_HOME/.config/wofi"
+  remove_if_present "$LABWC_TARGET_HOME/.config/mako"
+  remove_if_present "$LABWC_TARGET_HOME/.config/swaylock"
+  remove_if_present "$LABWC_TARGET_HOME/.config/foot"
+  remove_if_present "$LABWC_TARGET_HOME/.config/gammastep"
+  remove_if_present "$LABWC_TARGET_HOME/.config/xdg-desktop-portal"
+  remove_if_present "$LABWC_TARGET_HOME/.config/debian-labwc"
+  remove_if_present "$LABWC_TARGET_HOME/.local/share/debian-labwc"
+
+  log_info "removing installed helper scripts and session files"
+  remove_if_present "/usr/local/bin/debian-labwc-session"
+  remove_if_present "/usr/local/bin/debian-labwc-power-menu"
+  remove_if_present "/usr/local/bin/debian-labwc-screenshot-full"
+  remove_if_present "/usr/local/bin/debian-labwc-screenshot-region"
+  remove_if_present "/usr/local/bin/debian-labwc-record-toggle"
+  remove_if_present "/usr/local/bin/debian-labwc-dpms"
+  remove_if_present "/usr/local/bin/debian-labwc-refresh-outputs"
+  remove_if_present "/usr/share/wayland-sessions/labwc.desktop"
+  remove_if_present "/etc/greetd/config.toml"
+
+  log_info "removing target user systemd user unit links"
+  disable_target_user_unit pipewire.service
+  disable_target_user_unit pipewire.socket
+  disable_target_user_unit pipewire-pulse.service
+  disable_target_user_unit pipewire-pulse.socket
+  disable_target_user_unit wireplumber.service
+
+  log_info "disabling greetd and restoring multi-user target"
+  systemctl disable greetd.service >/dev/null 2>&1 || true
+  systemctl set-default multi-user.target >/dev/null 2>&1 || true
+
+  log_info "removing tuigreet cache and greeter user"
+  remove_if_present "/var/cache/tuigreet"
+  if getent passwd greeter >/dev/null 2>&1; then
+    userdel greeter >/dev/null 2>&1 || true
+  fi
+}

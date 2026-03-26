@@ -30,7 +30,7 @@ source "$SCRIPT_DIR/lib/verify.sh"
 
 usage() {
   cat <<'EOF'
-Usage: ./install.sh --phase doctor|detect|packages|render|enable|verify|print-env|all [--dry-run] [--yes]
+Usage: ./install.sh --phase doctor|detect|packages|render|enable|verify|print-env|nuke|all [--dry-run] [--yes]
 EOF
 }
 
@@ -67,6 +67,7 @@ load_env_file() {
 }
 
 phase_doctor() {
+  log_info "phase: doctor"
   require_root
   require_debian_trixie
   require_amd64
@@ -79,12 +80,14 @@ phase_doctor() {
 }
 
 phase_detect() {
+  log_info "phase: detect"
   phase_doctor
   detect_hardware "$ENV_FILE"
   load_env_file
 }
 
 phase_packages() {
+  log_info "phase: packages"
   phase_doctor
   load_env_file
   apt_update
@@ -92,26 +95,37 @@ phase_packages() {
 }
 
 phase_render() {
+  log_info "phase: render"
   phase_doctor
   load_env_file
   render_all_configs "$ENV_FILE"
 }
 
 phase_enable() {
+  log_info "phase: enable"
   phase_doctor
   load_env_file
   enable_all_services "$ENV_FILE"
 }
 
 phase_verify() {
+  log_info "phase: verify"
   phase_doctor
   load_env_file
   verify_install "$ENV_FILE"
 }
 
 phase_print_env() {
+  log_info "phase: print-env"
   load_env_file
   sed -n '1,240p' "$ENV_FILE"
+}
+
+phase_nuke() {
+  log_info "phase: nuke"
+  phase_doctor
+  load_env_file
+  nuke_all_state
 }
 
 main() {
@@ -124,6 +138,7 @@ main() {
     enable) phase_enable ;;
     verify) phase_verify ;;
     print-env) phase_print_env ;;
+    nuke) phase_nuke ;;
     all)
       phase_doctor
       phase_detect

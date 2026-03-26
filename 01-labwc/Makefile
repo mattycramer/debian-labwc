@@ -1,6 +1,6 @@
 SHELL := /usr/bin/env bash
 
-.PHONY: help doctor detect install render enable verify reconfigure print-env
+.PHONY: help doctor detect install render enable verify reconfigure print-env nuke
 
 help:
 	@printf '%s\n' \
@@ -13,7 +13,8 @@ help:
 	  '  enable      Install root-owned files and enable services' \
 	  '  verify      Check install state' \
 	  '  reconfigure Run detect, render, enable, verify' \
-	  '  print-env   Print effective env values'
+	  '  print-env   Print effective env values' \
+	  '  nuke        Remove generated state and disable installed wiring'
 
 doctor:
 	./install.sh --phase doctor
@@ -41,3 +42,6 @@ reconfigure:
 
 print-env:
 	./install.sh --phase print-env
+
+nuke:
+	./install.sh --phase nuke
