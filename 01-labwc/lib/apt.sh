@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 readonly BACKPORTS_SUITE="trixie-backports"
-readonly REQUESTED_PACKAGES=(
+readonly BACKPORTS_PACKAGES=(
   labwc
   kanshi
   waybar
@@ -37,14 +37,6 @@ readonly REQUESTED_PACKAGES=(
   qt6-wayland
   gvfs
   gvfs-backends
-  libgl1-mesa-dri
-  mesa-vulkan-drivers
-  mesa-utils
-  libgles2
-  vulkan-validationlayers
-  libegl1
-  libglvnd0
-  libvulkan1
   foot
   foot-terminfo
   pavucontrol
@@ -60,6 +52,17 @@ readonly REQUESTED_PACKAGES=(
   starship
   fonts-material-design-icons-iconfont
   fonts-weather-icons
+)
+
+readonly GRAPHICS_PACKAGES=(
+  libgl1-mesa-dri
+  mesa-vulkan-drivers
+  mesa-utils
+  libgles2
+  vulkan-validationlayers
+  libegl1
+  libglvnd0
+  libvulkan1
 )
 
 readonly NVIDIA_PACKAGES=(
@@ -113,7 +116,8 @@ apt_update() {
 }
 
 resolved_requested_packages() {
-  printf '%s\n' "${REQUESTED_PACKAGES[@]}"
+  printf '%s\n' "${BACKPORTS_PACKAGES[@]}"
+  printf '%s\n' "${GRAPHICS_PACKAGES[@]}"
   if nvidia_install_enabled; then
     printf '%s\n' "${NVIDIA_PACKAGES[@]}"
   fi
@@ -123,10 +127,20 @@ resolved_requested_packages() {
 }
 
 install_requested_packages() {
-  log_info "installing requested packages from $BACKPORTS_SUITE"
-  local -a package_list=()
+  log_info "installing backports package set"
+  local -a backports_package_list=()
+  local -a graphics_package_list=()
   local -a apt_args=()
-  mapfile -t package_list < <(resolved_requested_packages)
+  mapfile -t backports_package_list < <(printf '%s\n' "${BACKPORTS_PACKAGES[@]}")
+  mapfile -t graphics_package_list < <(printf '%s\n' "${GRAPHICS_PACKAGES[@]}")
+  if nvidia_install_enabled; then
+    mapfile -O "${#graphics_package_list[@]}" -t graphics_package_list < <(printf '%s\n' "${NVIDIA_PACKAGES[@]}")
+  fi
+  if [[ "${LABWC_HAS_INTEL_GPU:-no}" == "yes" ]]; then
+    mapfile -O "${#graphics_package_list[@]}" -t graphics_package_list < <(printf '%s\n' "${INTEL_PACKAGES[@]}")
+  fi
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${package_list[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${backports_package_list[@]}"
+  log_info "installing graphics package set"
+  run_cmd env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends "${apt_args[@]}" "${graphics_package_list[@]}"
 }

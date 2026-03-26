@@ -1,5 +1,17 @@
 #!/usr/bin/env bash
 
+ensure_greeter_user() {
+  if getent passwd greeter >/dev/null 2>&1; then
+    return 0
+  fi
+  run_cmd useradd \
+    --system \
+    --home-dir /nonexistent \
+    --no-create-home \
+    --shell /usr/sbin/nologin \
+    greeter
+}
+
 render_template_to_file() {
   local template_path="$1"
   local destination="$2"
@@ -31,6 +43,7 @@ install_helper_script() {
 }
 
 install_root_files() {
+  ensure_greeter_user
   render_template_to_file "$SCRIPT_DIR/templates/greetd-config.toml.tpl" "/etc/greetd/config.toml" 0644
   render_template_to_file "$SCRIPT_DIR/templates/labwc.desktop.tpl" "/usr/share/wayland-sessions/labwc.desktop" 0644
   render_template_to_file "$SCRIPT_DIR/templates/labwc-session.tpl" "/usr/local/bin/debian-labwc-session" 0755
