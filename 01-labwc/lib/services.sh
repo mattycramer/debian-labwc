@@ -12,6 +12,13 @@ ensure_greeter_user() {
     greeter
 }
 
+ensure_greeter_runtime_dirs() {
+  install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet
+  install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet/.cache
+  install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet/.local
+  install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet/.local/state
+}
+
 render_template_to_file() {
   local template_path="$1"
   local destination="$2"
@@ -44,11 +51,10 @@ install_helper_script() {
 
 install_root_files() {
   ensure_greeter_user
+  ensure_greeter_runtime_dirs
   render_template_to_file "$SCRIPT_DIR/templates/greetd-config.toml.tpl" "/etc/greetd/config.toml" 0644
   render_template_to_file "$SCRIPT_DIR/templates/labwc.desktop.tpl" "/usr/share/wayland-sessions/labwc.desktop" 0644
   render_template_to_file "$SCRIPT_DIR/templates/labwc-session.tpl" "/usr/local/bin/debian-labwc-session" 0755
-
-  install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet
 
   install_helper_script "$SCRIPT_DIR/bin/power-menu.sh" "/usr/local/bin/debian-labwc-power-menu"
   install_helper_script "$SCRIPT_DIR/bin/screenshot-full.sh" "/usr/local/bin/debian-labwc-screenshot-full"
@@ -58,14 +64,39 @@ install_root_files() {
   install_helper_script "$SCRIPT_DIR/bin/refresh-outputs.sh" "/usr/local/bin/debian-labwc-refresh-outputs"
 }
 
+resolve_user_unit_path() {
+  local unit_name="$1"
+  local candidate
+  for candidate in "/usr/lib/systemd/user/$unit_name" "/lib/systemd/user/$unit_name"; do
+    if [[ -f "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  die "missing systemd user unit: $unit_name"
+}
+
+enable_target_user_unit() {
+  local unit_name="$1"
+  local unit_path
+  local wants_dir="$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants"
+  unit_path="$(resolve_user_unit_path "$unit_name")"
+  install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$wants_dir"
+  ln -sfn "$unit_path" "$wants_dir/$unit_name"
+  chown -h "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$wants_dir/$unit_name"
+}
+
 enable_user_services() {
-  run_cmd systemctl --global enable pipewire.service pipewire.socket
-  run_cmd systemctl --global enable pipewire-pulse.service pipewire-pulse.socket
-  run_cmd systemctl --global enable wireplumber.service
+  enable_target_user_unit pipewire.service
+  enable_target_user_unit pipewire.socket
+  enable_target_user_unit pipewire-pulse.service
+  enable_target_user_unit pipewire-pulse.socket
+  enable_target_user_unit wireplumber.service
 }
 
 enable_system_services_only() {
   run_cmd systemctl daemon-reload
+  run_cmd systemctl set-default graphical.target
   run_cmd systemctl enable greetd.service
   run_cmd systemctl enable seatd.service
   run_cmd systemctl enable NetworkManager.service

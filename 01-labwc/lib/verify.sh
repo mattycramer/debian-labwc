@@ -29,10 +29,16 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.config/kanshi/config"
   require_file "$LABWC_TARGET_HOME/.config/xdg-desktop-portal/portals.conf"
   require_file "$LABWC_TARGET_HOME/.config/debian-labwc/runtime.env"
+  require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/pipewire.service"
+  require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/pipewire.socket"
+  require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/pipewire-pulse.service"
+  require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/pipewire-pulse.socket"
+  require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/wireplumber.service"
   require_file "$LABWC_TARGET_HOME/.local/share/debian-labwc/labwall2-1920x1080.png"
 }
 
 verify_services_enabled() {
+  [[ "$(systemctl get-default)" == "graphical.target" ]] || die "default systemd target is not graphical.target"
   systemctl is-enabled greetd.service >/dev/null 2>&1 || die "greetd.service is not enabled"
   systemctl is-enabled seatd.service >/dev/null 2>&1 || die "seatd.service is not enabled"
   systemctl is-enabled NetworkManager.service >/dev/null 2>&1 || die "NetworkManager.service is not enabled"
