@@ -70,21 +70,14 @@ require_backports_configured() {
   apt-cache policy | grep -F "$BACKPORTS_SUITE" >/dev/null || die "$BACKPORTS_SUITE is not configured"
 }
 
-require_backports_candidates() {
-  local pkg
-  for pkg in "${BOOTSTRAP_PACKAGES[@]}"; do
-    apt-cache policy "$pkg" | grep -F "$BACKPORTS_SUITE" >/dev/null || die "package '$pkg' has no $BACKPORTS_SUITE candidate"
-  done
-}
-
 apt_update() {
   log "updating apt metadata"
   retry 3 env DEBIAN_FRONTEND=noninteractive apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
 install_bootstrap() {
-  log "installing bootstrap packages from $BACKPORTS_SUITE"
-  env DEBIAN_FRONTEND=noninteractive apt -t "$BACKPORTS_SUITE" install --no-install-recommends -y "${BOOTSTRAP_PACKAGES[@]}"
+  log "installing bootstrap packages from trixie"
+  env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y "${BOOTSTRAP_PACKAGES[@]}"
 }
 
 main() {
@@ -93,7 +86,6 @@ main() {
   require_amd64
   require_backports_configured
   apt_update
-  require_backports_candidates
   install_bootstrap
   log "next: cd '$REPO_ROOT/01-labwc' && make install"
 }
