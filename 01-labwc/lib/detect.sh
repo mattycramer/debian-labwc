@@ -21,12 +21,16 @@ detect_target_user() {
 detect_gpu_vendor() {
   local gpu_info
   gpu_info="$(lspci -nn 2>/dev/null | grep -Ei 'vga|3d|display' || true)"
-  case "${gpu_info,,}" in
-    *nvidia*) LABWC_GPU_VENDOR="nvidia" ;;
-    *intel*) LABWC_GPU_VENDOR="intel" ;;
-    *amd*|*"advanced micro devices"*) LABWC_GPU_VENDOR="amd" ;;
-    *) LABWC_GPU_VENDOR="unknown" ;;
-  esac
+  gpu_info="${gpu_info,,}"
+  LABWC_HAS_INTEL_GPU="no"
+  LABWC_HAS_NVIDIA_GPU="no"
+  LABWC_HAS_AMD_GPU="no"
+
+  [[ "$gpu_info" == *intel* ]] && LABWC_HAS_INTEL_GPU="yes"
+  [[ "$gpu_info" == *nvidia* ]] && LABWC_HAS_NVIDIA_GPU="yes"
+  if [[ "$gpu_info" == *amd* || "$gpu_info" == *"advanced micro devices"* ]]; then
+    LABWC_HAS_AMD_GPU="yes"
+  fi
 }
 
 is_internal_connector() {
@@ -113,7 +117,9 @@ write_autogen_block() {
 $AUTOGEN_BEGIN
 LABWC_TARGET_USER="$LABWC_TARGET_USER"
 LABWC_TARGET_HOME="$LABWC_TARGET_HOME"
-LABWC_GPU_VENDOR="$LABWC_GPU_VENDOR"
+LABWC_HAS_INTEL_GPU="$LABWC_HAS_INTEL_GPU"
+LABWC_HAS_NVIDIA_GPU="$LABWC_HAS_NVIDIA_GPU"
+LABWC_HAS_AMD_GPU="$LABWC_HAS_AMD_GPU"
 LABWC_INTERNAL_OUTPUT="$LABWC_INTERNAL_OUTPUT"
 LABWC_EXTERNAL_OUTPUT="$LABWC_EXTERNAL_OUTPUT"
 LABWC_PRIMARY_OUTPUT="$LABWC_PRIMARY_OUTPUT"
@@ -173,5 +179,5 @@ detect_hardware() {
   detect_gpu_vendor
   detect_outputs
   write_autogen_block "$env_file"
-  log_info "detected user=$LABWC_TARGET_USER gpu=$LABWC_GPU_VENDOR primary=$LABWC_PRIMARY_OUTPUT"
+  log_info "detected user=$LABWC_TARGET_USER intel=$LABWC_HAS_INTEL_GPU nvidia=$LABWC_HAS_NVIDIA_GPU amd=$LABWC_HAS_AMD_GPU primary=$LABWC_PRIMARY_OUTPUT"
 }

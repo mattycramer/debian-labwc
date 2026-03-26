@@ -6,7 +6,9 @@ package_is_installed() {
 
 verify_packages() {
   local pkg
-  for pkg in "${REQUESTED_PACKAGES[@]}"; do
+  local -a package_list=()
+  mapfile -t package_list < <(resolved_requested_packages)
+  for pkg in "${package_list[@]}"; do
     package_is_installed "$pkg" || die "package '$pkg' is not installed"
   done
 }

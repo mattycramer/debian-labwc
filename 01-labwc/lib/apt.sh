@@ -41,11 +41,6 @@ readonly REQUESTED_PACKAGES=(
   mesa-vulkan-drivers
   mesa-utils
   libgles2
-  nvidia-driver
-  nvidia-kernel-dkms
-  intel-media-va-driver
-  nvidia-vaapi-driver
-  nvidia-vulkan-icd
   vulkan-validationlayers
   libegl1
   libglvnd0
@@ -65,6 +60,17 @@ readonly REQUESTED_PACKAGES=(
   starship
   fonts-material-design-icons-iconfont
   fonts-weather-icons
+)
+
+readonly NVIDIA_PACKAGES=(
+  nvidia-driver
+  nvidia-kernel-dkms
+  nvidia-vaapi-driver
+  nvidia-vulkan-icd
+)
+
+readonly INTEL_PACKAGES=(
+  intel-media-va-driver
 )
 
 retry_cmd() {
@@ -94,9 +100,21 @@ apt_update() {
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
+resolved_requested_packages() {
+  printf '%s\n' "${REQUESTED_PACKAGES[@]}"
+  if [[ "${LABWC_HAS_NVIDIA_GPU:-no}" == "yes" ]]; then
+    printf '%s\n' "${NVIDIA_PACKAGES[@]}"
+  fi
+  if [[ "${LABWC_HAS_INTEL_GPU:-no}" == "yes" ]]; then
+    printf '%s\n' "${INTEL_PACKAGES[@]}"
+  fi
+}
+
 install_requested_packages() {
   log_info "installing requested packages from $BACKPORTS_SUITE"
+  local -a package_list=()
   local -a apt_args=()
+  mapfile -t package_list < <(resolved_requested_packages)
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${REQUESTED_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${package_list[@]}"
 }

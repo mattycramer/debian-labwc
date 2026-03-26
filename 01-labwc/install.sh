@@ -86,6 +86,7 @@ phase_detect() {
 
 phase_packages() {
   phase_doctor
+  load_env_file
   apt_update
   install_requested_packages
 }
