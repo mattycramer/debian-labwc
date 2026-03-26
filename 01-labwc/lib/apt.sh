@@ -33,7 +33,7 @@ readonly REQUESTED_PACKAGES=(
   wf-recorder
   grim
   slurp
-  qt5wayland
+  qtwayland5
   qt6-wayland
   gvfs
   gvfs-backends
