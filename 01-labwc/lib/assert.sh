@@ -27,3 +27,7 @@ require_amd64() {
 require_file() {
   [[ -f "$1" ]] || die "missing file: $1"
 }
+
+require_dir() {
+  [[ -d "$1" ]] || die "missing directory: $1"
+}

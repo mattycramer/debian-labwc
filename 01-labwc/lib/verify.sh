@@ -40,9 +40,9 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/pipewire-pulse.socket"
   require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/wireplumber.service"
   require_file "$LABWC_TARGET_HOME/.local/share/debian-labwc/labwall2-1920x1080.png"
-  require_file "$LABWC_TARGET_HOME/Music"
-  require_file "$LABWC_TARGET_HOME/Videos"
-  require_file "$LABWC_TARGET_HOME/Documents"
+  require_dir "$LABWC_TARGET_HOME/Music"
+  require_dir "$LABWC_TARGET_HOME/Videos"
+  require_dir "$LABWC_TARGET_HOME/Documents"
 }
 
 verify_services_enabled() {
@@ -71,6 +71,13 @@ verify_labwc_config_semantics() {
   grep -F '<action name="ToggleMaximize" />' "$rc_path" >/dev/null || die "rc.xml missing titlebar double-click maximize"
 }
 
+verify_shell_config_semantics() {
+  grep -F 'bash_completion' "$LABWC_TARGET_HOME/.bashrc" >/dev/null || die ".bashrc missing bash completion setup"
+  grep -F 'starship init bash' "$LABWC_TARGET_HOME/.bashrc" >/dev/null || die ".bashrc missing starship init"
+  grep -F 'compinit' "$LABWC_TARGET_HOME/.zshrc" >/dev/null || die ".zshrc missing compinit"
+  grep -F 'starship init zsh' "$LABWC_TARGET_HOME/.zshrc" >/dev/null || die ".zshrc missing starship init"
+}
+
 verify_install() {
   verify_packages
   verify_paths
@@ -78,5 +85,6 @@ verify_install() {
   verify_greeter_user
   verify_ownership
   verify_labwc_config_semantics
+  verify_shell_config_semantics
   log_info "verification completed"
 }
