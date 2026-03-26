@@ -58,11 +58,19 @@ verify_labwc_config_semantics() {
   fi
 }
 
+verify_nvidia_build_state() {
+  if nvidia_install_enabled; then
+    [[ -e "/lib/modules/$(uname -r)/build" ]] || die "missing kernel build directory for $(uname -r)"
+    command -v gcc >/dev/null 2>&1 || die "gcc is not installed for NVIDIA DKMS builds"
+  fi
+}
+
 verify_install() {
   verify_packages
   verify_paths
   verify_services_enabled
   verify_ownership
   verify_labwc_config_semantics
+  verify_nvidia_build_state
   log_info "verification completed"
 }

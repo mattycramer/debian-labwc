@@ -63,6 +63,9 @@ readonly REQUESTED_PACKAGES=(
 )
 
 readonly NVIDIA_PACKAGES=(
+  build-essential
+  "linux-headers-$(uname -r)"
+  linux-headers-amd64
   nvidia-driver
   nvidia-kernel-dkms
   nvidia-vaapi-driver
@@ -72,6 +75,15 @@ readonly NVIDIA_PACKAGES=(
 readonly INTEL_PACKAGES=(
   intel-media-va-driver
 )
+
+nvidia_install_enabled() {
+  case "${NVIDIA_INSTALL:-}" in
+    1) return 0 ;;
+    0) return 1 ;;
+    "") [[ "${LABWC_HAS_NVIDIA_GPU:-no}" == "yes" ]] ;;
+    *) die "NVIDIA_INSTALL must be empty, 0, or 1" ;;
+  esac
+}
 
 retry_cmd() {
   local attempts="$1"
@@ -102,7 +114,7 @@ apt_update() {
 
 resolved_requested_packages() {
   printf '%s\n' "${REQUESTED_PACKAGES[@]}"
-  if [[ "${LABWC_HAS_NVIDIA_GPU:-no}" == "yes" ]]; then
+  if nvidia_install_enabled; then
     printf '%s\n' "${NVIDIA_PACKAGES[@]}"
   fi
   if [[ "${LABWC_HAS_INTEL_GPU:-no}" == "yes" ]]; then
