@@ -1,0 +1,23 @@
+workflow:
+  rules:
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_TAG =~ /(^|.*[^0-9])[0-9]{1,10}$/'
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" && $CI_COMMIT_BRANCH == "mcr/release" && $GH_RELEASE_PUSH =~ /^(true|TRUE|1|yes|YES|y|Y|on|ON)$/'
+    - when: never
+
+stages:
+  - verify
+  - test
+  - github-sync
+
+include:
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/github/validate.yml'
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/github/push.yml'
+
+variables:
+  GH_RELEASE_PUSH: "true"
+  GH_FORCE_PUSH: "true"
+  GH_PUBLIC_REPO: "true"
