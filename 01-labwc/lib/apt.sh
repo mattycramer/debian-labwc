@@ -94,20 +94,7 @@ apt_update() {
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
-package_has_backports_candidate() {
-  local pkg="$1"
-  apt-cache policy "$pkg" | grep -F "$BACKPORTS_SUITE" >/dev/null
-}
-
-assert_requested_package_candidates() {
-  local pkg
-  for pkg in "${REQUESTED_PACKAGES[@]}"; do
-    package_has_backports_candidate "$pkg" || die "package '$pkg' has no $BACKPORTS_SUITE candidate"
-  done
-}
-
 install_requested_packages() {
-  assert_requested_package_candidates
   log_info "installing requested packages from $BACKPORTS_SUITE"
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)

@@ -70,9 +70,7 @@ phase_doctor() {
   require_root
   require_debian_trixie
   require_amd64
-  require_backports_configured
   require_command apt
-  require_command apt-cache
   require_command install
   require_command systemctl
   require_command lspci

@@ -24,10 +24,6 @@ require_amd64() {
   [[ "$arch" == "amd64" ]] || die "expected amd64, found '$arch'"
 }
 
-require_backports_configured() {
-  apt-cache policy | grep -F "trixie-backports" >/dev/null || die "trixie-backports is not configured"
-}
-
 require_file() {
   [[ -f "$1" ]] || die "missing file: $1"
 }

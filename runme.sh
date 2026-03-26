@@ -4,7 +4,6 @@ IFS=$'\n\t'
 
 REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly REPO_ROOT
-readonly BACKPORTS_SUITE="trixie-backports"
 readonly BOOTSTRAP_PACKAGES=(
   bash
   make
@@ -66,17 +65,13 @@ require_amd64() {
   [[ "$arch" == "amd64" ]] || die "expected amd64, found '$arch'"
 }
 
-require_backports_configured() {
-  apt-cache policy | grep -F "$BACKPORTS_SUITE" >/dev/null || die "$BACKPORTS_SUITE is not configured"
-}
-
 apt_update() {
   log "updating apt metadata"
   retry 3 env DEBIAN_FRONTEND=noninteractive apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
 install_bootstrap() {
-  log "installing bootstrap packages from trixie"
+  log "installing bootstrap packages"
   env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y "${BOOTSTRAP_PACKAGES[@]}"
 }
 
@@ -84,7 +79,6 @@ main() {
   require_root
   require_trixie
   require_amd64
-  require_backports_configured
   apt_update
   install_bootstrap
   log "next: cd '$REPO_ROOT/01-labwc' && make install"
