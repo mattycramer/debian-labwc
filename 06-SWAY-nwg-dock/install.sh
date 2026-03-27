@@ -66,7 +66,6 @@ phase_doctor() {
   require_command getent
   require_command install
   require_command awk
-  require_command sed
   require_command tar
 }
 
@@ -76,9 +75,9 @@ phase_install() {
   load_env_file
   detect_target_user
   apt_update
-  install_crystal_dock_dependencies
-  install_crystal_dock_from_source
-  render_crystal_dock_config
+  install_nwg_dock_dependencies
+  install_nwg_dock_from_source
+  render_nwg_dock_config
 }
 
 phase_render() {
@@ -86,7 +85,7 @@ phase_render() {
   phase_doctor
   load_env_file
   detect_target_user
-  render_crystal_dock_config
+  render_nwg_dock_config
 }
 
 phase_verify() {
@@ -94,13 +93,13 @@ phase_verify() {
   phase_doctor
   load_env_file
   detect_target_user
-  verify_crystal_dock_install
+  verify_nwg_dock_install
 }
 
 phase_print_env() {
   log_info "phase: print-env"
   load_env_file
-  sed -n '1,160p' "$ENV_FILE"
+  sed -n '1,200p' "$ENV_FILE"
 }
 
 phase_nuke() {
@@ -108,7 +107,7 @@ phase_nuke() {
   phase_doctor
   load_env_file
   detect_target_user
-  remove_crystal_dock_install
+  remove_nwg_dock_install
 }
 
 main() {

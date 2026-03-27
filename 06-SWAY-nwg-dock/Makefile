@@ -4,12 +4,12 @@ SHELL := /usr/bin/env bash
 
 help:
 	@printf '%s\n' \
-	  '06-crystal-dock targets:' \
-	  '  doctor    Validate host prerequisites for Crystal Dock install' \
-	  '  install   Install Crystal Dock, render Labwc config, and wire autostart' \
-	  '  render    Re-render the managed Crystal Dock config and Labwc hook' \
-	  '  verify    Verify installed package and managed files' \
-	  '  nuke      Remove Crystal Dock package, wrapper, and managed config' \
+	  '06-nwg-dock targets:' \
+	  '  doctor    Validate host prerequisites for nwg-dock build/install' \
+	  '  install   Build/install nwg-dock, render config, and wire guarded autostart' \
+	  '  render    Re-render managed nwg-dock config and Labwc wrapper' \
+	  '  verify    Verify managed nwg-dock files and wrappers' \
+	  '  nuke      Remove managed nwg-dock binary, data, wrapper, and config' \
 	  '  print-env Show the effective managed environment values'
 
 doctor:

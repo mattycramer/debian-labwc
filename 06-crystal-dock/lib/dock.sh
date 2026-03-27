@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-readonly CRYSTAL_DOCK_AUTOSTART_MARKER_BEGIN="# >>> MANAGED BY 06-dock >>>"
-readonly CRYSTAL_DOCK_AUTOSTART_MARKER_END="# <<< MANAGED BY 06-dock <<<"
+readonly CRYSTAL_DOCK_AUTOSTART_MARKER_BEGIN="# >>> MANAGED BY 06-crystal-dock >>>"
+readonly CRYSTAL_DOCK_AUTOSTART_MARKER_END="# <<< MANAGED BY 06-crystal-dock <<<"
 readonly CRYSTAL_DOCK_WRAPPER_PATH="/usr/local/bin/debian-labwc-crystal-dock"
 readonly CRYSTAL_DOCK_BIN_PATH="/usr/bin/crystal-dock"
 readonly CRYSTAL_DOCK_DESKTOP_PATH="/usr/share/applications/crystal-dock.desktop"
-readonly CRYSTAL_DOCK_BUILD_ROOT="/usr/local/src/06-dock"
+readonly CRYSTAL_DOCK_BUILD_ROOT="/usr/local/src/06-crystal-dock"
 readonly CRYSTAL_DOCK_SOURCE_DIR="$CRYSTAL_DOCK_BUILD_ROOT/source"
 readonly CRYSTAL_DOCK_BUILD_DIR="$CRYSTAL_DOCK_BUILD_ROOT/build"
 
