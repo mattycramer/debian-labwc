@@ -64,6 +64,15 @@ install_crystal_dock_dependencies() {
   run_cmd env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_BUILD_PACKAGES[@]}"
 }
 
+patch_crystal_dock_source_tree() {
+  local cmake_path="$CRYSTAL_DOCK_SOURCE_DIR/src/CMakeLists.txt"
+  [[ -f "$cmake_path" ]] || die "missing Crystal Dock CMakeLists.txt after source extract"
+  run_cmd sed -i \
+    -e 's/find_package(Qt6 6.6 REQUIRED COMPONENTS DBus Gui Test Widgets)/find_package(Qt6 6.6 REQUIRED COMPONENTS DBus Gui Test Widgets GuiPrivate)/' \
+    -e '/^if (Qt6_VERSION VERSION_GREATER_EQUAL 6\.9\.0)$/,/^endif()$/d' \
+    "$cmake_path"
+}
+
 write_root_file() {
   local destination="$1"
   local mode="$2"
@@ -97,8 +106,9 @@ install_crystal_dock_from_source() {
   run_cmd curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 180 --silent --show-error -o "$archive_path" "$CRYSTAL_DOCK_SOURCE_URL"
   run_cmd tar -xzf "$archive_path" -C "$CRYSTAL_DOCK_SOURCE_DIR" --strip-components=1
   run_cmd rm -f -- "$archive_path"
+  patch_crystal_dock_source_tree
   run_cmd cmake -S "$CRYSTAL_DOCK_SOURCE_DIR/src" -B "$CRYSTAL_DOCK_BUILD_DIR" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
-  run_cmd cmake --build "$CRYSTAL_DOCK_BUILD_DIR" --parallel
+  run_cmd cmake --build "$CRYSTAL_DOCK_BUILD_DIR" --parallel --target crystal-dock
   run_cmd cmake --install "$CRYSTAL_DOCK_BUILD_DIR"
 }
 
