@@ -113,7 +113,7 @@ EOF
 )"
   starship="$(cat <<'EOF'
 add_newline = false
-format = "$username$hostname$directory$git_branch$git_status$character"
+format = "$username$hostname$directory$git_branch$git_status\n$character "
 
 [username]
 show_always = true
@@ -132,6 +132,12 @@ format = "[$path ](bold cyan)"
 home_symbol = "~"
 truncation_length = 3
 truncate_to_repo = false
+
+[git_branch]
+format = "[git:$branch ](bold magenta)"
+
+[git_status]
+format = "[$all_status$ahead_behind ](bold red)"
 EOF
 )"
   render_user_file "$LABWC_TARGET_HOME/.bashrc" "$bashrc"

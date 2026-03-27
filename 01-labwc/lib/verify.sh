@@ -122,9 +122,12 @@ verify_shell_config_semantics() {
   grep -F '. "$HOME/.bashrc"' "$LABWC_TARGET_HOME/.profile" >/dev/null || die ".profile missing POSIX .bashrc source form"
   grep -F 'if [ -f "$HOME/.profile" ]; then' "$LABWC_TARGET_HOME/.zprofile" >/dev/null || die ".zprofile missing POSIX-safe .profile guard"
   grep -F '. "$HOME/.profile"' "$LABWC_TARGET_HOME/.zprofile" >/dev/null || die ".zprofile missing POSIX-safe .profile source form"
+  grep -F 'format = "$username$hostname$directory$git_branch$git_status\n$character "' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing multiline prompt format"
   grep -F '[username]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing username config"
   grep -F '[hostname]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing hostname config"
   grep -F '[directory]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing directory config"
+  grep -F '[git_branch]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing git_branch config"
+  grep -F '[git_status]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing git_status config"
 }
 
 verify_install() {

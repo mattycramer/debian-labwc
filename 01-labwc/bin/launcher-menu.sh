@@ -28,47 +28,47 @@ run_terminal() {
 }
 
 entries=(
-  "󰆍  Applications"
-  "  Terminal"
-  "  Files"
+  "Applications"
+  "Terminal"
+  "Files"
 )
 
 if has_command thorium-browser; then
-  entries+=("󰖟  Browser")
+  entries+=("Browser")
 fi
 if has_command qutebrowser; then
-  entries+=("󰇩  Qutebrowser")
+  entries+=("Qutebrowser")
 fi
 if has_command code; then
-  entries+=("󰨞  Code")
+  entries+=("Code")
 fi
 if has_command obsidian; then
-  entries+=("󰠮  Obsidian")
+  entries+=("Obsidian")
 fi
 if has_command mullvad-vpn; then
-  entries+=("󰌾  Mullvad VPN")
+  entries+=("Mullvad VPN")
 fi
 if has_command bitwarden; then
-  entries+=("󰟀  Bitwarden")
+  entries+=("Bitwarden")
 fi
 if has_command nmtui; then
-  entries+=("󰒓  Network")
+  entries+=("Network")
 fi
-entries+=("  Power")
+entries+=("Power")
 
 selection="$(choose "Launch" "${entries[@]}")"
 
 case "$selection" in
-  "󰆍  Applications") exec wofi --show drun ;;
-  "  Terminal") run_terminal "Terminal" 'exec "${SHELL:-/bin/bash}"' ;;
-  "  Files") run_gui thunar ;;
-  "󰖟  Browser") run_gui thorium-browser ;;
-  "󰇩  Qutebrowser") run_gui qutebrowser ;;
-  "󰨞  Code") run_gui code ;;
-  "󰠮  Obsidian") run_gui obsidian ;;
-  "󰌾  Mullvad VPN") run_gui mullvad-vpn ;;
-  "󰟀  Bitwarden") run_gui bitwarden ;;
-  "󰒓  Network") run_terminal "Network" 'exec nmtui' ;;
-  "  Power") exec /usr/local/bin/debian-labwc-power-menu ;;
+  "Applications") exec wofi --show drun ;;
+  "Terminal") run_terminal "Terminal" 'exec "${SHELL:-/bin/bash}"' ;;
+  "Files") run_gui thunar ;;
+  "Browser") run_gui thorium-browser ;;
+  "Qutebrowser") run_gui qutebrowser ;;
+  "Code") run_gui code ;;
+  "Obsidian") run_gui obsidian ;;
+  "Mullvad VPN") run_gui mullvad-vpn ;;
+  "Bitwarden") run_gui bitwarden ;;
+  "Network") run_terminal "Network" 'exec nmtui' ;;
+  "Power") exec /usr/local/bin/debian-labwc-power-menu ;;
   *) exit 0 ;;
 esac
