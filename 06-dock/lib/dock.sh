@@ -109,6 +109,18 @@ else()
     message(FATAL_ERROR "Unable to locate Qt Gui private headers. Install qt6-base-private-dev.")
   endif()
   get_filename_component(QTGUI_VERSIONED_INCLUDE_DIR "${QTGUI_PRIVATE_INCLUDE_DIR}" DIRECTORY)
+  find_path(QTCORE_PRIVATE_INCLUDE_DIR private/qglobal_p.h
+    PATHS
+      /usr/include/qt6
+      /usr/include/${CMAKE_LIBRARY_ARCHITECTURE}/qt6
+      /usr/include/x86_64-linux-gnu/qt6
+    PATH_SUFFIXES
+      QtCore/${Qt6_VERSION}/QtCore
+      QtCore/${Qt6_VERSION_MAJOR}.${Qt6_VERSION_MINOR}.${Qt6_VERSION_PATCH}/QtCore)
+  if (NOT QTCORE_PRIVATE_INCLUDE_DIR)
+    message(FATAL_ERROR "Unable to locate Qt Core private headers. Install qt6-base-private-dev.")
+  endif()
+  get_filename_component(QTCORE_VERSIONED_INCLUDE_DIR "${QTCORE_PRIVATE_INCLUDE_DIR}" DIRECTORY)
 endif()
 """
 
@@ -117,7 +129,9 @@ inject = """add_library(crystal-dock_lib STATIC ${SRCS})
 if (NOT TARGET Qt6::GuiPrivate)
   target_include_directories(crystal-dock_lib PRIVATE
     "${QTGUI_VERSIONED_INCLUDE_DIR}"
-    "${QTGUI_PRIVATE_INCLUDE_DIR}")
+    "${QTGUI_PRIVATE_INCLUDE_DIR}"
+    "${QTCORE_VERSIONED_INCLUDE_DIR}"
+    "${QTCORE_PRIVATE_INCLUDE_DIR}")
 endif()
 
 """
