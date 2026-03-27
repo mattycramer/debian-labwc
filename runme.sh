@@ -79,12 +79,12 @@ require_amd64() {
 
 apt_update() {
   log "updating apt metadata"
-  retry 3 env DEBIAN_FRONTEND=noninteractive apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
+  retry 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
 install_bootstrap() {
   log "installing bootstrap packages"
-  env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y "${BOOTSTRAP_PACKAGES[@]}"
+  env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends -y "${BOOTSTRAP_PACKAGES[@]}"
 }
 
 repair_target_home() {
@@ -114,10 +114,10 @@ main() {
   repair_target_home
   log "next:"
   log "  cd '$REPO_ROOT/01-labwc' && make install"
+  log "  cd '$REPO_ROOT/04-dev' && make install"
   log "  cd '$REPO_ROOT/06-crystal-dock' && make install    # optional, Crystal Dock for Labwc"
   log "  cd '$REPO_ROOT/02-nvidia' && make install   # optional, NVIDIA hosts only"
   log "  cd '$REPO_ROOT/03-tools' && make install"
-  log "  cd '$REPO_ROOT/04-dev' && make install"
   log "  cd '$REPO_ROOT/05-security' && make install"
 }
 

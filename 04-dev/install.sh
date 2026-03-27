@@ -68,12 +68,14 @@ phase_doctor() {
   require_command awk
   require_command sed
   require_command install
+  require_command sudo
 }
 
 phase_install() {
   log_info "phase: install"
   phase_doctor
   load_env_file
+  detect_dev_download_user
   apt_update
   install_bootstrap_packages
   install_sid_repository

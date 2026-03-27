@@ -37,14 +37,15 @@ readonly CROWDSEC_PACKAGES=(
   crowdsec-firewall-bouncer-nftables
 )
 
-readonly MANIFEST_ROOT="/var/lib/05-security/manifests"
+readonly SECURITY_RUNTIME_ROOT="/var/lib/debian-labwc-security"
+readonly MANIFEST_ROOT="${SECURITY_RUNTIME_ROOT}/manifests"
 readonly CROWDSEC_KEYRING_PATH="/etc/apt/keyrings/crowdsec_crowdsec-archive-keyring.gpg"
 readonly CROWDSEC_LIST_PATH="/etc/apt/sources.list.d/crowdsec_crowdsec.list"
 readonly CROWDSEC_PREFS_PATH="/etc/apt/preferences.d/crowdsec"
-readonly CROWDSEC_ACQUIS_PATH="/etc/crowdsec/acquis.d/05-security.yaml"
-readonly CROWDSEC_BOUNCER_KEY_PATH="/etc/crowdsec/bouncers/05-security-firewall-bouncer.key"
-readonly CROWDSEC_BOUNCER_LOCAL_PATH="/etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml.local"
-readonly CROWDSEC_CONSOLE_MARKER="/etc/crowdsec/.console-enrolled-by-05-security"
+readonly CROWDSEC_ACQUIS_PATH="/etc/crowdsec/acquis.d/debian-labwc-security.yaml"
+readonly CROWDSEC_BOUNCER_KEY_PATH="/etc/crowdsec/bouncers/debian-labwc-firewall-bouncer.key"
+readonly CROWDSEC_BOUNCER_LOCAL_PATH="/etc/crowdsec/bouncers/debian-labwc-firewall-bouncer.yaml.local"
+readonly CROWDSEC_CONSOLE_MARKER="/etc/crowdsec/.console-enrolled-by-debian-labwc-security"
 readonly NFTABLES_CONF_PATH="/etc/nftables.conf"
 readonly NFTABLES_DROPIN_DIR="/etc/systemd/system/nftables.service.d"
 readonly NFTABLES_DROPIN_PATH="/etc/systemd/system/nftables.service.d/override.conf"
@@ -55,8 +56,26 @@ readonly AIDE_CONF_PATH="/etc/aide/aide.conf"
 readonly AIDE_DB_DIR="/var/lib/aide"
 readonly AIDE_DB_PATH="/var/lib/aide/aide.db.gz"
 readonly AIDE_DB_NEW_PATH="/var/lib/aide/aide.db.new.gz"
-readonly AIDE_CHECK_SERVICE_PATH="/etc/systemd/system/05-security-aide-check.service"
-readonly AIDE_CHECK_TIMER_PATH="/etc/systemd/system/05-security-aide-check.timer"
+readonly AIDE_CHECK_SERVICE_PATH="/etc/systemd/system/debian-labwc-security-aide-check.service"
+readonly AIDE_CHECK_TIMER_PATH="/etc/systemd/system/debian-labwc-security-aide-check.timer"
+
+detect_security_download_user() {
+  if [[ -n "${SECURITY_DOWNLOAD_USER:-}" ]] && id "$SECURITY_DOWNLOAD_USER" >/dev/null 2>&1; then
+    :
+  elif [[ -n "${SUDO_USER:-}" ]] && [[ "${SUDO_USER:-}" != "root" ]] && id "${SUDO_USER:-}" >/dev/null 2>&1; then
+    SECURITY_DOWNLOAD_USER="$SUDO_USER"
+  elif getent passwd _apt >/dev/null 2>&1; then
+    SECURITY_DOWNLOAD_USER="_apt"
+  elif getent passwd nobody >/dev/null 2>&1; then
+    SECURITY_DOWNLOAD_USER="nobody"
+  else
+    SECURITY_DOWNLOAD_USER="$(getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $7 !~ /(false|nologin)$/ {print $1; exit}')"
+  fi
+  [[ -n "${SECURITY_DOWNLOAD_USER:-}" ]] || die "could not determine security download user"
+  SECURITY_DOWNLOAD_GROUP="$(id -gn "$SECURITY_DOWNLOAD_USER")"
+  SECURITY_DOWNLOAD_HOME="$(getent passwd "$SECURITY_DOWNLOAD_USER" | awk -F: '{print $6}')"
+  [[ -n "${SECURITY_DOWNLOAD_HOME:-}" ]] || SECURITY_DOWNLOAD_HOME="/tmp"
+}
 
 retry_cmd() {
   local attempts="$1"
@@ -81,7 +100,29 @@ apt_yes_args() {
 }
 
 apt_update() {
-  retry_cmd 3 env DEBIAN_FRONTEND=noninteractive apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
+  retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
+}
+
+prepare_security_download_path() {
+  local path="$1"
+  run_cmd install -d -m 0755 -o "$SECURITY_DOWNLOAD_USER" -g "$SECURITY_DOWNLOAD_GROUP" "$(dirname "$path")"
+  run_cmd rm -f -- "$path"
+  run_cmd touch "$path"
+  run_cmd chown "$SECURITY_DOWNLOAD_USER:$SECURITY_DOWNLOAD_GROUP" "$path"
+  run_cmd chmod 0644 "$path"
+}
+
+download_as_security_user() {
+  local url="$1"
+  local path="$2"
+  prepare_security_download_path "$path"
+  run_cmd sudo -u "$SECURITY_DOWNLOAD_USER" env HOME="$SECURITY_DOWNLOAD_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 300 --silent --show-error -o "$path" "$url"
+  run_cmd chmod 0644 "$path"
+}
+
+fetch_as_security_user() {
+  local url="$1"
+  sudo -u "$SECURITY_DOWNLOAD_USER" env HOME="$SECURITY_DOWNLOAD_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error "$url"
 }
 
 write_text_file() {
@@ -97,12 +138,15 @@ write_text_file() {
 install_bootstrap_packages() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends "${apt_args[@]}" "${BOOTSTRAP_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${BOOTSTRAP_PACKAGES[@]}"
 }
 
 install_crowdsec_repository() {
+  local key_path="/tmp/crowdsec-packagecloud.key"
   run_cmd install -d -m 0755 /etc/apt/keyrings
-  run_cmd bash -lc 'curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error https://packagecloud.io/crowdsec/crowdsec/gpgkey | gpg --dearmor > /etc/apt/keyrings/crowdsec_crowdsec-archive-keyring.gpg'
+  download_as_security_user "https://packagecloud.io/crowdsec/crowdsec/gpgkey" "$key_path"
+  run_cmd bash -lc "gpg --dearmor < '$key_path' > '$CROWDSEC_KEYRING_PATH'"
+  run_cmd rm -f -- "$key_path"
   run_cmd chmod 0644 "$CROWDSEC_KEYRING_PATH"
   write_text_file "$CROWDSEC_LIST_PATH" $'deb [signed-by=/etc/apt/keyrings/crowdsec_crowdsec-archive-keyring.gpg] https://packagecloud.io/crowdsec/crowdsec/any any main\ndeb-src [signed-by=/etc/apt/keyrings/crowdsec_crowdsec-archive-keyring.gpg] https://packagecloud.io/crowdsec/crowdsec/any any main\n'
   write_text_file "$CROWDSEC_PREFS_PATH" $'Package: *\nPin: release o=packagecloud.io/crowdsec/crowdsec,a=any,n=any,c=main\nPin-Priority: 1001\n'
@@ -111,12 +155,12 @@ install_crowdsec_repository() {
 install_crowdsec_packages() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends "${apt_args[@]}" "${CROWDSEC_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${CROWDSEC_PACKAGES[@]}"
 }
 
 resolve_nftables_release() {
   local page
-  page="$(curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error https://www.nftables.org/projects/nftables/downloads.html)"
+  page="$(fetch_as_security_user "https://www.nftables.org/projects/nftables/downloads.html")"
   NFTABLES_TARBALL="$(printf '%s' "$page" | grep -o 'nftables-[0-9][0-9.]*\.tar\.xz' | head -n1)"
   [[ -n "${NFTABLES_TARBALL:-}" ]] || die "could not resolve latest nftables release"
   NFTABLES_VERSION="${NFTABLES_TARBALL#nftables-}"
@@ -127,7 +171,7 @@ resolve_nftables_release() {
 
 resolve_libmnl_release() {
   local page
-  page="$(curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error https://www.netfilter.org/projects/libmnl/downloads.html)"
+  page="$(fetch_as_security_user "https://www.netfilter.org/projects/libmnl/downloads.html")"
   LIBMNL_TARBALL="$(printf '%s' "$page" | grep -o 'libmnl-[0-9][0-9.]*\.tar\.bz2' | head -n1)"
   [[ -n "${LIBMNL_TARBALL:-}" ]] || die "could not resolve latest libmnl release"
   LIBMNL_VERSION="${LIBMNL_TARBALL#libmnl-}"
@@ -138,7 +182,7 @@ resolve_libmnl_release() {
 
 resolve_libnftnl_release() {
   local page
-  page="$(curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error https://www.netfilter.org/projects/libnftnl/downloads.html)"
+  page="$(fetch_as_security_user "https://www.netfilter.org/projects/libnftnl/downloads.html")"
   LIBNFTNL_TARBALL="$(printf '%s' "$page" | grep -o 'libnftnl-[0-9][0-9.]*\.tar\.xz' | head -n1)"
   [[ -n "${LIBNFTNL_TARBALL:-}" ]] || die "could not resolve latest libnftnl release"
   LIBNFTNL_VERSION="${LIBNFTNL_TARBALL#libnftnl-}"
@@ -149,7 +193,7 @@ resolve_libnftnl_release() {
 
 resolve_aide_release() {
   local json
-  json="$(curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error https://api.github.com/repos/aide/aide/releases/latest)"
+  json="$(fetch_as_security_user "https://api.github.com/repos/aide/aide/releases/latest")"
   AIDE_TAG="$(printf '%s' "$json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])')"
   [[ -n "${AIDE_TAG:-}" ]] || die "could not resolve latest AIDE release"
   AIDE_VERSION="${AIDE_TAG#v}"
@@ -160,7 +204,7 @@ resolve_aide_release() {
 
 resolve_crowdsec_release() {
   local json
-  json="$(curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error https://api.github.com/repos/crowdsecurity/crowdsec/releases/latest)"
+  json="$(fetch_as_security_user "https://api.github.com/repos/crowdsecurity/crowdsec/releases/latest")"
   CROWDSEC_TAG="$(printf '%s' "$json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])')"
   CROWDSEC_VERSION="${CROWDSEC_TAG#v}"
   export CROWDSEC_TAG CROWDSEC_VERSION
@@ -168,7 +212,7 @@ resolve_crowdsec_release() {
 
 resolve_crowdsec_bouncer_release() {
   local json
-  json="$(curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error https://api.github.com/repos/crowdsecurity/cs-firewall-bouncer/releases/latest)"
+  json="$(fetch_as_security_user "https://api.github.com/repos/crowdsecurity/cs-firewall-bouncer/releases/latest")"
   CROWDSEC_BOUNCER_TAG="$(printf '%s' "$json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])')"
   CROWDSEC_BOUNCER_VERSION="${CROWDSEC_BOUNCER_TAG#v}"
   export CROWDSEC_BOUNCER_TAG CROWDSEC_BOUNCER_VERSION
@@ -229,7 +273,8 @@ install_latest_libmnl() {
   source_dir="${tmpdir}/libmnl-${LIBMNL_VERSION}"
   stage_root="${tmpdir}/stage"
 
-  run_cmd curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 300 --silent --show-error -o "$archive_path" "$LIBMNL_URL"
+  run_cmd chown "$SECURITY_DOWNLOAD_USER:$SECURITY_DOWNLOAD_GROUP" "$tmpdir"
+  download_as_security_user "$LIBMNL_URL" "$archive_path"
   run_cmd tar -xjf "$archive_path" -C "$tmpdir"
   if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
     run_cmd bash -lc "cd '$source_dir' && ./configure --prefix=/usr/local"
@@ -257,7 +302,8 @@ install_latest_libnftnl() {
   source_dir="${tmpdir}/libnftnl-${LIBNFTNL_VERSION}"
   stage_root="${tmpdir}/stage"
 
-  run_cmd curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 300 --silent --show-error -o "$archive_path" "$LIBNFTNL_URL"
+  run_cmd chown "$SECURITY_DOWNLOAD_USER:$SECURITY_DOWNLOAD_GROUP" "$tmpdir"
+  download_as_security_user "$LIBNFTNL_URL" "$archive_path"
   run_cmd tar -xJf "$archive_path" -C "$tmpdir"
   if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
     run_cmd bash -lc "cd '$source_dir' && export PKG_CONFIG_PATH='$(netfilter_pkg_config_path)' && ./configure --prefix=/usr/local"
@@ -289,7 +335,8 @@ install_latest_nftables() {
   source_dir="${tmpdir}/nftables-${NFTABLES_VERSION}"
   stage_root="${tmpdir}/stage"
 
-  run_cmd curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 300 --silent --show-error -o "$archive_path" "$NFTABLES_URL"
+  run_cmd chown "$SECURITY_DOWNLOAD_USER:$SECURITY_DOWNLOAD_GROUP" "$tmpdir"
+  download_as_security_user "$NFTABLES_URL" "$archive_path"
   run_cmd tar -xJf "$archive_path" -C "$tmpdir"
   if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
     run_cmd bash -lc "cd '$source_dir' && export PKG_CONFIG_PATH='$(netfilter_pkg_config_path)' && ./configure --prefix=/usr/local"
@@ -319,7 +366,8 @@ install_latest_aide() {
   source_dir="${tmpdir}/aide-${AIDE_VERSION}"
   stage_root="${tmpdir}/stage"
 
-  run_cmd curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 300 --silent --show-error -o "$archive_path" "$AIDE_URL"
+  run_cmd chown "$SECURITY_DOWNLOAD_USER:$SECURITY_DOWNLOAD_GROUP" "$tmpdir"
+  download_as_security_user "$AIDE_URL" "$archive_path"
   run_cmd tar -xzf "$archive_path" -C "$tmpdir"
   if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
     run_cmd bash -lc "cd '$source_dir' && ./configure --prefix=/usr/local"
@@ -393,10 +441,10 @@ render_all_configs() {
 
   write_text_file "$AIDE_CONF_PATH" $'database_in=file:/var/lib/aide/aide.db.gz\ndatabase_out=file:/var/lib/aide/aide.db.new.gz\ngzip_dbout=yes\nreport_summarize_changes=yes\nreport_grouped=yes\nwarn_dead_symlinks=yes\n\nNORMAL = ftype+p+u+g+n+s+m+c+acl+xattrs+sha256\nDIR = ftype+p+u+g+n+acl+xattrs\n\n-/dev\n-/proc\n-/run\n-/sys\n-/tmp\n-/var/tmp\n-/var/cache\n-/var/spool\n-/var/log\n-/var/log/journal\n-/var/local\n-/var/swap\n-/data/workspace\n-/data/codex\n-/media\n-/mnt\n-/lost\\+found\n-/var/lib/aide\n-/var/lib/crowdsec\n-/var/lib/containerd\n-/var/lib/docker\n-/var/lib/containers\n-/var/lib/systemd/coredump\n\n/etc$ DIR\n/etc/ NORMAL\n/usr$ DIR\n/usr/ NORMAL\n/usr/local$ DIR\n/usr/local/ NORMAL\n/boot$ DIR\n/boot/ NORMAL\n/opt$ DIR\n/opt/ NORMAL\n/root$ DIR\n/root/ NORMAL\n/var/lib/systemd$ DIR\n/var/lib/systemd/ NORMAL\n/var/lib/dpkg$ DIR\n/var/lib/dpkg/ NORMAL\n'
 
-  write_text_file "$AIDE_CHECK_SERVICE_PATH" $'[Unit]\nDescription=05-security AIDE integrity check\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nType=oneshot\nExecStart=/usr/local/bin/aide --config=/etc/aide/aide.conf --check\nNice=19\nIOSchedulingClass=best-effort\nIOSchedulingPriority=7\n'
+  write_text_file "$AIDE_CHECK_SERVICE_PATH" $'[Unit]\nDescription=Debian Labwc security AIDE integrity check\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nType=oneshot\nExecStart=/usr/local/bin/aide --config=/etc/aide/aide.conf --check\nNice=19\nIOSchedulingClass=best-effort\nIOSchedulingPriority=7\n'
 
   write_text_file "$AIDE_CHECK_TIMER_PATH" "[Unit]
-Description=05-security AIDE scheduled integrity check
+Description=Debian Labwc security AIDE scheduled integrity check
 
 [Timer]
 OnCalendar=${AIDE_CHECK_ONCALENDAR}
@@ -459,7 +507,7 @@ initialize_aide_database() {
 
 enable_security_services() {
   run_cmd systemctl enable --now crowdsec-firewall-bouncer.service
-  run_cmd systemctl enable --now 05-security-aide-check.timer
+  run_cmd systemctl enable --now debian-labwc-security-aide-check.timer
 }
 
 command_is_available() {
@@ -518,11 +566,11 @@ verify_security_install() {
   systemctl is-enabled nftables.service >/dev/null 2>&1 || die "nftables.service is not enabled"
   systemctl is-enabled crowdsec.service >/dev/null 2>&1 || die "crowdsec.service is not enabled"
   systemctl is-enabled crowdsec-firewall-bouncer.service >/dev/null 2>&1 || die "crowdsec-firewall-bouncer.service is not enabled"
-  systemctl is-enabled 05-security-aide-check.timer >/dev/null 2>&1 || die "05-security-aide-check.timer is not enabled"
+  systemctl is-enabled debian-labwc-security-aide-check.timer >/dev/null 2>&1 || die "debian-labwc-security-aide-check.timer is not enabled"
 }
 
 remove_security_install() {
-  run_cmd systemctl disable --now 05-security-aide-check.timer >/dev/null 2>&1 || true
+  run_cmd systemctl disable --now debian-labwc-security-aide-check.timer >/dev/null 2>&1 || true
   run_cmd systemctl disable --now crowdsec-firewall-bouncer.service >/dev/null 2>&1 || true
   run_cmd systemctl disable --now crowdsec.service >/dev/null 2>&1 || true
   run_cmd systemctl disable --now nftables.service >/dev/null 2>&1 || true
@@ -544,7 +592,7 @@ remove_security_install() {
 
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt remove "${apt_args[@]}" crowdsec crowdsec-firewall-bouncer-nftables nftables || true
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" crowdsec crowdsec-firewall-bouncer-nftables nftables || true
   run_cmd ldconfig
   systemd_daemon_reload
 }

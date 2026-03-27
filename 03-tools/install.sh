@@ -57,6 +57,7 @@ phase_doctor() {
   require_command wget
   require_command gpg
   require_command dpkg-deb
+  require_command sudo
 }
 
 phase_install() {

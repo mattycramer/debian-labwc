@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-readonly NWG_DOCK_AUTOSTART_MARKER_BEGIN="# >>> MANAGED BY 06-nwg-dock >>>"
-readonly NWG_DOCK_AUTOSTART_MARKER_END="# <<< MANAGED BY 06-nwg-dock <<<"
-readonly NWG_DOCK_BUILD_ROOT="/usr/local/src/06-nwg-dock"
+readonly NWG_DOCK_AUTOSTART_MARKER_BEGIN="# >>> MANAGED BY debian-labwc nwg-dock >>>"
+readonly NWG_DOCK_AUTOSTART_MARKER_END="# <<< MANAGED BY debian-labwc nwg-dock <<<"
+readonly NWG_DOCK_BUILD_ROOT="/usr/local/src/nwg-dock"
 readonly NWG_DOCK_SOURCE_DIR="$NWG_DOCK_BUILD_ROOT/source"
 readonly NWG_DOCK_BUILD_DIR="$NWG_DOCK_BUILD_ROOT/build"
 readonly NWG_DOCK_BIN_PATH="/usr/bin/nwg-dock"
@@ -39,6 +39,8 @@ detect_target_user() {
   [[ -n "${NWG_TARGET_USER:-}" ]] || die "could not determine nwg-dock target user"
   NWG_TARGET_HOME="$(getent passwd "$NWG_TARGET_USER" | awk -F: '{print $6}')"
   [[ -n "${NWG_TARGET_HOME:-}" ]] || die "could not determine nwg-dock target home"
+  NWG_TARGET_GROUP="$(id -gn "$NWG_TARGET_USER")"
+  [[ -n "${NWG_TARGET_GROUP:-}" ]] || die "could not determine nwg-dock target group"
 }
 
 apt_update() {
@@ -73,18 +75,29 @@ write_user_file() {
   run_cmd rm -f -- "$temp_file"
 }
 
+prepare_nwg_download_path() {
+  local path="$1"
+  run_cmd install -d -m 0755 -o "$NWG_TARGET_USER" -g "$NWG_TARGET_GROUP" "$(dirname "$path")"
+  run_cmd rm -f -- "$path"
+  run_cmd touch "$path"
+  run_cmd chown "$NWG_TARGET_USER:$NWG_TARGET_GROUP" "$path"
+  run_cmd chmod 0644 "$path"
+}
+
 install_nwg_dock_from_source() {
   local archive_path
-  archive_path="$(mktemp --suffix=.tar.gz)"
+  archive_path="${NWG_DOCK_BUILD_ROOT}/nwg-dock.tar.gz"
   log_info "building nwg-dock from pinned source commit ${NWG_DOCK_COMMIT}"
   run_cmd install -d -m 0755 "$NWG_DOCK_BUILD_ROOT"
   run_cmd rm -rf -- "$NWG_DOCK_SOURCE_DIR" "$NWG_DOCK_BUILD_DIR"
-  run_cmd install -d -m 0755 "$NWG_DOCK_SOURCE_DIR" "$NWG_DOCK_BUILD_DIR"
-  run_cmd curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 180 --silent --show-error -o "$archive_path" "$NWG_DOCK_SOURCE_URL"
+  run_cmd install -d -m 0755 -o "$NWG_TARGET_USER" -g "$NWG_TARGET_GROUP" "$NWG_DOCK_SOURCE_DIR" "$NWG_DOCK_BUILD_DIR"
+  prepare_nwg_download_path "$archive_path"
+  run_cmd sudo -u "$NWG_TARGET_USER" env HOME="$NWG_TARGET_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 180 --silent --show-error -o "$archive_path" "$NWG_DOCK_SOURCE_URL"
   run_cmd tar -xzf "$archive_path" -C "$NWG_DOCK_SOURCE_DIR" --strip-components=1
   run_cmd rm -f -- "$archive_path"
-  run_cmd bash -lc "cd '$NWG_DOCK_SOURCE_DIR' && GOCACHE='$NWG_DOCK_BUILD_DIR/gocache' GOPATH='$NWG_DOCK_BUILD_DIR/gopath' go mod download"
-  run_cmd bash -lc "cd '$NWG_DOCK_SOURCE_DIR' && GOCACHE='$NWG_DOCK_BUILD_DIR/gocache' GOPATH='$NWG_DOCK_BUILD_DIR/gopath' go build -v -o '$NWG_DOCK_BUILD_DIR/nwg-dock' ."
+  run_cmd chown -R "$NWG_TARGET_USER:$NWG_TARGET_GROUP" "$NWG_DOCK_SOURCE_DIR" "$NWG_DOCK_BUILD_DIR"
+  run_cmd sudo -u "$NWG_TARGET_USER" env HOME="$NWG_TARGET_HOME" TMPDIR=/tmp bash -lc "cd '$NWG_DOCK_SOURCE_DIR' && GOCACHE='$NWG_DOCK_BUILD_DIR/gocache' GOPATH='$NWG_DOCK_BUILD_DIR/gopath' go mod download"
+  run_cmd sudo -u "$NWG_TARGET_USER" env HOME="$NWG_TARGET_HOME" TMPDIR=/tmp bash -lc "cd '$NWG_DOCK_SOURCE_DIR' && GOCACHE='$NWG_DOCK_BUILD_DIR/gocache' GOPATH='$NWG_DOCK_BUILD_DIR/gopath' go build -v -o '$NWG_DOCK_BUILD_DIR/nwg-dock' ."
   run_cmd install -D -m 0755 "$NWG_DOCK_BUILD_DIR/nwg-dock" "$NWG_DOCK_BIN_PATH"
   run_cmd rm -rf -- "$NWG_DOCK_DATA_PATH"
   run_cmd install -d -m 0755 "$NWG_DOCK_DATA_PATH"
@@ -126,7 +139,7 @@ set -Eeuo pipefail
 IFS=\$'\\n\\t'
 
 if [[ -z "\${SWAYSOCK:-}" ]]; then
-  printf '[06-nwg-dock] sway-compatible IPC is unavailable; upstream nwg-dock expects sway IPC and will not start under plain labwc.\\n' >&2
+  printf '[debian-labwc-nwg-dock] sway-compatible IPC is unavailable; upstream nwg-dock expects sway IPC and will not start under plain labwc.\\n' >&2
   exit 0
 fi
 

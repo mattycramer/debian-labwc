@@ -69,6 +69,8 @@ phase_doctor() {
   require_command sed
   require_command python3
   require_command install
+  require_command libtool
+  require_command sudo
   require_command systemctl
   require_command openssl
   require_command make
@@ -80,6 +82,7 @@ phase_install() {
   log_info "phase: install"
   phase_doctor
   load_env_file
+  detect_security_download_user
   apt_update
   install_bootstrap_packages
   install_crowdsec_repository
@@ -99,6 +102,7 @@ phase_verify() {
   log_info "phase: verify"
   phase_doctor
   load_env_file
+  detect_security_download_user
   verify_security_install
 }
 

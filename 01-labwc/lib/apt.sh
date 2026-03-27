@@ -106,7 +106,7 @@ apt_yes_args() {
 
 apt_update() {
   log_info "updating apt metadata"
-  retry_cmd 3 env DEBIAN_FRONTEND=noninteractive apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
+  retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
 resolved_requested_packages() {
@@ -128,7 +128,7 @@ install_requested_packages() {
     mapfile -O "${#graphics_package_list[@]}" -t graphics_package_list < <(printf '%s\n' "${INTEL_PACKAGES[@]}")
   fi
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${backports_package_list[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${backports_package_list[@]}"
   log_info "installing graphics package set"
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends "${apt_args[@]}" "${graphics_package_list[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${graphics_package_list[@]}"
 }

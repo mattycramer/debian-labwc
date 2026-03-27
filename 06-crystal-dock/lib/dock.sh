@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 
-readonly CRYSTAL_DOCK_AUTOSTART_MARKER_BEGIN="# >>> MANAGED BY 06-crystal-dock >>>"
-readonly CRYSTAL_DOCK_AUTOSTART_MARKER_END="# <<< MANAGED BY 06-crystal-dock <<<"
+readonly CRYSTAL_DOCK_AUTOSTART_MARKER_BEGIN="# >>> MANAGED BY debian-labwc crystal-dock >>>"
+readonly CRYSTAL_DOCK_AUTOSTART_MARKER_END="# <<< MANAGED BY debian-labwc crystal-dock <<<"
 readonly CRYSTAL_DOCK_WRAPPER_PATH="/usr/local/bin/debian-labwc-crystal-dock"
 readonly CRYSTAL_DOCK_BIN_PATH="/usr/bin/crystal-dock"
 readonly CRYSTAL_DOCK_DESKTOP_PATH="/usr/share/applications/crystal-dock.desktop"
+readonly CRYSTAL_DOCK_DOWNLOAD_DIR="/tmp/crystal-dock"
 readonly CRYSTAL_DOCK_SID_SUITE="sid"
 readonly CRYSTAL_DOCK_SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
 readonly CRYSTAL_DOCK_SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
@@ -46,7 +47,7 @@ detect_target_user() {
 }
 
 apt_update() {
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
 install_crystal_dock_dependencies() {
@@ -54,22 +55,29 @@ install_crystal_dock_dependencies() {
   mapfile -t apt_args < <(apt_yes_args)
   [[ -f "$CRYSTAL_DOCK_SID_SOURCE_PATH" ]] || die "missing sid source file: $CRYSTAL_DOCK_SID_SOURCE_PATH (run 04-dev first)"
   [[ -f "$CRYSTAL_DOCK_SID_PREFERENCES_PATH" ]] || die "missing sid preferences file: $CRYSTAL_DOCK_SID_PREFERENCES_PATH (run 04-dev first)"
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt -t "$CRYSTAL_DOCK_SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_BOOTSTRAP_PACKAGES[@]}"
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt -t "$CRYSTAL_DOCK_SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_RUNTIME_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$CRYSTAL_DOCK_SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_BOOTSTRAP_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$CRYSTAL_DOCK_SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_RUNTIME_PACKAGES[@]}"
 }
 
 install_crystal_dock_package() {
   local -a apt_args=()
-  local deb_path
+  local deb_name deb_path tmp_path
   mapfile -t apt_args < <(apt_yes_args)
-  deb_path="$(mktemp --suffix=.deb)"
+  deb_name="${CRYSTAL_DOCK_DEB_URL##*/}"
+  deb_path="${CRYSTAL_DOCK_DOWNLOAD_DIR}/${deb_name}"
+  tmp_path="${deb_path}.part"
   log_info "installing Crystal Dock ${CRYSTAL_DOCK_VERSION} from pinned .deb release"
-  run_cmd curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 180 --silent --show-error -o "$deb_path" "$CRYSTAL_DOCK_DEB_URL"
+  run_cmd install -d -m 0755 -o "$DOCK_TARGET_USER" -g "$DOCK_TARGET_USER" "$CRYSTAL_DOCK_DOWNLOAD_DIR"
+  run_cmd rm -f -- "$deb_path" "$tmp_path"
+  run_cmd sudo -u "$DOCK_TARGET_USER" env TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 180 --silent --show-error -o "$tmp_path" "$CRYSTAL_DOCK_DEB_URL"
+  run_cmd mv -- "$tmp_path" "$deb_path"
+  run_cmd chown "$DOCK_TARGET_USER:$DOCK_TARGET_USER" "$deb_path"
+  run_cmd chmod 0644 "$deb_path"
   if [[ "${DRY_RUN:-0}" -eq 0 ]]; then
     printf '%s  %s\n' "$CRYSTAL_DOCK_DEB_SHA256" "$deb_path" | sha256sum --check --status || die "Crystal Dock deb sha256 mismatch"
     [[ "$(dpkg-deb -f "$deb_path" Package 2>/dev/null)" == "crystal-dock" ]] || die "downloaded package is not crystal-dock"
   fi
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends "${apt_args[@]}" "$deb_path"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$CRYSTAL_DOCK_SID_SUITE" install --no-install-recommends "${apt_args[@]}" "$deb_path"
   run_cmd rm -f -- "$deb_path"
 }
 
@@ -253,7 +261,7 @@ verify_crystal_dock_install() {
 remove_crystal_dock_install() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt remove "${apt_args[@]}" crystal-dock || true
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" crystal-dock || true
   run_cmd rm -f -- "$CRYSTAL_DOCK_WRAPPER_PATH"
   run_cmd rm -rf -- "$DOCK_TARGET_HOME/.config/crystal-dock"
   run_cmd rm -f -- "$DOCK_TARGET_HOME/.config/labwc/autostart.d/50-crystal-dock.sh"

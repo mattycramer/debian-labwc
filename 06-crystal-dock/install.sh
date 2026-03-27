@@ -69,6 +69,7 @@ phase_doctor() {
   require_command sha256sum
   require_command sed
   require_command dpkg-deb
+  require_command sudo
 }
 
 phase_install() {

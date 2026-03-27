@@ -42,16 +42,18 @@ detect_tools_target_user() {
   [[ -n "$TOOLS_TARGET_USER" ]] || die "could not determine tools target user"
   TOOLS_TARGET_HOME="$(getent passwd "$TOOLS_TARGET_USER" | awk -F: '{print $6}')"
   [[ -n "$TOOLS_TARGET_HOME" ]] || die "could not determine tools target home"
+  TOOLS_TARGET_GROUP="$(id -gn "$TOOLS_TARGET_USER")"
+  [[ -n "$TOOLS_TARGET_GROUP" ]] || die "could not determine tools target group"
 }
 
 apt_update() {
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
 install_repo_bootstrap() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends "${apt_args[@]}" "${NORMAL_BOOTSTRAP_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${NORMAL_BOOTSTRAP_PACKAGES[@]}"
 }
 
 write_text_file() {
@@ -64,27 +66,55 @@ write_text_file() {
   rm -f -- "$temp_file"
 }
 
+prepare_tools_download_path() {
+  local path="$1"
+  run_cmd install -d -m 0755 -o "$TOOLS_TARGET_USER" -g "$TOOLS_TARGET_GROUP" "$(dirname "$path")"
+  run_cmd rm -f -- "$path"
+  run_cmd touch "$path"
+  run_cmd chown "$TOOLS_TARGET_USER:$TOOLS_TARGET_GROUP" "$path"
+  run_cmd chmod 0644 "$path"
+}
+
+download_as_tools_user() {
+  local url="$1"
+  local path="$2"
+  prepare_tools_download_path "$path"
+  run_cmd sudo -u "$TOOLS_TARGET_USER" env HOME="$TOOLS_TARGET_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 180 --silent --show-error -o "$path" "$url"
+  run_cmd chmod 0644 "$path"
+}
+
+fetch_as_tools_user() {
+  local url="$1"
+  sudo -u "$TOOLS_TARGET_USER" env HOME="$TOOLS_TARGET_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error "$url"
+}
+
 install_repository_files() {
-  run_cmd bash -lc 'wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /tmp/microsoft.gpg'
-  run_cmd install -D -o root -g root -m 0644 /tmp/microsoft.gpg /usr/share/keyrings/microsoft.gpg
-  run_cmd rm -f /tmp/microsoft.gpg
+  local microsoft_key_asc="/tmp/microsoft-packages.asc"
+  local microsoft_key_gpg="/tmp/microsoft-packages.gpg"
+  download_as_tools_user "https://packages.microsoft.com/keys/microsoft.asc" "$microsoft_key_asc"
+  run_cmd bash -lc "gpg --dearmor < '$microsoft_key_asc' > '$microsoft_key_gpg'"
+  run_cmd install -D -o root -g root -m 0644 "$microsoft_key_gpg" /usr/share/keyrings/microsoft.gpg
+  run_cmd rm -f -- "$microsoft_key_asc" "$microsoft_key_gpg"
   write_text_file "/etc/apt/sources.list.d/vscode.sources" $'Types: deb\nURIs: https://packages.microsoft.com/repos/code\nSuites: stable\nComponents: main\nArchitectures: amd64\nSigned-By: /usr/share/keyrings/microsoft.gpg\n'
   run_cmd rm -f /etc/apt/sources.list.d/thorium.sources /etc/apt/sources.list.d/thorium.list
 
-  run_cmd curl -fsSLo /usr/share/keyrings/mullvad-keyring.asc https://repository.mullvad.net/deb/mullvad-keyring.asc
+  local mullvad_key="/tmp/mullvad-keyring.asc"
+  download_as_tools_user "https://repository.mullvad.net/deb/mullvad-keyring.asc" "$mullvad_key"
+  run_cmd install -D -o root -g root -m 0644 "$mullvad_key" /usr/share/keyrings/mullvad-keyring.asc
+  run_cmd rm -f -- "$mullvad_key"
   write_text_file "/etc/apt/sources.list.d/mullvad.sources" $'Types: deb\nURIs: https://repository.mullvad.net/deb/stable\nSuites: stable\nComponents: main\nArchitectures: amd64\nSigned-By: /usr/share/keyrings/mullvad-keyring.asc\n'
 }
 
 install_normal_tools() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}"
 }
 
 install_backports_tools() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt -t trixie-backports install --no-install-recommends "${apt_args[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t trixie-backports install --no-install-recommends "${apt_args[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}"
 }
 
 install_deb_url() {
@@ -94,18 +124,18 @@ install_deb_url() {
   [[ -n "$url" ]] || die "missing deb download url"
   [[ "$output_path" == *.deb ]] || die "deb output path must end in .deb: $output_path"
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 180 --silent --show-error -o "$output_path" "$url"
+  download_as_tools_user "$url" "$output_path"
   if [[ "${DRY_RUN:-0}" -eq 0 ]]; then
     dpkg-deb -f "$output_path" Package >/dev/null 2>&1 || die "downloaded file is not a valid Debian package: $output_path"
   fi
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt install "${apt_args[@]}" "$output_path"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install "${apt_args[@]}" "$output_path"
   run_cmd rm -f "$output_path"
 }
 
 resolve_latest_thorium_url() {
   local index_html
   local latest_deb
-  index_html="$(curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error "$THORIUM_INDEX_URL")"
+  index_html="$(fetch_as_tools_user "$THORIUM_INDEX_URL")"
   latest_deb="$(
     printf '%s' "$index_html" \
       | grep -o 'thorium-browser_[0-9][0-9A-Za-z.+:~-]*_amd64\.deb' \
@@ -164,7 +194,7 @@ verify_tools_install() {
 remove_tools_install() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}" thorium-browser bitwarden obsidian filen || true
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}" thorium-browser bitwarden obsidian filen || true
   run_cmd rm -f /etc/apt/sources.list.d/vscode.sources /etc/apt/sources.list.d/thorium.sources /etc/apt/sources.list.d/thorium.list /etc/apt/sources.list.d/mullvad.sources
   run_cmd rm -f /usr/share/keyrings/microsoft.gpg /usr/share/keyrings/mullvad-keyring.asc
   run_cmd rm -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf"

@@ -23,6 +23,25 @@ readonly DEV_PACKAGES=(
 
 readonly SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
 readonly SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
+readonly DEBIAN_ARCHIVE_KEYRING_PATH="/usr/share/keyrings/debian-archive-keyring.gpg"
+
+detect_dev_download_user() {
+  if [[ -n "${DEV_DOWNLOAD_USER:-}" ]] && id "$DEV_DOWNLOAD_USER" >/dev/null 2>&1; then
+    :
+  elif [[ -n "${SUDO_USER:-}" ]] && [[ "${SUDO_USER:-}" != "root" ]] && id "${SUDO_USER:-}" >/dev/null 2>&1; then
+    DEV_DOWNLOAD_USER="$SUDO_USER"
+  elif getent passwd _apt >/dev/null 2>&1; then
+    DEV_DOWNLOAD_USER="_apt"
+  elif getent passwd nobody >/dev/null 2>&1; then
+    DEV_DOWNLOAD_USER="nobody"
+  else
+    DEV_DOWNLOAD_USER="$(getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $7 !~ /(false|nologin)$/ {print $1; exit}')"
+  fi
+  [[ -n "${DEV_DOWNLOAD_USER:-}" ]] || die "could not determine dev download user"
+  DEV_DOWNLOAD_GROUP="$(id -gn "$DEV_DOWNLOAD_USER")"
+  DEV_DOWNLOAD_HOME="$(getent passwd "$DEV_DOWNLOAD_USER" | awk -F: '{print $6}')"
+  [[ -n "${DEV_DOWNLOAD_HOME:-}" ]] || DEV_DOWNLOAD_HOME="/tmp"
+}
 
 retry_cmd() {
   local attempts="$1"
@@ -47,7 +66,7 @@ apt_yes_args() {
 }
 
 apt_update() {
-  retry_cmd 3 env DEBIAN_FRONTEND=noninteractive apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
+  retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
 write_text_file() {
@@ -60,28 +79,47 @@ write_text_file() {
   run_cmd rm -f -- "$temp_file"
 }
 
+prepare_dev_download_path() {
+  local path="$1"
+  run_cmd install -d -m 0755 -o "$DEV_DOWNLOAD_USER" -g "$DEV_DOWNLOAD_GROUP" "$(dirname "$path")"
+  run_cmd rm -f -- "$path"
+  run_cmd touch "$path"
+  run_cmd chown "$DEV_DOWNLOAD_USER:$DEV_DOWNLOAD_GROUP" "$path"
+  run_cmd chmod 0644 "$path"
+}
+
+download_as_dev_user() {
+  local url="$1"
+  local path="$2"
+  prepare_dev_download_path "$path"
+  run_cmd sudo -u "$DEV_DOWNLOAD_USER" env HOME="$DEV_DOWNLOAD_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 300 --silent --show-error -o "$path" "$url"
+  run_cmd chmod 0644 "$path"
+}
+
 install_bootstrap_packages() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends "${apt_args[@]}" "${BOOTSTRAP_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${BOOTSTRAP_PACKAGES[@]}"
 }
 
 install_sid_repository() {
-  write_text_file "$SID_SOURCE_PATH" $'Types: deb\nURIs: http://ftp.dk.debian.org/debian\nSuites: sid\nComponents: main\nArchitectures: amd64\n'
+  [[ -f "$DEBIAN_ARCHIVE_KEYRING_PATH" ]] || die "missing Debian archive keyring: $DEBIAN_ARCHIVE_KEYRING_PATH"
+  write_text_file "$SID_SOURCE_PATH" $'Types: deb\nURIs: http://ftp.dk.debian.org/debian\nSuites: sid\nComponents: main\nArchitectures: amd64\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg\n'
   write_text_file "$SID_PREFERENCES_PATH" $'Package: *\nPin: release n=sid\nPin-Priority: 100\n'
 }
 
 install_dev_packages() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends "${apt_args[@]}" "${DEV_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${DEV_PACKAGES[@]}"
 }
 
 resolve_node_release() {
   local shasums_url="${NODE_DIST_BASE}/SHASUMS256.txt"
   local shasums_file
   shasums_file="$(mktemp)"
-  curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error -o "$shasums_file" "$shasums_url"
+  run_cmd chown "$DEV_DOWNLOAD_USER:$DEV_DOWNLOAD_GROUP" "$shasums_file"
+  run_cmd sudo -u "$DEV_DOWNLOAD_USER" env HOME="$DEV_DOWNLOAD_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error -o "$shasums_file" "$shasums_url"
   local line
   line="$(awk '/ node-v[0-9]+\.[0-9]+\.[0-9]+-linux-x64\.tar\.xz$/ {print $1, $2; exit}' "$shasums_file")"
   rm -f -- "$shasums_file"
@@ -108,7 +146,8 @@ install_node_runtime() {
   if [[ ! -x "$install_dir/bin/node" ]]; then
     tmpdir="$(mktemp -d)"
     tarball_path="${tmpdir}/${NODE_TARBALL}"
-    run_cmd curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 300 --silent --show-error -o "$tarball_path" "${NODE_DIST_BASE}/${NODE_TARBALL}"
+    run_cmd chown "$DEV_DOWNLOAD_USER:$DEV_DOWNLOAD_GROUP" "$tmpdir"
+    download_as_dev_user "${NODE_DIST_BASE}/${NODE_TARBALL}" "$tarball_path"
     if [[ "${DRY_RUN:-0}" -eq 0 ]]; then
       local actual_sha
       actual_sha="$(sha256sum "$tarball_path" | awk '{print $1}')"
@@ -126,7 +165,9 @@ install_node_runtime() {
   run_cmd ln -sfn "${current_link}/bin/npx" /usr/local/bin/npx
   run_cmd rm -f "${current_link}/bin/pnpm" "${current_link}/bin/pnpx"
   run_cmd rm -rf "${current_link}/lib/node_modules/pnpm"
-  run_cmd "${current_link}/bin/npm" --prefix "$current_link" install --global --force "$PNPM_NPM_SPEC"
+  run_cmd chown -R "$DEV_DOWNLOAD_USER:$DEV_DOWNLOAD_GROUP" "$install_dir"
+  run_cmd sudo -u "$DEV_DOWNLOAD_USER" env HOME="$DEV_DOWNLOAD_HOME" TMPDIR=/tmp "${current_link}/bin/npm" --prefix "$current_link" install --global --force "$PNPM_NPM_SPEC"
+  run_cmd chown -R root:root "$install_dir"
   run_cmd ln -sfn "${current_link}/bin/pnpm" /usr/local/bin/pnpm
   run_cmd ln -sfn "${current_link}/bin/pnpx" /usr/local/bin/pnpx
 }
@@ -163,6 +204,7 @@ verify_dev_install() {
   [[ -f "$SID_PREFERENCES_PATH" ]] || die "missing sid preferences file"
   grep -F 'URIs: http://ftp.dk.debian.org/debian' "$SID_SOURCE_PATH" >/dev/null || die "sid source file missing ftp.dk.debian.org/debian"
   grep -F 'Suites: sid' "$SID_SOURCE_PATH" >/dev/null || die "sid source file missing sid suite"
+  grep -F 'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg' "$SID_SOURCE_PATH" >/dev/null || die "sid source file missing Signed-By"
   grep -F 'Pin-Priority: 100' "$SID_PREFERENCES_PATH" >/dev/null || die "sid preferences missing pin priority 100"
   verify_node_runtime
 }
@@ -177,7 +219,7 @@ remove_managed_link() {
 remove_dev_install() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt remove "${apt_args[@]}" "${DEV_PACKAGES[@]}" || true
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" "${DEV_PACKAGES[@]}" || true
   run_cmd rm -f -- "$SID_SOURCE_PATH" "$SID_PREFERENCES_PATH"
   remove_managed_link /usr/local/bin/node
   remove_managed_link /usr/local/bin/npm

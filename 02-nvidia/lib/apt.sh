@@ -18,7 +18,7 @@ apt_yes_args() {
 
 apt_update() {
   log_info "updating apt metadata"
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
 install_nvidia_packages() {
@@ -26,7 +26,7 @@ install_nvidia_packages() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
   log_info "installing NVIDIA packages"
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends "${apt_args[@]}" "${NVIDIA_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${NVIDIA_PACKAGES[@]}"
 }
 
 verify_nvidia_install() {
@@ -42,5 +42,5 @@ remove_nvidia_packages() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
   log_info "removing NVIDIA packages"
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt remove "${apt_args[@]}" "${NVIDIA_PACKAGES[@]}" || true
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" "${NVIDIA_PACKAGES[@]}" || true
 }

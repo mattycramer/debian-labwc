@@ -6,17 +6,21 @@ ensure_greeter_user() {
   fi
   run_cmd useradd \
     --system \
-    --home-dir /var/cache/tuigreet \
+    --home-dir /var/lib/greetd/greeter \
     --no-create-home \
     --shell /usr/sbin/nologin \
     greeter
 }
 
 ensure_greeter_runtime_dirs() {
-  run_cmd install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet
-  run_cmd install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet/.cache
-  run_cmd install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet/.local
-  run_cmd install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet/.local/state
+  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter
+  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.cache
+  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.config
+  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.config/autostart
+  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.local
+  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.local/state
+  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.local/share
+  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.local/share/flatpak/db
 }
 
 validate_greetd_settings() {
@@ -187,7 +191,7 @@ nuke_all_state() {
   systemctl set-default multi-user.target >/dev/null 2>&1 || true
 
   log_info "removing tuigreet cache and greeter user"
-  remove_if_present "/var/cache/tuigreet"
+  remove_if_present "/var/lib/greetd/greeter"
   if getent passwd greeter >/dev/null 2>&1; then
     userdel greeter >/dev/null 2>&1 || true
   fi
