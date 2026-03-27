@@ -23,7 +23,7 @@ strip_findmnt_fsroot() {
 }
 
 detect_btrfs_layout() {
-  local root_source_raw root_source_raw_fs root_source uuid device mountpoint partition root_options_raw root_flags opt
+  local root_source_raw root_source_raw_fs root_source uuid device mountpoint partition root_options_raw root_flags opt cmdline_raw cmdline_filtered arg
   local -a devices=()
   local -a mountpoints=()
   local -a partitions=()
@@ -81,9 +81,24 @@ detect_btrfs_layout() {
   done
   [[ -n "$root_flags" ]] || die "could not derive Btrfs rootflags from '$root_options_raw'"
 
+  cmdline_raw="$(cat /proc/cmdline 2>/dev/null || true)"
+  [[ -n "$cmdline_raw" ]] || die "could not read /proc/cmdline"
+  cmdline_filtered=""
+  for arg in $cmdline_raw; do
+    case "$arg" in
+      BOOT_IMAGE=*|root=*|rootfstype=*|rootflags=*|ro|rw|initrd=*) continue ;;
+    esac
+    if [[ -n "$cmdline_filtered" ]]; then
+      cmdline_filtered+=" ${arg}"
+    else
+      cmdline_filtered="${arg}"
+    fi
+  done
+
   MAINTENANCE_ROOT_BTRFS_SOURCE="$root_source"
   MAINTENANCE_ROOT_BTRFS_UUID="$uuid"
   MAINTENANCE_ROOT_BTRFS_KERNEL_FLAGS="rootfstype=btrfs rootflags=${root_flags}"
+  MAINTENANCE_CURRENT_KERNEL_PARAMETERS="$cmdline_filtered"
   MAINTENANCE_BTRFS_PARTITION_LIST="$(IFS=:; printf '%s' "${partitions[*]}")"
   MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST="$(IFS=:; printf '%s' "${unmounted_partitions[*]}")"
   MAINTENANCE_BTRFS_PARTITION_COUNT="${#partitions[@]}"
@@ -105,6 +120,7 @@ MAINTENANCE_TARGET_HOME="$MAINTENANCE_TARGET_HOME"
 MAINTENANCE_ROOT_BTRFS_SOURCE="$MAINTENANCE_ROOT_BTRFS_SOURCE"
 MAINTENANCE_ROOT_BTRFS_UUID="$MAINTENANCE_ROOT_BTRFS_UUID"
 MAINTENANCE_ROOT_BTRFS_KERNEL_FLAGS="$MAINTENANCE_ROOT_BTRFS_KERNEL_FLAGS"
+MAINTENANCE_CURRENT_KERNEL_PARAMETERS="$MAINTENANCE_CURRENT_KERNEL_PARAMETERS"
 MAINTENANCE_BTRFS_PARTITION_LIST="$MAINTENANCE_BTRFS_PARTITION_LIST"
 MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST="$MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST"
 MAINTENANCE_BTRFS_PARTITION_COUNT="$MAINTENANCE_BTRFS_PARTITION_COUNT"
