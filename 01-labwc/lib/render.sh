@@ -309,6 +309,13 @@ pgrep -x swayidle >/dev/null 2>&1 || swayidle \
 if [[ ! -f "$LABWC_TARGET_HOME/.config/debian-labwc/.outputs-refined" ]]; then
   /usr/local/bin/debian-labwc-refresh-outputs >/dev/null 2>&1 &
 fi
+
+autostart_dir="$LABWC_TARGET_HOME/.config/labwc/autostart.d"
+if [[ -d "$autostart_dir" ]]; then
+  while IFS= read -r -d '' autostart_fragment; do
+    bash "$autostart_fragment" >/dev/null 2>&1 || true
+  done < <(find "$autostart_dir" -maxdepth 1 -type f -name '*.sh' -print0 | sort -z)
+fi
 EOF
 )"
   render_user_script "$LABWC_TARGET_HOME/.config/labwc/autostart" "$autostart"

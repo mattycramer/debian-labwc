@@ -114,6 +114,7 @@ main() {
   repair_target_home
   log "next:"
   log "  cd '$REPO_ROOT/01-labwc' && make install"
+  log "  cd '$REPO_ROOT/06-dock' && make install    # optional, Crystal Dock for Labwc"
   log "  cd '$REPO_ROOT/02-nvidia' && make install   # optional, NVIDIA hosts only"
   log "  cd '$REPO_ROOT/03-tools' && make install"
   log "  cd '$REPO_ROOT/04-dev' && make install"
