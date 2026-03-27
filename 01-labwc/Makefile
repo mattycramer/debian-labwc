@@ -1,4 +1,5 @@
 SHELL := /usr/bin/env bash
+RUN_INSTALL = if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh; else sudo bash ./install.sh; fi
 
 .PHONY: help doctor detect install render enable verify reconfigure print-env nuke
 
@@ -17,31 +18,31 @@ help:
 	  '  nuke        Remove generated state and disable installed wiring'
 
 doctor:
-	./install.sh --phase doctor
+	@$(RUN_INSTALL) --phase doctor
 
 detect:
-	./install.sh --phase detect
+	@$(RUN_INSTALL) --phase detect
 
 install:
-	./install.sh --phase all
+	@$(RUN_INSTALL) --phase all
 
 render:
-	./install.sh --phase render
+	@$(RUN_INSTALL) --phase render
 
 enable:
-	./install.sh --phase enable
+	@$(RUN_INSTALL) --phase enable
 
 verify:
-	./install.sh --phase verify
+	@$(RUN_INSTALL) --phase verify
 
 reconfigure:
-	./install.sh --phase detect
-	./install.sh --phase render
-	./install.sh --phase enable
-	./install.sh --phase verify
+	@$(RUN_INSTALL) --phase detect
+	@$(RUN_INSTALL) --phase render
+	@$(RUN_INSTALL) --phase enable
+	@$(RUN_INSTALL) --phase verify
 
 print-env:
-	./install.sh --phase print-env
+	@$(RUN_INSTALL) --phase print-env
 
 nuke:
-	./install.sh --phase nuke
+	@$(RUN_INSTALL) --phase nuke

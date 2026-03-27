@@ -13,12 +13,24 @@ readonly BOOTSTRAP_PACKAGES=(
   grep
   sed
   gawk
+  sudo
   findutils
   coreutils
   util-linux
   procps
   pciutils
 )
+
+detect_target_user() {
+  if [[ -n "${SUDO_USER:-}" && "${SUDO_USER:-}" != "root" ]] && id "${SUDO_USER:-}" >/dev/null 2>&1; then
+    TARGET_USER="$SUDO_USER"
+  else
+    TARGET_USER="$(getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $7 !~ /(false|nologin)$/ {print $1; exit}')"
+  fi
+  [[ -n "${TARGET_USER:-}" ]] || die "could not determine target user"
+  TARGET_HOME="$(getent passwd "$TARGET_USER" | awk -F: '{print $6}')"
+  [[ -n "${TARGET_HOME:-}" ]] || die "could not determine target user home"
+}
 
 log() {
   printf '[runme] %s\n' "$*"
@@ -75,12 +87,31 @@ install_bootstrap() {
   env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y "${BOOTSTRAP_PACKAGES[@]}"
 }
 
+repair_target_home() {
+  log "repairing target home ownership and base directories"
+  install -d -m 0755 -o "$TARGET_USER" -g "$TARGET_USER" \
+    "$TARGET_HOME" \
+    "$TARGET_HOME/.config" \
+    "$TARGET_HOME/.cache" \
+    "$TARGET_HOME/.local" \
+    "$TARGET_HOME/.local/bin" \
+    "$TARGET_HOME/.local/share"
+  chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME"
+  chmod 0755 "$TARGET_HOME"
+  chown -R "$TARGET_USER:$TARGET_USER" \
+    "$TARGET_HOME/.config" \
+    "$TARGET_HOME/.cache" \
+    "$TARGET_HOME/.local"
+}
+
 main() {
   require_root
   require_trixie
   require_amd64
+  detect_target_user
   apt_update
   install_bootstrap
+  repair_target_home
   log "next: cd '$REPO_ROOT/01-labwc' && make install"
 }
 

@@ -103,6 +103,10 @@ install_deb_tools() {
 }
 
 render_mpv_config() {
+  install -d -m 0755 -o "$TOOLS_TARGET_USER" -g "$TOOLS_TARGET_USER" \
+    "$TOOLS_TARGET_HOME/.config" \
+    "$TOOLS_TARGET_HOME/.local"
+  chown -R "$TOOLS_TARGET_USER:$TOOLS_TARGET_USER" "$TOOLS_TARGET_HOME/.config" "$TOOLS_TARGET_HOME/.local"
   local config_dir="$TOOLS_TARGET_HOME/.config/mpv"
   install -d -m 0755 -o "$TOOLS_TARGET_USER" -g "$TOOLS_TARGET_USER" "$config_dir"
   printf '%s\n' 'vo=gpu' 'gpu-api=opengl' 'hwdec=auto-safe' > /tmp/mpv.conf.codex
@@ -114,17 +118,23 @@ package_is_installed() {
   dpkg-query -W -f='${Status}\n' "$1" 2>/dev/null | grep -F "install ok installed" >/dev/null
 }
 
+package_pattern_installed() {
+  local pattern="$1"
+  dpkg-query -W 2>/dev/null | awk '{print $1}' | grep -Ei "$pattern" >/dev/null
+}
+
 verify_tools_install() {
   local pkg
   for pkg in "${NORMAL_TOOLS_PACKAGES[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}"; do
     package_is_installed "$pkg" || die "package '$pkg' is not installed"
   done
-  package_is_installed obsidian || die "package 'obsidian' is not installed"
-  package_is_installed filen || die "package 'filen' is not installed"
+  package_pattern_installed '^obsidian($|[-])' || die "obsidian package is not installed"
+  package_pattern_installed 'filen' || die "filen package is not installed"
   [[ -f "/etc/apt/sources.list.d/vscode.sources" ]] || die "missing vscode.sources"
   [[ -f "/etc/apt/sources.list.d/thorium.sources" ]] || die "missing thorium.sources"
   [[ -f "/etc/apt/sources.list.d/mullvad.sources" ]] || die "missing mullvad.sources"
   [[ -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf" ]] || die "missing mpv.conf"
+  [[ "$(stat -c '%U:%G' "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf")" == "$TOOLS_TARGET_USER:$TOOLS_TARGET_USER" ]] || die "mpv.conf ownership is wrong"
 }
 
 remove_tools_install() {

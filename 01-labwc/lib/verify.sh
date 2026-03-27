@@ -72,8 +72,12 @@ verify_labwc_config_semantics() {
 }
 
 verify_shell_config_semantics() {
+  grep -F 'umask 022' "$LABWC_TARGET_HOME/.bashrc" >/dev/null || die ".bashrc missing umask"
+  grep -F "/data/usr/local/bin:/usr/local/bin:\$HOME/.local/bin:\$PATH" "$LABWC_TARGET_HOME/.bashrc" >/dev/null || die ".bashrc missing PATH additions"
   grep -F 'bash_completion' "$LABWC_TARGET_HOME/.bashrc" >/dev/null || die ".bashrc missing bash completion setup"
   grep -F 'starship init bash' "$LABWC_TARGET_HOME/.bashrc" >/dev/null || die ".bashrc missing starship init"
+  grep -F 'umask 022' "$LABWC_TARGET_HOME/.zshrc" >/dev/null || die ".zshrc missing umask"
+  grep -F "/data/usr/local/bin:/usr/local/bin:\$HOME/.local/bin:\$PATH" "$LABWC_TARGET_HOME/.zshrc" >/dev/null || die ".zshrc missing PATH additions"
   grep -F 'compinit' "$LABWC_TARGET_HOME/.zshrc" >/dev/null || die ".zshrc missing compinit"
   grep -F 'zsh-autosuggestions' "$LABWC_TARGET_HOME/.zshrc" >/dev/null || die ".zshrc missing zsh-autosuggestions setup"
   grep -F 'starship init zsh' "$LABWC_TARGET_HOME/.zshrc" >/dev/null || die ".zshrc missing starship init"

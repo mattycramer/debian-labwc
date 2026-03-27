@@ -57,6 +57,9 @@ render_shell_startup_files() {
   local bashrc profile zshrc zprofile starship
   bashrc="$(cat <<'EOF'
 # Managed by debian-labwc
+umask 022
+export PATH="/data/usr/local/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+
 if [[ -f /etc/bash_completion ]]; then
   # shellcheck disable=SC1091
   source /etc/bash_completion
@@ -72,6 +75,9 @@ EOF
 )"
   profile="$(cat <<'EOF'
 # Managed by debian-labwc
+umask 022
+export PATH="/data/usr/local/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+
 if [[ -f "$HOME/.bashrc" ]]; then
   # shellcheck disable=SC1090
   source "$HOME/.bashrc"
@@ -80,6 +86,9 @@ EOF
 )"
   zshrc="$(cat <<'EOF'
 # Managed by debian-labwc
+umask 022
+export PATH="/data/usr/local/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+
 autoload -Uz compinit
 compinit
 
@@ -94,6 +103,9 @@ EOF
 )"
   zprofile="$(cat <<'EOF'
 # Managed by debian-labwc
+umask 022
+export PATH="/data/usr/local/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+
 if [[ -f "$HOME/.profile" ]]; then
   source "$HOME/.profile"
 fi

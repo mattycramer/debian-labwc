@@ -1,4 +1,5 @@
 SHELL := /usr/bin/env bash
+RUN_INSTALL = if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh; else sudo bash ./install.sh; fi
 
 .PHONY: help doctor install verify nuke
 
@@ -12,13 +13,13 @@ help:
 	  '  nuke    Remove installed tooling and repo files'
 
 doctor:
-	./install.sh --phase doctor
+	@$(RUN_INSTALL) --phase doctor
 
 install:
-	./install.sh --phase all
+	@$(RUN_INSTALL) --phase all
 
 verify:
-	./install.sh --phase verify
+	@$(RUN_INSTALL) --phase verify
 
 nuke:
-	./install.sh --phase nuke
+	@$(RUN_INSTALL) --phase nuke
