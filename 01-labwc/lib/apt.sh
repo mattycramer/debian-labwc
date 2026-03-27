@@ -85,11 +85,16 @@ readonly TWEAKS_BUILD_PACKAGES=(
   cmake
   git
   libglib2.0-dev
+  libxkbcommon-dev
   libxml2-dev
   ninja-build
   pkg-config
+)
+
+readonly TWEAKS_BACKPORTS_PACKAGES=(
   qt6-base-dev
   qt6-l10n-tools
+  qt6-tools-dev
   qt6-tools-dev-tools
 )
 
@@ -128,6 +133,7 @@ resolved_requested_packages() {
   printf '%s\n' "${BACKPORTS_PACKAGES[@]}"
   printf '%s\n' "${GRAPHICS_PACKAGES[@]}"
   printf '%s\n' "${TWEAKS_BUILD_PACKAGES[@]}"
+  printf '%s\n' "${TWEAKS_BACKPORTS_PACKAGES[@]}"
   if [[ "${LABWC_HAS_INTEL_GPU:-no}" == "yes" ]]; then
     printf '%s\n' "${INTEL_PACKAGES[@]}"
   fi
@@ -138,17 +144,21 @@ install_requested_packages() {
   local -a backports_package_list=()
   local -a graphics_package_list=()
   local -a tweaks_build_package_list=()
+  local -a tweaks_backports_package_list=()
   local -a apt_args=()
   mapfile -t backports_package_list < <(printf '%s\n' "${BACKPORTS_PACKAGES[@]}")
   mapfile -t graphics_package_list < <(printf '%s\n' "${GRAPHICS_PACKAGES[@]}")
   mapfile -t tweaks_build_package_list < <(printf '%s\n' "${TWEAKS_BUILD_PACKAGES[@]}")
+  mapfile -t tweaks_backports_package_list < <(printf '%s\n' "${TWEAKS_BACKPORTS_PACKAGES[@]}")
   if [[ "${LABWC_HAS_INTEL_GPU:-no}" == "yes" ]]; then
     mapfile -O "${#graphics_package_list[@]}" -t graphics_package_list < <(printf '%s\n' "${INTEL_PACKAGES[@]}")
   fi
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${backports_package_list[@]}"
-  log_info "installing graphics package set"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${graphics_package_list[@]}"
-  log_info "installing labwc-tweaks build package set"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${tweaks_build_package_list[@]}"
+  log_info "installing graphics package set from backports"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${graphics_package_list[@]}"
+  log_info "installing generic build dependencies for labwc-tweaks source build from backports"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${tweaks_build_package_list[@]}"
+  log_info "installing Qt build dependencies for labwc-tweaks source build from backports"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${tweaks_backports_package_list[@]}"
 }

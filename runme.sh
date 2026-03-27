@@ -119,6 +119,7 @@ main() {
   log "  cd '$REPO_ROOT/02-nvidia' && make install   # optional, NVIDIA hosts only"
   log "  cd '$REPO_ROOT/03-tools' && make install"
   log "  cd '$REPO_ROOT/05-security' && make install"
+  log "  cd '$REPO_ROOT/07-maintenance' && make install"
 }
 
 main "$@"
