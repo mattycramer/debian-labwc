@@ -11,11 +11,31 @@ selection="$(
     "poweroff" | wofi --dmenu --prompt "Power"
 )"
 
+run_shutdown_hook() {
+  local shutdown_hook="${XDG_CONFIG_HOME:-$HOME/.config}/labwc/shutdown"
+  if [[ -x "$shutdown_hook" ]]; then
+    "$shutdown_hook" >/dev/null 2>&1 || true
+    sleep 1
+  fi
+}
+
 case "$selection" in
   lock) exec swaylock -f ;;
-  logout) pkill -x labwc || true ;;
-  suspend) exec systemctl suspend ;;
-  reboot) exec systemctl reboot ;;
-  poweroff) exec systemctl poweroff ;;
+  logout)
+    run_shutdown_hook
+    labwc --exit >/dev/null 2>&1 || pkill -x labwc || true
+    ;;
+  suspend)
+    run_shutdown_hook
+    exec systemctl suspend
+    ;;
+  reboot)
+    run_shutdown_hook
+    exec systemctl reboot
+    ;;
+  poweroff)
+    run_shutdown_hook
+    exec systemctl poweroff
+    ;;
   *) exit 0 ;;
 esac

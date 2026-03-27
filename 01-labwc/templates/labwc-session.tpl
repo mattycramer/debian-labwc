@@ -8,6 +8,7 @@ export XDG_SESSION_DESKTOP=labwc
 export DESKTOP_SESSION=labwc
 export XCURSOR_THEME=@XCURSOR_THEME@
 export XCURSOR_SIZE=@XCURSOR_SIZE@
+export LABWC_UPDATE_ACTIVATION_ENV=1
 
 if [[ -r "@RUNTIME_ENV_PATH@" ]]; then
   # shellcheck disable=SC1090,SC1091

@@ -291,9 +291,6 @@ set -Eeuo pipefail
 IFS=\$'\\n\\t'
 
 export XDG_CURRENT_DESKTOP=labwc:wlroots
-if [[ -n "\${DBUS_SESSION_BUS_ADDRESS:-}" ]] && command -v systemctl >/dev/null 2>&1; then
-  dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=labwc:wlroots XDG_SESSION_DESKTOP=labwc DESKTOP_SESSION=labwc XCURSOR_THEME=${LABWC_XCURSOR_THEME} XCURSOR_SIZE=${LABWC_XCURSOR_SIZE} >/dev/null 2>&1 || true
-fi
 
 pgrep -x foot >/dev/null 2>&1 || foot --server &
 pgrep -x swaybg >/dev/null 2>&1 || swaybg -i "$wallpaper_path" -m "${LABWC_WALLPAPER_MODE}" &
@@ -338,22 +335,6 @@ pkill -x "lxpolkit" >/dev/null 2>&1 || true
 pkill -x "swayidle" >/dev/null 2>&1 || true
 pkill -x "crystal-dock" >/dev/null 2>&1 || true
 pkill -x "nwg-dock" >/dev/null 2>&1 || true
-
-if command -v systemctl >/dev/null 2>&1; then
-  systemctl --user stop \
-    xdg-desktop-portal.service \
-    xdg-desktop-portal-gtk.service \
-    xdg-desktop-portal-wlr.service \
-    wireplumber.service \
-    pipewire-pulse.service \
-    pipewire.service \
-    pipewire-pulse.socket \
-    pipewire.socket \
-    gpg-agent-ssh.socket \
-    gpg-agent-browser.socket \
-    gpg-agent-extra.socket \
-    gpg-agent.socket >/dev/null 2>&1 || true
-fi
 
 if command -v gpgconf >/dev/null 2>&1; then
   gpgconf --kill gpg-agent >/dev/null 2>&1 || true

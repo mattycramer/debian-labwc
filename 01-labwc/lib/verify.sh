@@ -97,11 +97,13 @@ verify_labwc_config_semantics() {
 verify_greetd_semantics() {
   local greetd_config="/etc/greetd/config.toml"
   local greetd_dropin="/etc/systemd/system/greetd.service.d/10-vt.conf"
+  local session_wrapper="/usr/local/bin/debian-labwc-session"
   grep -F "vt = ${LABWC_GREETD_VT}" "$greetd_config" >/dev/null || die "greetd config missing expected vt"
   grep -F 'switch = true' "$greetd_config" >/dev/null || die "greetd config missing explicit vt switch"
   grep -F 'tuigreet --time --asterisks --cmd /usr/local/bin/debian-labwc-session --sessions /usr/share/wayland-sessions' "$greetd_config" >/dev/null || die "greetd config missing expected tuigreet command"
   grep -F "Conflicts=getty@tty${LABWC_GREETD_VT}.service" "$greetd_dropin" >/dev/null || die "greetd drop-in missing getty conflict"
   grep -F "Before=getty@tty${LABWC_GREETD_VT}.service" "$greetd_dropin" >/dev/null || die "greetd drop-in missing getty ordering"
+  grep -F 'export LABWC_UPDATE_ACTIVATION_ENV=1' "$session_wrapper" >/dev/null || die "labwc session wrapper missing explicit activation-environment enablement"
 }
 
 verify_waybar_config_semantics() {
@@ -126,10 +128,6 @@ verify_gpg_agent_semantics() {
   local shutdown_path="$LABWC_TARGET_HOME/.config/labwc/shutdown"
   local override_path="$LABWC_TARGET_HOME/.config/systemd/user/gpg-agent.service.d/override.conf"
   grep -F 'pkill -x "waybar"' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing waybar stop"
-  grep -F 'wireplumber.service' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing wireplumber stop"
-  grep -F 'pipewire.service' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing pipewire stop"
-  grep -F 'xdg-desktop-portal.service' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing portal stop"
-  grep -F 'systemctl --user stop \' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing gpg-agent socket stop"
   grep -F 'gpgconf --kill gpg-agent' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing gpg-agent kill"
   grep -F 'TimeoutStopSec=10s' "$override_path" >/dev/null || die "gpg-agent override missing reduced stop timeout"
 }
