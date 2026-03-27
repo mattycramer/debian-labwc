@@ -29,6 +29,7 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.config/labwc/rc.xml"
   require_file "$LABWC_TARGET_HOME/.config/labwc/menu.xml"
   require_file "$LABWC_TARGET_HOME/.config/labwc/autostart"
+  require_file "$LABWC_TARGET_HOME/.config/labwc/shutdown"
   require_file "$LABWC_TARGET_HOME/.config/waybar/config.jsonc"
   require_file "$LABWC_TARGET_HOME/.config/kanshi/config"
   require_file "$LABWC_TARGET_HOME/.config/xdg-desktop-portal/portals.conf"
@@ -38,6 +39,7 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.profile"
   require_file "$LABWC_TARGET_HOME/.zshrc"
   require_file "$LABWC_TARGET_HOME/.zprofile"
+  require_file "$LABWC_TARGET_HOME/.config/systemd/user/gpg-agent.service.d/override.conf"
   require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/pipewire.service"
   require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/pipewire.socket"
   require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/pipewire-pulse.service"
@@ -98,6 +100,14 @@ verify_waybar_config_semantics() {
   grep -F '"/usr/local/bin/debian-labwc-player-status"' "$waybar_path" >/dev/null || die "waybar config missing player status helper"
 }
 
+verify_gpg_agent_semantics() {
+  local shutdown_path="$LABWC_TARGET_HOME/.config/labwc/shutdown"
+  local override_path="$LABWC_TARGET_HOME/.config/systemd/user/gpg-agent.service.d/override.conf"
+  grep -F 'systemctl --user stop \' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing gpg-agent socket stop"
+  grep -F 'gpgconf --kill gpg-agent' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing gpg-agent kill"
+  grep -F 'TimeoutStopSec=10s' "$override_path" >/dev/null || die "gpg-agent override missing reduced stop timeout"
+}
+
 verify_shell_config_semantics() {
   grep -F 'umask 022' "$LABWC_TARGET_HOME/.bashrc" >/dev/null || die ".bashrc missing umask"
   grep -F "/data/usr/local/bin:/usr/local/bin:\$HOME/.local/bin:\$PATH" "$LABWC_TARGET_HOME/.bashrc" >/dev/null || die ".bashrc missing PATH additions"
@@ -126,6 +136,7 @@ verify_install() {
   verify_greetd_semantics
   verify_labwc_config_semantics
   verify_waybar_config_semantics
+  verify_gpg_agent_semantics
   verify_shell_config_semantics
   log_info "verification completed"
 }

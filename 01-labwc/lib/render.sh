@@ -298,6 +298,33 @@ EOF
   render_user_script "$LABWC_TARGET_HOME/.config/labwc/autostart" "$autostart"
 }
 
+render_labwc_shutdown() {
+  local shutdown
+  shutdown="$(cat <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl --user stop \
+    gpg-agent-ssh.socket \
+    gpg-agent-browser.socket \
+    gpg-agent-extra.socket \
+    gpg-agent.socket >/dev/null 2>&1 || true
+fi
+
+if command -v gpgconf >/dev/null 2>&1; then
+  gpgconf --kill gpg-agent >/dev/null 2>&1 || true
+fi
+EOF
+)"
+  render_user_script "$LABWC_TARGET_HOME/.config/labwc/shutdown" "$shutdown"
+}
+
+render_gpg_agent_override() {
+  render_user_file "$LABWC_TARGET_HOME/.config/systemd/user/gpg-agent.service.d/override.conf" $'[Service]\nTimeoutStopSec=10s\n'
+}
+
 render_waybar_config() {
   local waybar
   waybar="$(cat <<'EOF'
@@ -695,6 +722,7 @@ render_all_configs() {
     "$config_root/gammastep" \
     "$config_root/xdg-desktop-portal" \
     "$config_root/debian-labwc" \
+    "$config_root/systemd/user/gpg-agent.service.d" \
     "$config_root/systemd/user/default.target.wants" \
     "$config_root"
 
@@ -705,6 +733,8 @@ render_all_configs() {
   render_labwc_rc_xml
   render_labwc_menu_xml
   render_labwc_autostart
+  render_labwc_shutdown
+  render_gpg_agent_override
   render_waybar_config
   render_waybar_style
   render_kanshi_config
