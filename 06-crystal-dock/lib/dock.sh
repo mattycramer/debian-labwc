@@ -5,7 +5,9 @@ readonly CRYSTAL_DOCK_AUTOSTART_MARKER_END="# <<< MANAGED BY 06-crystal-dock <<<
 readonly CRYSTAL_DOCK_WRAPPER_PATH="/usr/local/bin/debian-labwc-crystal-dock"
 readonly CRYSTAL_DOCK_BIN_PATH="/usr/bin/crystal-dock"
 readonly CRYSTAL_DOCK_DESKTOP_PATH="/usr/share/applications/crystal-dock.desktop"
-readonly CRYSTAL_DOCK_BACKPORTS_SUITE="trixie-backports"
+readonly CRYSTAL_DOCK_SID_SUITE="sid"
+readonly CRYSTAL_DOCK_SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
+readonly CRYSTAL_DOCK_SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
 
 readonly CRYSTAL_DOCK_BOOTSTRAP_PACKAGES=(
   ca-certificates
@@ -50,8 +52,10 @@ apt_update() {
 install_crystal_dock_dependencies() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt -t "$CRYSTAL_DOCK_BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_BOOTSTRAP_PACKAGES[@]}"
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt -t "$CRYSTAL_DOCK_BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_RUNTIME_PACKAGES[@]}"
+  [[ -f "$CRYSTAL_DOCK_SID_SOURCE_PATH" ]] || die "missing sid source file: $CRYSTAL_DOCK_SID_SOURCE_PATH (run 04-dev first)"
+  [[ -f "$CRYSTAL_DOCK_SID_PREFERENCES_PATH" ]] || die "missing sid preferences file: $CRYSTAL_DOCK_SID_PREFERENCES_PATH (run 04-dev first)"
+  run_cmd env DEBIAN_FRONTEND=noninteractive apt -t "$CRYSTAL_DOCK_SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_BOOTSTRAP_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive apt -t "$CRYSTAL_DOCK_SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_RUNTIME_PACKAGES[@]}"
 }
 
 install_crystal_dock_package() {

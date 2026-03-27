@@ -211,6 +211,15 @@ netfilter_pkg_config_path() {
   printf '/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig%s' "${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 }
 
+finalize_local_libtool_install() {
+  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
+    run_cmd libtool --finish /usr/local/lib
+    return 0
+  fi
+  run_cmd libtool --finish /usr/local/lib
+  run_cmd ldconfig
+}
+
 install_latest_libmnl() {
   resolve_libmnl_release
 
@@ -235,7 +244,7 @@ install_latest_libmnl() {
     )
   fi
   copy_staged_tree "$stage_root" "libmnl"
-  run_cmd ldconfig
+  finalize_local_libtool_install
   run_cmd rm -rf -- "$tmpdir"
 }
 
@@ -265,7 +274,7 @@ install_latest_libnftnl() {
     )
   fi
   copy_staged_tree "$stage_root" "libnftnl"
-  run_cmd ldconfig
+  finalize_local_libtool_install
   run_cmd rm -rf -- "$tmpdir"
 }
 
@@ -297,7 +306,7 @@ install_latest_nftables() {
     )
   fi
   copy_staged_tree "$stage_root" "nftables"
-  run_cmd ldconfig
+  finalize_local_libtool_install
   run_cmd rm -rf -- "$tmpdir"
 }
 

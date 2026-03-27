@@ -76,6 +76,8 @@ phase_install() {
   load_env_file
   apt_update
   install_bootstrap_packages
+  install_sid_repository
+  apt_update
   install_dev_packages
   install_node_runtime
 }

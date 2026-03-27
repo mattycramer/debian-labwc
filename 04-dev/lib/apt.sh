@@ -21,6 +21,9 @@ readonly DEV_PACKAGES=(
   htop
 )
 
+readonly SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
+readonly SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
+
 retry_cmd() {
   local attempts="$1"
   shift
@@ -47,10 +50,25 @@ apt_update() {
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
+write_text_file() {
+  local destination="$1"
+  local content="$2"
+  local temp_file
+  temp_file="$(mktemp)"
+  printf '%s' "$content" >"$temp_file"
+  run_cmd install -D -m 0644 "$temp_file" "$destination"
+  run_cmd rm -f -- "$temp_file"
+}
+
 install_bootstrap_packages() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends "${apt_args[@]}" "${BOOTSTRAP_PACKAGES[@]}"
+}
+
+install_sid_repository() {
+  write_text_file "$SID_SOURCE_PATH" $'Types: deb\nURIs: http://ftp.dk.debian.org/debian\nSuites: sid\nComponents: main\nArchitectures: amd64\n'
+  write_text_file "$SID_PREFERENCES_PATH" $'Package: *\nPin: release n=sid\nPin-Priority: 100\n'
 }
 
 install_dev_packages() {
@@ -141,6 +159,11 @@ verify_dev_install() {
   for cmd in node npm npx pnpm pnpx nmap strace lsof netstat ss jq yamllint valgrind perf pipx pkg-config htop; do
     command_is_available "$cmd" || die "command '$cmd' is not available"
   done
+  [[ -f "$SID_SOURCE_PATH" ]] || die "missing sid sources file"
+  [[ -f "$SID_PREFERENCES_PATH" ]] || die "missing sid preferences file"
+  grep -F 'URIs: http://ftp.dk.debian.org/debian' "$SID_SOURCE_PATH" >/dev/null || die "sid source file missing ftp.dk.debian.org/debian"
+  grep -F 'Suites: sid' "$SID_SOURCE_PATH" >/dev/null || die "sid source file missing sid suite"
+  grep -F 'Pin-Priority: 100' "$SID_PREFERENCES_PATH" >/dev/null || die "sid preferences missing pin priority 100"
   verify_node_runtime
 }
 
@@ -155,6 +178,7 @@ remove_dev_install() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive apt remove "${apt_args[@]}" "${DEV_PACKAGES[@]}" || true
+  run_cmd rm -f -- "$SID_SOURCE_PATH" "$SID_PREFERENCES_PATH"
   remove_managed_link /usr/local/bin/node
   remove_managed_link /usr/local/bin/npm
   remove_managed_link /usr/local/bin/npx
