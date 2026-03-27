@@ -327,17 +327,13 @@ IFS=$'\n\t'
 
 # Stop session clients first so they do not keep poking D-Bus or PipeWire
 # while the compositor and user bus are already shutting down.
-for proc_name in \
-  waybar \
-  kanshi \
-  mako \
-  lxpolkit \
-  swayidle \
-  crystal-dock \
-  nwg-dock
-do
-  pkill -x "$proc_name" >/dev/null 2>&1 || true
-done
+pkill -x "waybar" >/dev/null 2>&1 || true
+pkill -x "kanshi" >/dev/null 2>&1 || true
+pkill -x "mako" >/dev/null 2>&1 || true
+pkill -x "lxpolkit" >/dev/null 2>&1 || true
+pkill -x "swayidle" >/dev/null 2>&1 || true
+pkill -x "crystal-dock" >/dev/null 2>&1 || true
+pkill -x "nwg-dock" >/dev/null 2>&1 || true
 
 if command -v systemctl >/dev/null 2>&1; then
   systemctl --user stop \
