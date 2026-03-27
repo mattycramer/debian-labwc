@@ -26,6 +26,9 @@ readonly BACKPORTS_TOOLS_PACKAGES=(
   aptitude
 )
 
+readonly TOOLS_TMP_ROOT="/tmp/debian-labwc-03-tools"
+readonly TOOLS_KEYRING_DIR="/usr/share/keyrings"
+
 apt_yes_args() {
   if [[ "${ASSUME_YES:-1}" -eq 1 ]]; then
     printf '%s\n' "-y"
@@ -60,7 +63,9 @@ install_repo_bootstrap() {
 write_text_file() {
   local destination="$1"
   local content="$2"
-  local temp_file="/tmp/debian-labwc-03-tools-write-text.tmp"
+  local temp_file="${TOOLS_TMP_ROOT}/write-text.$$"
+  run_cmd install -d -m 1777 /tmp
+  run_cmd install -d -m 0755 "$TOOLS_TMP_ROOT"
   printf '%s' "$content" >"$temp_file"
   run_cmd install -D -m 0644 "$temp_file" "$destination"
   rm -f -- "$temp_file"
@@ -69,11 +74,20 @@ write_text_file() {
 prepare_tools_download_path() {
   local path="$1"
   [[ "$path" == /tmp/* ]] || die "download path must stay under /tmp: $path"
+  run_cmd install -d -m 1777 /tmp
   run_cmd install -d -m 0755 -o "$TOOLS_TARGET_USER" -g "$TOOLS_TARGET_GROUP" "$(dirname "$path")"
   run_cmd rm -f -- "$path"
   run_cmd touch "$path"
   run_cmd chown "$TOOLS_TARGET_USER:$TOOLS_TARGET_GROUP" "$path"
   run_cmd chmod 0644 "$path"
+}
+
+remove_legacy_source_file_if_matching() {
+  local path="$1"
+  local needle="$2"
+  [[ -f "$path" ]] || return 0
+  grep -F "$needle" "$path" >/dev/null || return 0
+  run_cmd rm -f -- "$path"
 }
 
 download_as_tools_user() {
@@ -92,18 +106,20 @@ fetch_as_tools_user() {
 install_repository_files() {
   local microsoft_key_asc="/tmp/microsoft-packages.asc"
   local microsoft_key_gpg="/tmp/microsoft-packages.gpg"
+  run_cmd install -d -m 0755 "$TOOLS_KEYRING_DIR"
   download_as_tools_user "https://packages.microsoft.com/keys/microsoft.asc" "$microsoft_key_asc"
-  run_cmd bash -lc "gpg --dearmor < '$microsoft_key_asc' > '$microsoft_key_gpg'"
-  run_cmd install -D -o root -g root -m 0644 "$microsoft_key_gpg" /usr/share/keyrings/microsoft.gpg
+  run_cmd gpg --dearmor --yes --output "$microsoft_key_gpg" "$microsoft_key_asc"
+  run_cmd install -D -o root -g root -m 0644 "$microsoft_key_gpg" "${TOOLS_KEYRING_DIR}/microsoft.gpg"
   run_cmd rm -f -- "$microsoft_key_asc" "$microsoft_key_gpg"
+  remove_legacy_source_file_if_matching "/etc/apt/sources.list.d/vscode.list" "packages.microsoft.com/repos/code"
   write_text_file "/etc/apt/sources.list.d/vscode.sources" $'Types: deb\nURIs: https://packages.microsoft.com/repos/code\nSuites: stable\nComponents: main\nArchitectures: amd64\nSigned-By: /usr/share/keyrings/microsoft.gpg\n'
-  run_cmd rm -f /etc/apt/sources.list.d/thorium.sources /etc/apt/sources.list.d/thorium.list
 
   local mullvad_key="/tmp/mullvad-keyring.asc"
   download_as_tools_user "https://repository.mullvad.net/deb/mullvad-keyring.asc" "$mullvad_key"
-  run_cmd install -D -o root -g root -m 0644 "$mullvad_key" /usr/share/keyrings/mullvad-keyring.asc
+  run_cmd install -D -o root -g root -m 0644 "$mullvad_key" "${TOOLS_KEYRING_DIR}/mullvad-keyring.asc"
   run_cmd rm -f -- "$mullvad_key"
-  write_text_file "/etc/apt/sources.list.d/mullvad.sources" $'Types: deb\nURIs: https://repository.mullvad.net/deb/stable\nSuites: stable\nComponents: main\nArchitectures: amd64\nSigned-By: /usr/share/keyrings/mullvad-keyring.asc\n'
+  remove_legacy_source_file_if_matching "/etc/apt/sources.list.d/mullvad.sources" "repository.mullvad.net/deb/stable"
+  write_text_file "/etc/apt/sources.list.d/mullvad.list" $'deb [signed-by=/usr/share/keyrings/mullvad-keyring.asc arch=amd64] https://repository.mullvad.net/deb/stable stable main\n'
 }
 
 install_normal_tools() {
@@ -187,11 +203,15 @@ verify_tools_install() {
   package_pattern_installed '^obsidian($|[-])' || die "obsidian package is not installed"
   package_pattern_installed 'filen' || die "filen package is not installed"
   [[ -f "/etc/apt/sources.list.d/vscode.sources" ]] || die "missing vscode.sources"
-  [[ -f "/etc/apt/sources.list.d/mullvad.sources" ]] || die "missing mullvad.sources"
+  [[ -f "/etc/apt/sources.list.d/mullvad.list" ]] || die "missing mullvad.list"
+  [[ -f "/usr/share/keyrings/microsoft.gpg" ]] || die "missing microsoft keyring"
+  [[ -f "/usr/share/keyrings/mullvad-keyring.asc" ]] || die "missing mullvad keyring"
   grep -F 'Architectures: amd64' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing amd64 architecture"
   grep -F 'Signed-By: /usr/share/keyrings/microsoft.gpg' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing microsoft signed-by key"
-  grep -F 'Architectures: amd64' /etc/apt/sources.list.d/mullvad.sources >/dev/null || die "mullvad source missing amd64 architecture"
-  grep -F 'Signed-By: /usr/share/keyrings/mullvad-keyring.asc' /etc/apt/sources.list.d/mullvad.sources >/dev/null || die "mullvad source missing mullvad signed-by key"
+  grep -F 'URIs: https://packages.microsoft.com/repos/code' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing expected repo uri"
+  grep -F 'arch=amd64' /etc/apt/sources.list.d/mullvad.list >/dev/null || die "mullvad source missing amd64 architecture"
+  grep -F 'signed-by=/usr/share/keyrings/mullvad-keyring.asc' /etc/apt/sources.list.d/mullvad.list >/dev/null || die "mullvad source missing mullvad signed-by key"
+  grep -F 'https://repository.mullvad.net/deb/stable stable main' /etc/apt/sources.list.d/mullvad.list >/dev/null || die "mullvad source missing expected repo uri"
   [[ -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf" ]] || die "missing mpv.conf"
   [[ "$(stat -c '%U:%G' "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf")" == "$TOOLS_TARGET_USER:$TOOLS_TARGET_USER" ]] || die "mpv.conf ownership is wrong"
 }
