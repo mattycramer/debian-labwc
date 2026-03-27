@@ -75,7 +75,11 @@ verify_shell_config_semantics() {
   grep -F 'bash_completion' "$LABWC_TARGET_HOME/.bashrc" >/dev/null || die ".bashrc missing bash completion setup"
   grep -F 'starship init bash' "$LABWC_TARGET_HOME/.bashrc" >/dev/null || die ".bashrc missing starship init"
   grep -F 'compinit' "$LABWC_TARGET_HOME/.zshrc" >/dev/null || die ".zshrc missing compinit"
+  grep -F 'zsh-autosuggestions' "$LABWC_TARGET_HOME/.zshrc" >/dev/null || die ".zshrc missing zsh-autosuggestions setup"
   grep -F 'starship init zsh' "$LABWC_TARGET_HOME/.zshrc" >/dev/null || die ".zshrc missing starship init"
+  grep -F '[username]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing username config"
+  grep -F '[hostname]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing hostname config"
+  grep -F '[directory]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing directory config"
 }
 
 verify_install() {

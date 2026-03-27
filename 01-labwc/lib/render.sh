@@ -75,6 +75,10 @@ EOF
 autoload -Uz compinit
 compinit
 
+if [[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then
+  source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+fi
+
 if command -v starship >/dev/null 2>&1; then
   eval "$(starship init zsh)"
 fi
@@ -88,13 +92,24 @@ fi
 EOF
 )"
   starship="$(cat <<'EOF'
-format = "$directory$git_branch$git_status$character"
+add_newline = false
+format = "$username$hostname$directory$git_branch$git_status$character"
+
+[username]
+show_always = true
+format = "[$user@](bold yellow)"
+
+[hostname]
+ssh_only = false
+format = "[$hostname ](bold blue)"
 
 [character]
 success_symbol = "[>](bold green)"
 error_symbol = "[>](bold red)"
 
 [directory]
+format = "[$path ](bold cyan)"
+home_symbol = "~"
 truncation_length = 3
 truncate_to_repo = false
 EOF

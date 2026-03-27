@@ -26,6 +26,7 @@ readonly BACKPORTS_PACKAGES=(
   greetd
   tuigreet
   gammastep
+  xdg-utils
   xdg-desktop-portal
   xdg-desktop-portal-wlr
   xdg-desktop-portal-gtk
@@ -49,6 +50,7 @@ readonly BACKPORTS_PACKAGES=(
   fonts-noto
   fonts-noto-core
   zsh
+  zsh-autosuggestions
   starship
   fonts-material-design-icons-iconfont
   fonts-weather-icons
