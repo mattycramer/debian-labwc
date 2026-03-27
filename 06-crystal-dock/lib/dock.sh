@@ -68,8 +68,12 @@ install_crystal_dock_dependencies() {
 patch_crystal_dock_source_tree() {
   local cmake_path="$CRYSTAL_DOCK_SOURCE_DIR/src/CMakeLists.txt"
   local desktop_env_path="$CRYSTAL_DOCK_SOURCE_DIR/src/desktop/desktop_env.cc"
+  local window_system_h_path="$CRYSTAL_DOCK_SOURCE_DIR/src/display/window_system.h"
+  local window_system_cc_path="$CRYSTAL_DOCK_SOURCE_DIR/src/display/window_system.cc"
   [[ -f "$cmake_path" ]] || die "missing Crystal Dock CMakeLists.txt after source extract"
   [[ -f "$desktop_env_path" ]] || die "missing Crystal Dock desktop_env.cc after source extract"
+  [[ -f "$window_system_h_path" ]] || die "missing Crystal Dock window_system.h after source extract"
+  [[ -f "$window_system_cc_path" ]] || die "missing Crystal Dock window_system.cc after source extract"
   run_cmd python3 - "$cmake_path" <<'PY'
 from pathlib import Path
 import re
@@ -167,6 +171,96 @@ text, count = re.subn(
 )
 if count != 1:
     raise SystemExit("expected upstream DesktopEnv::getDesktopEnv block not found")
+
+path.write_text(text)
+PY
+  run_cmd python3 - "$window_system_h_path" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+
+for include in (
+    '#include "kde_screen_edge.h"\n',
+    '#include "plasma_virtual_desktop.h"\n',
+    '#include "plasma_window_management.h"\n',
+):
+    text = text.replace(include, '')
+
+text = re.sub(
+    r'  static org_kde_plasma_virtual_desktop_management\* kde_virtual_desktop_management_;\n'
+    r'  static org_kde_plasma_window_management\* kde_window_management_;\n'
+    r'  static kde_screen_edge_manager_v1\* kde_screen_edge_manager_;\n\n'
+    r'  static zwlr_foreign_toplevel_manager_v1\* wlr_window_manager_;\n',
+    '  static zwlr_foreign_toplevel_manager_v1* wlr_window_manager_;\n',
+    text,
+    count=1,
+)
+
+path.write_text(text)
+PY
+  run_cmd python3 - "$window_system_cc_path" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+
+for include in (
+    '#include "kde_auto_hide_manager.h"\n',
+    '#include "kde_virtual_desktop_manager.h"\n',
+    '#include "kde_window_manager.h"\n',
+):
+    text = text.replace(include, '')
+
+text = re.sub(
+    r'org_kde_plasma_virtual_desktop_management\* WindowSystem::kde_virtual_desktop_management_;\n'
+    r'org_kde_plasma_window_management\* WindowSystem::kde_window_management_;\n'
+    r'kde_screen_edge_manager_v1\* WindowSystem::kde_screen_edge_manager_;\n\n'
+    r'zwlr_foreign_toplevel_manager_v1\* WindowSystem::wlr_window_manager_;\n',
+    'zwlr_foreign_toplevel_manager_v1* WindowSystem::wlr_window_manager_;\n',
+    text,
+    count=1,
+)
+
+text, count = re.subn(
+    r'/\* static \*/ bool WindowSystem::init\(struct wl_display\* display\) \{\n.*?\n\}\n',
+    """/* static */ bool WindowSystem::init(struct wl_display* display) {\n  struct wl_registry *registry = wl_display_get_registry(display);\n  wl_registry_add_listener(registry, &registry_listener_, NULL);\n\n  // wait for the \"initial\" set of globals to appear\n  wl_display_roundtrip(display);\n\n  if (!wlr_window_manager_) {\n    std::cerr << \"Failed to bind required Wayland interfaces\" << std::endl;\n    return false;\n  }\n\n  WlrWindowManager::init(wlr_window_manager_);\n  WlrWindowManager::bindWindowManagerFunctions(&windowManager_);\n\n  LayerShellQt::Shell::useLayerShell();\n\n  activityManager_ = std::make_unique<QDBusInterface>(\n      \"org.kde.ActivityManager\", \"/ActivityManager/Activities\",\n      \"org.kde.ActivityManager.Activities\");\n  if (activityManager_->isValid()) {\n    const QDBusReply<QString> reply = activityManager_->call(\"CurrentActivity\");\n    if (reply.isValid()) {\n      WindowSystem::self()->setCurrentActivity(reply.value().toStdString());\n    }\n    connect(activityManager_.get(), SIGNAL(CurrentActivityChanged(QString)),\n            WindowSystem::self(), SLOT(onCurrentActivityChanged(QString)));\n  }\n\n  initScreens();\n\n  return true;\n}\n""",
+    text,
+    count=1,
+    flags=re.S,
+)
+if count != 1:
+    raise SystemExit("expected WindowSystem::init block not found")
+
+text = text.replace(
+    "/* static */ bool WindowSystem::hasVirtualDesktopManager() {\n  return kde_virtual_desktop_management_ != nullptr;\n}\n",
+    "/* static */ bool WindowSystem::hasVirtualDesktopManager() {\n  return false;\n}\n",
+    1,
+)
+text = text.replace(
+    "/* static */ bool WindowSystem::hasAutoHideManager() {\n  return kde_screen_edge_manager_ != nullptr;\n}\n",
+    "/* static */ bool WindowSystem::hasAutoHideManager() {\n  return false;\n}\n",
+    1,
+)
+
+text, count = re.subn(
+    r'/\* static \*/ void WindowSystem::registry_global\(\n'
+    r'    void\* data,\n'
+    r'    struct wl_registry\* registry,\n'
+    r'    uint32_t name,\n'
+    r'    const char\* interface,\n'
+    r'    uint32_t version\) \{\n.*?\n\}\n',
+    """/* static */ void WindowSystem::registry_global(\n    void* data,\n    struct wl_registry* registry,\n    uint32_t name,\n    const char* interface,\n    uint32_t version) {\n  if (std::string(interface) == \"zwlr_foreign_toplevel_manager_v1\") {\n    wlr_window_manager_ =\n        reinterpret_cast<zwlr_foreign_toplevel_manager_v1*>(wl_registry_bind(\n            registry, name, &zwlr_foreign_toplevel_manager_v1_interface, 3));\n    if (!wlr_window_manager_) {\n      std::cerr << \"Failed to bind zwlr_foreign_toplevel_manager_v1 Wayland interface\"\n                << std::endl;\n    }\n  }\n}\n""",
+    text,
+    count=1,
+    flags=re.S,
+)
+if count != 1:
+    raise SystemExit("expected WindowSystem::registry_global block not found")
 
 path.write_text(text)
 PY
