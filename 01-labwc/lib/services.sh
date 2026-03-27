@@ -69,6 +69,9 @@ install_root_files() {
   install_helper_script "$SCRIPT_DIR/bin/record-toggle.sh" "/usr/local/bin/debian-labwc-record-toggle"
   install_helper_script "$SCRIPT_DIR/bin/dpms.sh" "/usr/local/bin/debian-labwc-dpms"
   install_helper_script "$SCRIPT_DIR/bin/refresh-outputs.sh" "/usr/local/bin/debian-labwc-refresh-outputs"
+  install_helper_script "$SCRIPT_DIR/bin/launcher-menu.sh" "/usr/local/bin/debian-labwc-launcher-menu"
+  install_helper_script "$SCRIPT_DIR/bin/module-menu.sh" "/usr/local/bin/debian-labwc-module-menu"
+  install_helper_script "$SCRIPT_DIR/bin/player-status.sh" "/usr/local/bin/debian-labwc-player-status"
 }
 
 resolve_user_unit_path() {
@@ -162,6 +165,9 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/debian-labwc-record-toggle"
   remove_if_present "/usr/local/bin/debian-labwc-dpms"
   remove_if_present "/usr/local/bin/debian-labwc-refresh-outputs"
+  remove_if_present "/usr/local/bin/debian-labwc-launcher-menu"
+  remove_if_present "/usr/local/bin/debian-labwc-module-menu"
+  remove_if_present "/usr/local/bin/debian-labwc-player-status"
   remove_if_present "/usr/share/wayland-sessions/labwc.desktop"
   remove_if_present "/etc/greetd/config.toml"
   remove_if_present "/etc/systemd/system/greetd.service.d/10-vt.conf"

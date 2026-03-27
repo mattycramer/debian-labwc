@@ -92,12 +92,19 @@ install_deb_url() {
   local url="$1"
   local output_path="$2"
   local -a apt_args=()
+  [[ -n "$url" ]] || die "missing deb download url"
+  [[ "$output_path" == *.deb ]] || die "deb output path must end in .deb: $output_path"
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd curl -fsSL -o "$output_path" "$url"
+  run_cmd curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 180 --silent --show-error -o "$output_path" "$url"
+  if [[ "${DRY_RUN:-0}" -eq 0 ]]; then
+    dpkg-deb -f "$output_path" Package >/dev/null 2>&1 || die "downloaded file is not a valid Debian package: $output_path"
+  fi
   run_cmd env DEBIAN_FRONTEND=noninteractive apt install "${apt_args[@]}" "$output_path"
+  run_cmd rm -f "$output_path"
 }
 
 install_deb_tools() {
+  install_deb_url "$BITWARDEN_URL" /tmp/bitwarden_amd64.deb
   install_deb_url "$OBSIDIAN_URL" /tmp/obsidian_amd64.deb
   install_deb_url "$FILEN_URL" /tmp/filen_amd64.deb
 }
@@ -128,6 +135,7 @@ verify_tools_install() {
   for pkg in "${NORMAL_TOOLS_PACKAGES[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}"; do
     package_is_installed "$pkg" || die "package '$pkg' is not installed"
   done
+  package_is_installed bitwarden || die "bitwarden package is not installed"
   package_pattern_installed '^obsidian($|[-])' || die "obsidian package is not installed"
   package_pattern_installed 'filen' || die "filen package is not installed"
   [[ -f "/etc/apt/sources.list.d/vscode.sources" ]] || die "missing vscode.sources"
@@ -140,7 +148,7 @@ verify_tools_install() {
 remove_tools_install() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}" obsidian filen || true
+  run_cmd env DEBIAN_FRONTEND=noninteractive apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}" bitwarden obsidian filen || true
   run_cmd rm -f /etc/apt/sources.list.d/vscode.sources /etc/apt/sources.list.d/thorium.sources /etc/apt/sources.list.d/mullvad.sources
   run_cmd rm -f /usr/share/keyrings/microsoft.gpg /usr/share/keyrings/mullvad-keyring.asc
   run_cmd rm -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf"

@@ -23,6 +23,9 @@ verify_paths() {
   require_file "/usr/local/bin/debian-labwc-screenshot-region"
   require_file "/usr/local/bin/debian-labwc-record-toggle"
   require_file "/usr/local/bin/debian-labwc-refresh-outputs"
+  require_file "/usr/local/bin/debian-labwc-launcher-menu"
+  require_file "/usr/local/bin/debian-labwc-module-menu"
+  require_file "/usr/local/bin/debian-labwc-player-status"
   require_file "$LABWC_TARGET_HOME/.config/labwc/rc.xml"
   require_file "$LABWC_TARGET_HOME/.config/labwc/menu.xml"
   require_file "$LABWC_TARGET_HOME/.config/labwc/autostart"
@@ -85,6 +88,16 @@ verify_greetd_semantics() {
   grep -F "Before=getty@tty${LABWC_GREETD_VT}.service" "$greetd_dropin" >/dev/null || die "greetd drop-in missing getty ordering"
 }
 
+verify_waybar_config_semantics() {
+  local waybar_path="$LABWC_TARGET_HOME/.config/waybar/config.jsonc"
+  grep -F '"custom/launcher"' "$waybar_path" >/dev/null || die "waybar config missing launcher module"
+  grep -F '"disk"' "$waybar_path" >/dev/null || die "waybar config missing disk module"
+  grep -F '"/usr/local/bin/debian-labwc-launcher-menu"' "$waybar_path" >/dev/null || die "waybar config missing launcher click binding"
+  grep -F '"/usr/local/bin/debian-labwc-module-menu network menu"' "$waybar_path" >/dev/null || die "waybar config missing network right-click menu"
+  grep -F '"/usr/local/bin/debian-labwc-module-menu storage menu"' "$waybar_path" >/dev/null || die "waybar config missing storage right-click menu"
+  grep -F '"/usr/local/bin/debian-labwc-player-status"' "$waybar_path" >/dev/null || die "waybar config missing player status helper"
+}
+
 verify_shell_config_semantics() {
   grep -F 'umask 022' "$LABWC_TARGET_HOME/.bashrc" >/dev/null || die ".bashrc missing umask"
   grep -F "/data/usr/local/bin:/usr/local/bin:\$HOME/.local/bin:\$PATH" "$LABWC_TARGET_HOME/.bashrc" >/dev/null || die ".bashrc missing PATH additions"
@@ -95,6 +108,10 @@ verify_shell_config_semantics() {
   grep -F 'compinit' "$LABWC_TARGET_HOME/.zshrc" >/dev/null || die ".zshrc missing compinit"
   grep -F 'zsh-autosuggestions' "$LABWC_TARGET_HOME/.zshrc" >/dev/null || die ".zshrc missing zsh-autosuggestions setup"
   grep -F 'starship init zsh' "$LABWC_TARGET_HOME/.zshrc" >/dev/null || die ".zshrc missing starship init"
+  grep -F '[ -n "${BASH_VERSION:-}" ] && [ -f "$HOME/.bashrc" ]' "$LABWC_TARGET_HOME/.profile" >/dev/null || die ".profile missing bash-only guard for .bashrc"
+  grep -F '. "$HOME/.bashrc"' "$LABWC_TARGET_HOME/.profile" >/dev/null || die ".profile missing POSIX .bashrc source form"
+  grep -F 'if [ -f "$HOME/.profile" ]; then' "$LABWC_TARGET_HOME/.zprofile" >/dev/null || die ".zprofile missing POSIX-safe .profile guard"
+  grep -F '. "$HOME/.profile"' "$LABWC_TARGET_HOME/.zprofile" >/dev/null || die ".zprofile missing POSIX-safe .profile source form"
   grep -F '[username]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing username config"
   grep -F '[hostname]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing hostname config"
   grep -F '[directory]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing directory config"
@@ -108,6 +125,7 @@ verify_install() {
   verify_ownership
   verify_greetd_semantics
   verify_labwc_config_semantics
+  verify_waybar_config_semantics
   verify_shell_config_semantics
   log_info "verification completed"
 }

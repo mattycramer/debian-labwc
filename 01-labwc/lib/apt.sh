@@ -58,7 +58,8 @@ readonly BACKPORTS_PACKAGES=(
   fonts-weather-icons
   file-roller
   ripgrep
-  find-fd
+  fd-find
+  btop
   ncdu
   fzf
 )

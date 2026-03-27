@@ -78,9 +78,9 @@ EOF
 umask 022
 export PATH="/data/usr/local/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
 
-if [[ -f "$HOME/.bashrc" ]]; then
+if [ -n "${BASH_VERSION:-}" ] && [ -f "$HOME/.bashrc" ]; then
   # shellcheck disable=SC1090
-  source "$HOME/.bashrc"
+  . "$HOME/.bashrc"
 fi
 EOF
 )"
@@ -106,8 +106,8 @@ EOF
 umask 022
 export PATH="/data/usr/local/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
 
-if [[ -f "$HOME/.profile" ]]; then
-  source "$HOME/.profile"
+if [ -f "$HOME/.profile" ]; then
+  . "$HOME/.profile"
 fi
 EOF
 )"
@@ -167,11 +167,6 @@ EOF
   </focus>
   <windowSwitcher preview="yes" outlines="yes" unshade="yes" order="focus">
     <osd show="yes" style="classic" output="focused" />
-    <fields>
-      <field content="icon" width="8%" />
-      <field content="desktop_entry_name" width="30%" />
-      <field content="title" width="62%" />
-    </fields>
   </windowSwitcher>
   <mouse>
     <default />
@@ -309,53 +304,135 @@ render_waybar_config() {
 {
   "layer": "top",
   "position": "top",
-  "modules-left": ["wlr/workspaces", "wlr/taskbar"],
+  "height": 36,
+  "spacing": 6,
+  "modules-left": ["custom/launcher", "wlr/workspaces", "wlr/taskbar"],
   "modules-center": ["clock"],
-  "modules-right": ["tray", "network", "pulseaudio", "battery", "backlight", "cpu", "memory", "custom/player", "custom/power"],
+  "modules-right": ["network", "pulseaudio", "battery", "backlight", "cpu", "memory", "disk", "custom/player", "tray", "custom/power"],
+  "custom/launcher": {
+    "format": "󱄅  Menu",
+    "tooltip": false,
+    "on-click": "/usr/local/bin/debian-labwc-launcher-menu",
+    "on-click-right": "wofi --show drun"
+  },
   "wlr/workspaces": {
     "format": "{name}"
   },
   "wlr/taskbar": {
-    "format": "{icon}"
+    "format": "{icon}",
+    "tooltip-format": "{title}"
   },
   "clock": {
-    "format": "{:%a %Y-%m-%d %H:%M}"
+    "interval": 30,
+    "format": "{:%a %b %d  %H:%M}",
+    "format-alt": "{:%Y-%m-%d  %H:%M:%S}",
+    "tooltip-format": "<tt>{:%A %Y-%m-%d\nWeek %V  %Z}</tt>"
   },
   "tray": {
     "spacing": 8
   },
   "network": {
-    "format-wifi": "  {essid}",
-    "format-ethernet": "󰈀  wired",
-    "format-disconnected": "󰖪  offline"
+    "interval": 5,
+    "family": "ipv4",
+    "format-wifi": "{icon}  {essid}",
+    "format-ethernet": "󰈀  {ifname}",
+    "format-linked": "󰈀  {ifname} (no ip)",
+    "format-disconnected": "󰖪  offline",
+    "format-disabled": "󰤭  down",
+    "format-icons": ["󰤟", "󰤢", "󰤥", "󰤨"],
+    "tooltip-format-wifi": "{essid}\n{signalStrength}%  {ipaddr}\n↑ {bandwidthUpBytes}  ↓ {bandwidthDownBytes}",
+    "tooltip-format-ethernet": "{ifname}\n{ipaddr}\n↑ {bandwidthUpBytes}  ↓ {bandwidthDownBytes}",
+    "tooltip-format-disconnected": "Network disconnected",
+    "on-click": "/usr/local/bin/debian-labwc-module-menu network quick",
+    "on-click-right": "/usr/local/bin/debian-labwc-module-menu network menu"
   },
   "pulseaudio": {
     "format": "{icon}  {volume}%",
     "format-muted": "󰖁  muted",
     "format-icons": {
       "default": ["", "", ""]
-    }
+    },
+    "tooltip-format": "{desc}",
+    "scroll-step": 5,
+    "on-click": "pavucontrol",
+    "on-click-middle": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+    "on-click-right": "/usr/local/bin/debian-labwc-module-menu audio menu"
   },
   "battery": {
+    "interval": 15,
+    "states": {
+      "warning": 30,
+      "critical": 15
+    },
     "format": "{icon}  {capacity}%",
-    "format-icons": ["", "", "", "", ""]
+    "format-charging": "󰂄  {capacity}%",
+    "format-full": "󱟢  {capacity}%",
+    "format-warning": "󰂃  {capacity}%",
+    "format-critical": "󰁺  {capacity}%",
+    "format-icons": ["", "", "", "", ""],
+    "tooltip-format": "{timeTo}\nHealth {health}%  Cycles {cycles}",
+    "on-click": "/usr/local/bin/debian-labwc-module-menu battery menu",
+    "on-click-right": "/usr/local/bin/debian-labwc-module-menu battery details"
   },
   "backlight": {
-    "format": "󰃠  {percent}%"
+    "format": "{icon}  {percent}%",
+    "format-icons": ["󰃞", "󰃟", "󰃠"],
+    "scroll-step": 5,
+    "tooltip-format": "Brightness {percent}%",
+    "reverse-scrolling": false,
+    "reverse-mouse-scrolling": false,
+    "on-click-right": "/usr/local/bin/debian-labwc-module-menu brightness menu"
   },
   "cpu": {
-    "format": "󰍛  {usage}%"
+    "interval": 5,
+    "states": {
+      "warning": 65,
+      "critical": 85
+    },
+    "format": "󰍛  {usage}%",
+    "tooltip": true,
+    "on-click": "/usr/local/bin/debian-labwc-module-menu system monitor",
+    "on-click-right": "/usr/local/bin/debian-labwc-module-menu system menu"
   },
   "memory": {
-    "format": "󰘚  {}%"
+    "interval": 10,
+    "states": {
+      "warning": 70,
+      "critical": 90
+    },
+    "format": "󰘚  {percentage}%",
+    "tooltip-format": "{used:0.1f} GiB / {total:0.1f} GiB\nSwap {swapUsed:0.1f} / {swapTotal:0.1f} GiB",
+    "on-click": "/usr/local/bin/debian-labwc-module-menu system monitor",
+    "on-click-right": "/usr/local/bin/debian-labwc-module-menu system memory"
+  },
+  "disk": {
+    "interval": 30,
+    "path": "/",
+    "unit": "GiB",
+    "states": {
+      "warning": 75,
+      "critical": 90
+    },
+    "format": "󰋊  {percentage_used}%",
+    "tooltip-format": "{used} used of {total}\n{free} free on {path}",
+    "on-click": "/usr/local/bin/debian-labwc-module-menu storage ncdu",
+    "on-click-right": "/usr/local/bin/debian-labwc-module-menu storage menu"
   },
   "custom/player": {
-    "exec": "playerctl metadata --format '{{ artist }} - {{ title }}' 2>/dev/null || printf 'idle'",
+    "exec": "/usr/local/bin/debian-labwc-player-status",
     "interval": 2,
-    "return-type": "text"
+    "return-type": "text",
+    "max-length": 38,
+    "tooltip": false,
+    "on-click": "playerctl play-pause",
+    "on-click-middle": "playerctl stop",
+    "on-click-right": "/usr/local/bin/debian-labwc-module-menu player menu",
+    "on-scroll-up": "playerctl next",
+    "on-scroll-down": "playerctl previous"
   },
   "custom/power": {
-    "format": "",
+    "format": "  Power",
+    "tooltip": false,
     "on-click": "/usr/local/bin/debian-labwc-power-menu"
   }
 }
@@ -370,18 +447,47 @@ render_waybar_style() {
 * {
   font-family: "Noto Sans", "Font Awesome 6 Free", "Material Design Icons";
   font-size: 13px;
+  min-height: 0;
+  font-feature-settings: "tnum";
 }
 
 window#waybar {
-  background: rgba(17, 17, 17, 0.92);
-  color: #f5f5f5;
+  background: rgba(10, 14, 20, 0.84);
+  color: #edf2f7;
+  border-bottom: 1px solid rgba(173, 181, 189, 0.16);
+}
+
+#workspaces {
+  margin: 5px 0;
+  padding: 0 4px;
+  border-radius: 14px;
+  background: rgba(25, 32, 44, 0.74);
+  border: 1px solid rgba(88, 101, 119, 0.25);
 }
 
 #workspaces button {
-  color: #f5f5f5;
-  padding: 0 10px;
+  color: #d7dde6;
+  padding: 0 12px;
+  margin: 4px 2px;
+  border-radius: 10px;
+  background: transparent;
 }
 
+#workspaces button:hover {
+  background: rgba(92, 165, 219, 0.18);
+  color: #ffffff;
+}
+
+#workspaces button.active {
+  background: linear-gradient(180deg, rgba(109, 196, 237, 0.92), rgba(71, 167, 214, 0.92));
+  color: #09121b;
+}
+
+#taskbar {
+  margin: 5px 0 5px 8px;
+}
+
+#custom-launcher,
 #clock,
 #network,
 #pulseaudio,
@@ -389,11 +495,80 @@ window#waybar {
 #backlight,
 #cpu,
 #memory,
+#disk,
 #custom-player,
 #custom-power,
 #tray {
-  margin: 0 8px;
-  padding: 0 6px;
+  margin: 5px 0 5px 8px;
+  padding: 0 12px;
+  min-height: 28px;
+  border-radius: 14px;
+  background: rgba(25, 32, 44, 0.74);
+  border: 1px solid rgba(88, 101, 119, 0.25);
+}
+
+#custom-launcher {
+  color: #f6bd60;
+  font-weight: 600;
+}
+
+#clock {
+  color: #f3f4f6;
+}
+
+#network.disconnected,
+#network.disabled {
+  color: #f6ad55;
+}
+
+#pulseaudio.muted {
+  color: #f6ad55;
+}
+
+#battery.charging,
+#battery.full {
+  color: #9ae6b4;
+}
+
+#battery.warning,
+#cpu.warning,
+#memory.warning,
+#disk.warning {
+  color: #f6e05e;
+}
+
+#battery.critical,
+#cpu.critical,
+#memory.critical,
+#disk.critical {
+  color: #fc8181;
+}
+
+#custom-player {
+  color: #c4b5fd;
+}
+
+#custom-power {
+  background: rgba(68, 25, 33, 0.78);
+  border-color: rgba(246, 173, 173, 0.28);
+  color: #fed7d7;
+  font-weight: 600;
+}
+
+#custom-launcher:hover,
+#clock:hover,
+#network:hover,
+#pulseaudio:hover,
+#battery:hover,
+#backlight:hover,
+#cpu:hover,
+#memory:hover,
+#disk:hover,
+#custom-player:hover,
+#custom-power:hover,
+#tray:hover {
+  background: rgba(40, 54, 74, 0.92);
+  border-color: rgba(119, 141, 169, 0.38);
 }
 EOF
 )"
@@ -476,8 +651,8 @@ EOF
 }
 
 render_wofi() {
-  render_user_file "$LABWC_TARGET_HOME/.config/wofi/config" $'show=drun\nwidth=36%\nheight=40%\nprompt=Run\nallow_images=true\n'
-  render_user_file "$LABWC_TARGET_HOME/.config/wofi/style.css" $'window {\n  margin: 0;\n  border: 2px solid #444;\n  background-color: rgba(20, 20, 20, 0.95);\n}\n#input {\n  margin: 8px;\n}\n#entry:selected {\n  background-color: #2d5a88;\n}\n'
+  render_user_file "$LABWC_TARGET_HOME/.config/wofi/config" $'show=drun\nwidth=34%\nheight=48%\nprompt=Run\nallow_images=true\ninsensitive=true\n'
+  render_user_file "$LABWC_TARGET_HOME/.config/wofi/style.css" $'window {\n  margin: 0;\n  padding: 14px;\n  border: 1px solid rgba(111, 124, 143, 0.32);\n  border-radius: 18px;\n  background-color: rgba(12, 17, 24, 0.96);\n}\n#outer-box {\n  padding: 4px;\n}\n#input {\n  margin: 0 0 12px 0;\n  padding: 12px 14px;\n  border-radius: 12px;\n  border: 1px solid rgba(80, 97, 119, 0.35);\n  background-color: rgba(24, 31, 43, 0.92);\n  color: #edf2f7;\n}\n#entry {\n  padding: 10px 12px;\n  border-radius: 12px;\n}\n#entry:selected {\n  background: linear-gradient(180deg, rgba(109, 196, 237, 0.92), rgba(71, 167, 214, 0.92));\n  color: #07111b;\n}\n#text {\n  color: inherit;\n}\n'
 }
 
 render_mako() {
