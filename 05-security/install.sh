@@ -57,20 +57,22 @@ phase_doctor() {
   require_debian_trixie
   require_amd64
   require_command apt
+  require_command install
+  require_command runuser
+  require_command systemctl
+}
+
+phase_bootstrap_doctor() {
   require_command curl
   require_command gpg
   require_command tar
   require_command awk
   require_command sed
   require_command python3
-  require_command install
-  require_command libtool
-  require_command runuser
-  require_command systemctl
   require_command openssl
   require_command make
   require_command sha256sum
-  require_command ldconfig
+  [[ -x /usr/sbin/ldconfig ]] || die "missing /usr/sbin/ldconfig (package libc-bin)"
 }
 
 phase_install() {
@@ -79,6 +81,7 @@ phase_install() {
   load_env_file
   detect_security_download_user
   install_bootstrap_packages
+  phase_bootstrap_doctor
   install_crowdsec_repository
   apt_update
   install_crowdsec_packages
@@ -95,6 +98,7 @@ phase_install() {
 phase_verify() {
   log_info "phase: verify"
   phase_doctor
+  phase_bootstrap_doctor
   load_env_file
   detect_security_download_user
   verify_security_install

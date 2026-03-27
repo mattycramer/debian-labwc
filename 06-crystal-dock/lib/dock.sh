@@ -117,22 +117,6 @@ EOF
   write_root_file "$CRYSTAL_DOCK_WRAPPER_PATH" 0755 "$wrapper"
 }
 
-render_labwc_autostart_fragment() {
-  local fragment_path="$DOCK_TARGET_HOME/.config/labwc/autostart.d/50-crystal-dock.sh"
-  local fragment
-  fragment="$(cat <<'EOF'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-IFS=$'\n\t'
-
-command -v /usr/local/bin/debian-labwc-crystal-dock >/dev/null 2>&1 || exit 0
-pgrep -x crystal-dock >/dev/null 2>&1 && exit 0
-/usr/local/bin/debian-labwc-crystal-dock >/dev/null 2>&1 &
-EOF
-)"
-  write_user_file "$fragment_path" 0755 "$fragment"
-}
-
 ensure_labwc_autostart_hook() {
   local autostart_path="$DOCK_TARGET_HOME/.config/labwc/autostart"
   if [[ ! -f "$autostart_path" ]]; then
@@ -141,30 +125,17 @@ ensure_labwc_autostart_hook() {
 #!/usr/bin/env bash
 set -Eeuo pipefail
 IFS=\$'\\n\\t'
-
-autostart_dir="$DOCK_TARGET_HOME/.config/labwc/autostart.d"
-if [[ -d "\$autostart_dir" ]]; then
-  while IFS= read -r -d '' autostart_fragment; do
-    bash "\$autostart_fragment" >/dev/null 2>&1 || true
-  done < <(find "\$autostart_dir" -maxdepth 1 -type f -name '*.sh' -print0 | sort -z)
-fi
 EOF
 )"
     write_user_file "$autostart_path" 0755 "$autostart_content"
-    return 0
   fi
-  grep -F '.config/labwc/autostart.d' "$autostart_path" >/dev/null && return 0
   grep -F "$CRYSTAL_DOCK_AUTOSTART_MARKER_BEGIN" "$autostart_path" >/dev/null && return 0
   local hook
   hook="$(cat <<EOF
 
 $CRYSTAL_DOCK_AUTOSTART_MARKER_BEGIN
-autostart_dir="$DOCK_TARGET_HOME/.config/labwc/autostart.d"
-if [[ -d "\$autostart_dir" ]]; then
-  while IFS= read -r -d '' autostart_fragment; do
-    bash "\$autostart_fragment" >/dev/null 2>&1 || true
-  done < <(find "\$autostart_dir" -maxdepth 1 -type f -name '*.sh' -print0 | sort -z)
-fi
+command -v /usr/local/bin/debian-labwc-crystal-dock >/dev/null 2>&1 || exit 0
+pgrep -x crystal-dock >/dev/null 2>&1 || /usr/local/bin/debian-labwc-crystal-dock >/dev/null 2>&1 &
 $CRYSTAL_DOCK_AUTOSTART_MARKER_END
 EOF
 )"
@@ -223,23 +194,19 @@ render_crystal_dock_config() {
   run_cmd install -d -m 0755 -o "$DOCK_TARGET_USER" -g "$DOCK_TARGET_USER" \
     "$DOCK_TARGET_HOME/.config" \
     "$DOCK_TARGET_HOME/.config/labwc" \
-    "$DOCK_TARGET_HOME/.config/labwc/autostart.d" \
     "$DOCK_TARGET_HOME/.config/crystal-dock" \
     "$DOCK_TARGET_HOME/.config/crystal-dock/labwc"
   render_wrapper_script
   render_appearance_config
   render_panel_config
-  render_labwc_autostart_fragment
   ensure_labwc_autostart_hook
   run_cmd chown -R "$DOCK_TARGET_USER:$DOCK_TARGET_USER" \
-    "$DOCK_TARGET_HOME/.config/crystal-dock" \
-    "$DOCK_TARGET_HOME/.config/labwc/autostart.d"
+    "$DOCK_TARGET_HOME/.config/crystal-dock"
 }
 
 verify_crystal_dock_install() {
   local appearance_path="$DOCK_TARGET_HOME/.config/crystal-dock/labwc/appearance.conf"
   local panel_path="$DOCK_TARGET_HOME/.config/crystal-dock/labwc/panel_1.conf"
-  local fragment_path="$DOCK_TARGET_HOME/.config/labwc/autostart.d/50-crystal-dock.sh"
   local autostart_path="$DOCK_TARGET_HOME/.config/labwc/autostart"
 
   [[ "$(dpkg-query -W -f='${Status}\n' crystal-dock 2>/dev/null || true)" == *"install ok installed"* ]] || die "crystal-dock package is not installed"
@@ -248,16 +215,13 @@ verify_crystal_dock_install() {
   require_file "$CRYSTAL_DOCK_WRAPPER_PATH"
   require_file "$appearance_path"
   require_file "$panel_path"
-  require_file "$fragment_path"
   require_file "$autostart_path"
 
   grep -F 'XDG_CURRENT_DESKTOP="labwc:wlroots"' "$CRYSTAL_DOCK_WRAPPER_PATH" >/dev/null || die "wrapper missing labwc/wlroots desktop override"
   grep -F "panelStyle=${CRYSTAL_DOCK_PANEL_STYLE}" "$appearance_path" >/dev/null || die "appearance config missing expected panel style"
   grep -F "position=${CRYSTAL_DOCK_POSITION}" "$panel_path" >/dev/null || die "panel config missing expected position"
   grep -F "showTaskManager=${CRYSTAL_DOCK_SHOW_TASK_MANAGER}" "$panel_path" >/dev/null || die "panel config missing expected task manager state"
-  grep -F '/usr/local/bin/debian-labwc-crystal-dock >/dev/null 2>&1 &' "$fragment_path" >/dev/null || die "autostart fragment missing dock launcher"
-
-  grep -F '.config/labwc/autostart.d' "$autostart_path" >/dev/null || die "labwc autostart missing autostart.d hook"
+  grep -F '/usr/local/bin/debian-labwc-crystal-dock >/dev/null 2>&1 &' "$autostart_path" >/dev/null || die "labwc autostart missing crystal-dock launcher"
 
   [[ "$(stat -c '%U:%G' "$appearance_path")" == "$DOCK_TARGET_USER:$DOCK_TARGET_USER" ]] || die "appearance config ownership is wrong"
   [[ "$(stat -c '%U:%G' "$panel_path")" == "$DOCK_TARGET_USER:$DOCK_TARGET_USER" ]] || die "panel config ownership is wrong"
@@ -270,7 +234,6 @@ remove_crystal_dock_install() {
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" crystal-dock || true
   run_cmd rm -f -- "$CRYSTAL_DOCK_WRAPPER_PATH"
   run_cmd rm -rf -- "$DOCK_TARGET_HOME/.config/crystal-dock"
-  run_cmd rm -f -- "$DOCK_TARGET_HOME/.config/labwc/autostart.d/50-crystal-dock.sh"
 
   local autostart_path="$DOCK_TARGET_HOME/.config/labwc/autostart"
   if [[ -f "$autostart_path" ]]; then

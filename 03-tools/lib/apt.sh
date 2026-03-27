@@ -89,17 +89,27 @@ install_repository_files() {
   run_cmd gpg --dearmor --yes --output "$microsoft_key_gpg" "$microsoft_key_asc"
   run_cmd chmod 0644 "$microsoft_key_gpg"
   run_cmd rm -f -- "$microsoft_key_asc"
-  printf '%s' 'deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/code stable main
-' > /etc/apt/sources.list.d/vscode.list
-  run_cmd chmod 0644 /etc/apt/sources.list.d/vscode.list
+  printf '%s' 'Types: deb
+URIs: https://packages.microsoft.com/repos/code
+Suites: stable
+Components: main
+Architectures: amd64
+Signed-By: /usr/share/keyrings/microsoft.gpg
+' > /etc/apt/sources.list.d/vscode.sources
+  run_cmd chmod 0644 /etc/apt/sources.list.d/vscode.sources
 
   download_as_tools_user "https://repository.mullvad.net/deb/mullvad-keyring.asc" "$mullvad_key_asc"
   run_cmd gpg --dearmor --yes --output "$mullvad_key_gpg" "$mullvad_key_asc"
   run_cmd chmod 0644 "$mullvad_key_gpg"
   run_cmd rm -f -- "$mullvad_key_asc"
-  printf '%s' 'deb [signed-by=/usr/share/keyrings/mullvad-keyring.gpg arch=amd64] https://repository.mullvad.net/deb/stable stable main
-' > /etc/apt/sources.list.d/mullvad.list
-  run_cmd chmod 0644 /etc/apt/sources.list.d/mullvad.list
+  printf '%s' 'Types: deb
+URIs: https://repository.mullvad.net/deb/stable
+Suites: stable
+Components: main
+Architectures: amd64
+Signed-By: /usr/share/keyrings/mullvad-keyring.gpg
+' > /etc/apt/sources.list.d/mullvad.sources
+  run_cmd chmod 0644 /etc/apt/sources.list.d/mullvad.sources
 }
 
 install_normal_tools() {
@@ -179,16 +189,20 @@ verify_tools_install() {
   package_is_installed bitwarden || die "bitwarden package is not installed"
   package_pattern_installed '^obsidian($|[-])' || die "obsidian package is not installed"
   package_pattern_installed 'filen' || die "filen package is not installed"
-  [[ -f "/etc/apt/sources.list.d/vscode.list" ]] || die "missing vscode.list"
-  [[ -f "/etc/apt/sources.list.d/mullvad.list" ]] || die "missing mullvad.list"
+  [[ -f "/etc/apt/sources.list.d/vscode.sources" ]] || die "missing vscode.sources"
+  [[ -f "/etc/apt/sources.list.d/mullvad.sources" ]] || die "missing mullvad.sources"
   [[ -f "/usr/share/keyrings/microsoft.gpg" ]] || die "missing microsoft keyring"
   [[ -f "/usr/share/keyrings/mullvad-keyring.gpg" ]] || die "missing mullvad keyring"
-  grep -F 'arch=amd64' /etc/apt/sources.list.d/vscode.list >/dev/null || die "vscode source missing amd64 architecture"
-  grep -F 'signed-by=/usr/share/keyrings/microsoft.gpg' /etc/apt/sources.list.d/vscode.list >/dev/null || die "vscode source missing microsoft signed-by key"
-  grep -F 'https://packages.microsoft.com/repos/code stable main' /etc/apt/sources.list.d/vscode.list >/dev/null || die "vscode source missing expected repo uri"
-  grep -F 'arch=amd64' /etc/apt/sources.list.d/mullvad.list >/dev/null || die "mullvad source missing amd64 architecture"
-  grep -F 'signed-by=/usr/share/keyrings/mullvad-keyring.gpg' /etc/apt/sources.list.d/mullvad.list >/dev/null || die "mullvad source missing mullvad signed-by key"
-  grep -F 'https://repository.mullvad.net/deb/stable stable main' /etc/apt/sources.list.d/mullvad.list >/dev/null || die "mullvad source missing expected repo uri"
+  grep -F 'Architectures: amd64' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing amd64 architecture"
+  grep -F 'Signed-By: /usr/share/keyrings/microsoft.gpg' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing microsoft signed-by key"
+  grep -F 'URIs: https://packages.microsoft.com/repos/code' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing expected repo uri"
+  grep -F 'Suites: stable' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing stable suite"
+  grep -F 'Components: main' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing main component"
+  grep -F 'Architectures: amd64' /etc/apt/sources.list.d/mullvad.sources >/dev/null || die "mullvad source missing amd64 architecture"
+  grep -F 'Signed-By: /usr/share/keyrings/mullvad-keyring.gpg' /etc/apt/sources.list.d/mullvad.sources >/dev/null || die "mullvad source missing mullvad signed-by key"
+  grep -F 'URIs: https://repository.mullvad.net/deb/stable' /etc/apt/sources.list.d/mullvad.sources >/dev/null || die "mullvad source missing expected repo uri"
+  grep -F 'Suites: stable' /etc/apt/sources.list.d/mullvad.sources >/dev/null || die "mullvad source missing stable suite"
+  grep -F 'Components: main' /etc/apt/sources.list.d/mullvad.sources >/dev/null || die "mullvad source missing main component"
   [[ -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf" ]] || die "missing mpv.conf"
   [[ "$(stat -c '%U:%G' "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf")" == "$TOOLS_TARGET_USER:$TOOLS_TARGET_USER" ]] || die "mpv.conf ownership is wrong"
 }

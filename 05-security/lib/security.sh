@@ -40,7 +40,7 @@ readonly CROWDSEC_PACKAGES=(
 readonly SECURITY_RUNTIME_ROOT="/var/lib/debian-labwc-security"
 readonly MANIFEST_ROOT="${SECURITY_RUNTIME_ROOT}/manifests"
 readonly CROWDSEC_KEYRING_PATH="/etc/apt/keyrings/crowdsec_crowdsec-archive-keyring.gpg"
-readonly CROWDSEC_LIST_PATH="/etc/apt/sources.list.d/crowdsec_crowdsec.list"
+readonly CROWDSEC_SOURCE_PATH="/etc/apt/sources.list.d/crowdsec_crowdsec.sources"
 readonly CROWDSEC_PREFS_PATH="/etc/apt/preferences.d/crowdsec"
 readonly CROWDSEC_ACQUIS_PATH="/etc/crowdsec/acquis.d/debian-labwc-security.yaml"
 readonly CROWDSEC_BOUNCER_KEY_PATH="/etc/crowdsec/bouncers/debian-labwc-firewall-bouncer.key"
@@ -58,6 +58,7 @@ readonly AIDE_DB_PATH="/var/lib/aide/aide.db.gz"
 readonly AIDE_DB_NEW_PATH="/var/lib/aide/aide.db.new.gz"
 readonly AIDE_CHECK_SERVICE_PATH="/etc/systemd/system/debian-labwc-security-aide-check.service"
 readonly AIDE_CHECK_TIMER_PATH="/etc/systemd/system/debian-labwc-security-aide-check.timer"
+readonly LDCONFIG_BIN="/usr/sbin/ldconfig"
 
 detect_security_download_user() {
   if [[ -n "${SECURITY_DOWNLOAD_USER:-}" ]] && id "$SECURITY_DOWNLOAD_USER" >/dev/null 2>&1; then
@@ -142,7 +143,7 @@ install_crowdsec_repository() {
   run_cmd gpg --dearmor --yes --output "$CROWDSEC_KEYRING_PATH" "$key_path"
   run_cmd rm -f -- "$key_path"
   run_cmd chmod 0644 "$CROWDSEC_KEYRING_PATH"
-  write_text_file "$CROWDSEC_LIST_PATH" $'deb [signed-by=/etc/apt/keyrings/crowdsec_crowdsec-archive-keyring.gpg] https://packagecloud.io/crowdsec/crowdsec/any any main\ndeb-src [signed-by=/etc/apt/keyrings/crowdsec_crowdsec-archive-keyring.gpg] https://packagecloud.io/crowdsec/crowdsec/any any main\n'
+  write_text_file "$CROWDSEC_SOURCE_PATH" $'Types: deb deb-src\nURIs: https://packagecloud.io/crowdsec/crowdsec/any\nSuites: any\nComponents: main\nArchitectures: amd64\nSigned-By: /etc/apt/keyrings/crowdsec_crowdsec-archive-keyring.gpg\n'
   write_text_file "$CROWDSEC_PREFS_PATH" $'Package: *\nPin: release o=packagecloud.io/crowdsec/crowdsec,a=any,n=any,c=main\nPin-Priority: 1001\n'
 }
 
@@ -245,8 +246,7 @@ netfilter_pkg_config_path() {
 }
 
 finalize_local_libtool_install() {
-  run_cmd libtool --finish /usr/local/lib
-  run_cmd ldconfig
+  run_cmd "$LDCONFIG_BIN"
 }
 
 install_latest_libmnl() {
@@ -351,7 +351,7 @@ install_latest_aide() {
     run_cmd make DESTDIR="$stage_root" install
   )
   copy_staged_tree "$stage_root" "aide"
-  run_cmd ldconfig
+  run_cmd "$LDCONFIG_BIN"
   run_cmd rm -rf -- "$tmpdir"
 }
 
@@ -548,7 +548,7 @@ remove_security_install() {
   remove_manifest_files "${MANIFEST_ROOT}/libnftnl.files"
   run_cmd rm -rf -- "$MANIFEST_ROOT"
 
-  run_cmd rm -f -- "$CROWDSEC_KEYRING_PATH" "$CROWDSEC_LIST_PATH" "$CROWDSEC_PREFS_PATH"
+  run_cmd rm -f -- "$CROWDSEC_KEYRING_PATH" "$CROWDSEC_SOURCE_PATH" "$CROWDSEC_PREFS_PATH"
   run_cmd rm -f -- "$NFTABLES_CONF_PATH" "$NFTABLES_CROWDSEC_RULES_PATH" "$NFTABLES_DROPIN_PATH"
   run_cmd rmdir --ignore-fail-on-non-empty "$NFTABLES_DROPIN_DIR" >/dev/null 2>&1 || true
   run_cmd rmdir --ignore-fail-on-non-empty "$NFTABLES_RULES_DIR" >/dev/null 2>&1 || true
@@ -560,6 +560,6 @@ remove_security_install() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" crowdsec crowdsec-firewall-bouncer-nftables nftables || true
-  run_cmd ldconfig
+  run_cmd "$LDCONFIG_BIN"
   systemd_daemon_reload
 }
