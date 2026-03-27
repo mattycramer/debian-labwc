@@ -109,6 +109,9 @@ verify_greetd_semantics() {
 verify_waybar_config_semantics() {
   local waybar_path="$LABWC_TARGET_HOME/.config/waybar/config.jsonc"
   grep -F '"custom/launcher"' "$waybar_path" >/dev/null || die "waybar config missing launcher module"
+  grep -F '"ext/workspaces"' "$waybar_path" >/dev/null || die "waybar config missing labwc-compatible ext/workspaces module"
+  ! grep -F '"wlr/workspaces"' "$waybar_path" >/dev/null || die "waybar config still references unsupported wlr/workspaces"
+  grep -F '"height": 42' "$waybar_path" >/dev/null || die "waybar config height is not set high enough for the configured modules"
   grep -F '"disk"' "$waybar_path" >/dev/null || die "waybar config missing disk module"
   grep -F '"/usr/local/bin/debian-labwc-launcher-menu"' "$waybar_path" >/dev/null || die "waybar config missing launcher click binding"
   grep -F '"/usr/local/bin/debian-labwc-module-menu network menu"' "$waybar_path" >/dev/null || die "waybar config missing network right-click menu"

@@ -286,28 +286,24 @@ render_labwc_autostart() {
   local wallpaper_path="$LABWC_TARGET_HOME/.local/share/debian-labwc/labwall2-1920x1080.png"
   local autostart
   autostart="$(cat <<EOF
-#!/usr/bin/env bash
-set -Eeuo pipefail
-IFS=\$'\\n\\t'
+#!/bin/sh
+set -eu
+IFS='
+	'
 
 export XDG_CURRENT_DESKTOP=labwc:wlroots
-
-wait_for_user_bus() {
-  local attempt=1
-  while (( attempt <= 20 )); do
-    if systemctl --user --quiet is-active dbus.service >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 1
-    attempt=\$((attempt + 1))
-  done
-  return 0
-}
 
 pgrep -x foot >/dev/null 2>&1 || foot --server &
 pgrep -x swaybg >/dev/null 2>&1 || swaybg -i "$wallpaper_path" -m "${LABWC_WALLPAPER_MODE}" &
 
-wait_for_user_bus
+attempt=1
+while [ "\$attempt" -le 20 ]; do
+  if systemctl --user --quiet is-active dbus.service >/dev/null 2>&1; then
+    break
+  fi
+  sleep 1
+  attempt=\$((attempt + 1))
+done
 
 pgrep -x waybar >/dev/null 2>&1 || waybar &
 pgrep -x kanshi >/dev/null 2>&1 || kanshi &
@@ -319,15 +315,16 @@ pgrep -x swayidle >/dev/null 2>&1 || swayidle \
   resume '/usr/local/bin/debian-labwc-dpms on' \
   before-sleep 'swaylock -f' &
 
-if [[ ! -f "$LABWC_TARGET_HOME/.config/debian-labwc/.outputs-refined" ]]; then
+if [ ! -f "$LABWC_TARGET_HOME/.config/debian-labwc/.outputs-refined" ]; then
   /usr/local/bin/debian-labwc-refresh-outputs >/dev/null 2>&1 &
 fi
 
 autostart_dir="$LABWC_TARGET_HOME/.config/labwc/autostart.d"
-if [[ -d "\$autostart_dir" ]]; then
-  while IFS= read -r -d '' autostart_fragment; do
-    bash "\$autostart_fragment" >/dev/null 2>&1 || true
-  done < <(find "\$autostart_dir" -maxdepth 1 -type f -name '*.sh' -print0 | sort -z)
+if [ -d "\$autostart_dir" ]; then
+  find "\$autostart_dir" -maxdepth 1 -type f -name '*.sh' | sort | while IFS= read -r autostart_fragment; do
+    [ -n "\$autostart_fragment" ] || continue
+    "\$autostart_fragment" >/dev/null 2>&1 || true
+  done
 fi
 EOF
 )"
@@ -337,9 +334,10 @@ EOF
 render_labwc_shutdown() {
   local shutdown
   shutdown="$(cat <<'EOF'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-IFS=$'\n\t'
+#!/bin/sh
+set -eu
+IFS='
+	'
 
 # Stop session clients first so they do not keep poking D-Bus or PipeWire
 # while the compositor and user bus are already shutting down.
@@ -369,9 +367,9 @@ render_waybar_config() {
 {
   "layer": "top",
   "position": "top",
-  "height": 36,
+  "height": 42,
   "spacing": 6,
-  "modules-left": ["custom/launcher", "wlr/workspaces", "wlr/taskbar"],
+  "modules-left": ["custom/launcher", "ext/workspaces", "wlr/taskbar"],
   "modules-center": ["clock"],
   "modules-right": ["network", "pulseaudio", "battery", "backlight", "cpu", "memory", "disk", "custom/player", "tray", "custom/power"],
   "custom/launcher": {
@@ -380,12 +378,15 @@ render_waybar_config() {
     "on-click": "/usr/local/bin/debian-labwc-launcher-menu",
     "on-click-right": "wofi --show drun"
   },
-  "wlr/workspaces": {
-    "format": "{name}"
+  "ext/workspaces": {
+    "format": "{name}",
+    "sort-by-number": true,
+    "on-click": "activate"
   },
   "wlr/taskbar": {
-    "format": "{icon}",
-    "tooltip-format": "{title}"
+    "format": "{app_id}",
+    "tooltip-format": "{title}",
+    "on-click": "minimize-raise"
   },
   "clock": {
     "interval": 30,
@@ -725,7 +726,7 @@ render_swaylock() {
 }
 
 render_foot() {
-  render_user_file "$LABWC_TARGET_HOME/.config/foot/foot.ini" $'[main]\nfont=Noto Sans Mono:size=11\npad=8x8\n\n[colors]\nbackground=111111\nforeground=f5f5f5\n'
+  render_user_file "$LABWC_TARGET_HOME/.config/foot/foot.ini" $'[main]\nfont=Noto Sans Mono:size=11\npad=8x8\n\n[bell]\nsystem=no\n\n[colors]\nbackground=111111\nforeground=f5f5f5\n'
 }
 
 render_gammastep() {

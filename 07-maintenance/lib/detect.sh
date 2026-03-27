@@ -64,11 +64,10 @@ detect_grub_kernel_parameters() {
 }
 
 detect_btrfs_layout() {
-  local root_source_raw root_source_raw_fs root_source uuid device mountpoint partition partition_uuid root_options_raw root_flags opt
+  local root_source_raw root_source_raw_fs root_source uuid device mountpoint device_uuid partition partition_uuid root_options_raw root_flags opt
   local -a devices=()
   local -a mountpoints=()
   local -a partitions=()
-  local -a unmounted_partitions=()
 
   root_source_raw="$(findmnt -rn -o SOURCE / || true)"
   root_source_raw_fs="$(findmnt -rn -o FSTYPE / || true)"
@@ -84,13 +83,12 @@ detect_btrfs_layout() {
   fi
   [[ -n "$uuid" ]] || die "could not determine UUID for root Btrfs device '$root_source'"
 
-  while IFS= read -r device; do
+  while IFS=$'\t' read -r device mountpoint device_uuid; do
     [[ -n "$device" ]] || continue
+    [[ "$device_uuid" == "$uuid" ]] || continue
     devices+=("$device")
-    mountpoint="$(findmnt -rn -t btrfs --first-only -o TARGET -S "$device" || true)"
-    [[ -n "$mountpoint" ]] || die "could not determine representative mountpoint for '$device'"
     mountpoints+=("$mountpoint")
-  done < <(findmnt -rn -t btrfs -o SOURCE --nofsroot | strip_findmnt_fsroot | sort -u)
+  done < <(findmnt -rn -t btrfs -o SOURCE,TARGET,UUID --nofsroot | strip_findmnt_fsroot | sort -u)
 
   ((${#devices[@]} > 0)) || die "no mounted Btrfs block devices were detected"
 
@@ -102,12 +100,6 @@ detect_btrfs_layout() {
   done < <(lsblk -rno PATH,TYPE,FSTYPE | awk '$2 == "part" && $3 == "btrfs" {print $1}' | sort -u)
 
   ((${#partitions[@]} > 0)) || die "no Btrfs partitions matching root UUID '$uuid' were detected via lsblk"
-
-  for partition in "${partitions[@]}"; do
-    if [[ " ${devices[*]} " != *" ${partition} "* ]]; then
-      unmounted_partitions+=("$partition")
-    fi
-  done
 
   root_flags=""
   IFS=',' read -r -a root_options_array <<<"$root_options_raw"
@@ -128,7 +120,7 @@ detect_btrfs_layout() {
   MAINTENANCE_ROOT_BTRFS_UUID="$uuid"
   MAINTENANCE_ROOT_BTRFS_KERNEL_FLAGS="rootfstype=btrfs rootflags=${root_flags}"
   MAINTENANCE_BTRFS_PARTITION_LIST="$(IFS=:; printf '%s' "${partitions[*]}")"
-  MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST="$(IFS=:; printf '%s' "${unmounted_partitions[*]}")"
+  MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST=""
   MAINTENANCE_BTRFS_PARTITION_COUNT="${#partitions[@]}"
   MAINTENANCE_BTRFS_DEVICE_LIST="$(IFS=:; printf '%s' "${devices[*]}")"
   MAINTENANCE_BTRFS_MOUNTPOINT_LIST="$(IFS=:; printf '%s' "${mountpoints[*]}")"
@@ -198,8 +190,5 @@ detect_host_layout() {
   detect_btrfs_layout
   detect_grub_kernel_parameters
   write_autogen_block "$env_file"
-  if [[ -n "$MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST" ]]; then
-    log_warn "detected unmounted Btrfs partition(s): ${MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST}"
-  fi
   log_info "detected ${MAINTENANCE_BTRFS_PARTITION_COUNT} Btrfs partition(s) and ${MAINTENANCE_BTRFS_DEVICE_COUNT} mounted Btrfs device(s); root=${MAINTENANCE_ROOT_BTRFS_SOURCE}"
 }
