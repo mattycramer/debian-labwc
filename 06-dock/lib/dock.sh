@@ -72,31 +72,26 @@ patch_crystal_dock_source_tree() {
   [[ -f "$desktop_env_path" ]] || die "missing Crystal Dock desktop_env.cc after source extract"
   run_cmd python3 - "$cmake_path" <<'PY'
 from pathlib import Path
+import re
 import sys
 
 path = Path(sys.argv[1])
 text = path.read_text()
 
-old_find = """find_package(Qt6 6.6 REQUIRED COMPONENTS DBus Gui Test Widgets)
-find_package(Wayland 1.22 REQUIRED COMPONENTS Client)
-find_package(LayerShellQt 6.0 REQUIRED)
-"""
-
-new_find = """find_package(Qt6 6.6 REQUIRED COMPONENTS DBus Gui Test Widgets)
-find_package(Wayland 1.22 REQUIRED COMPONENTS Client)
-find_package(LayerShellQt 6.0 REQUIRED)
-"""
-
-old_libs = "set(LIBS Qt6::DBus Qt6::GuiPrivate Qt6::Widgets Wayland::Client LayerShellQt::Interface)\n"
-new_libs = "set(LIBS Qt6::DBus Qt6::Widgets Wayland::Client LayerShellQt::Interface)\n"
-
-if old_find not in text:
-    raise SystemExit("expected upstream Qt find_package block not found")
-if old_libs not in text:
-    raise SystemExit("expected upstream LIBS block not found")
-
-text = text.replace(old_find, new_find, 1)
-text = text.replace(old_libs, new_libs, 1)
+text = re.sub(
+    r'if \(Qt6_VERSION VERSION_GREATER_EQUAL 6\.9\.0\)\n'
+    r'  set\(QT_NO_PRIVATE_MODULE_WARNING ON\)\n'
+    r'  find_package\(Qt6 REQUIRED COMPONENTS GuiPrivate\)\n'
+    r'endif\(\)\n',
+    '',
+    text,
+    count=1,
+)
+text = text.replace(
+    'set(LIBS Qt6::DBus Qt6::GuiPrivate Qt6::Widgets Wayland::Client LayerShellQt::Interface)\n',
+    'set(LIBS Qt6::DBus Qt6::Widgets Wayland::Client LayerShellQt::Interface)\n',
+    1,
+)
 
 exclude_lines = [
     "    desktop/budgie_desktop_env.cc\n",
@@ -134,60 +129,11 @@ path.write_text(text)
 PY
   run_cmd python3 - "$desktop_env_path" <<'PY'
 from pathlib import Path
+import re
 import sys
 
 path = Path(sys.argv[1])
 text = path.read_text()
-
-old_includes = """#include "budgie_desktop_env.h"
-#include "hyprland_desktop_env.h"
-#include "kde_desktop_env.h"
-#include "labwc_desktop_env.h"
-#include "lxqt_desktop_env.h"
-#include "niri_desktop_env.h"
-#include "sway_desktop_env.h"
-#include "wayfire_desktop_env.h"
-#include <model/application_menu_config.h>
-#include <model/multi_dock_model.h>
-"""
-
-new_includes = """#include "labwc_desktop_env.h"
-#include <model/application_menu_config.h>
-#include <model/multi_dock_model.h>
-"""
-
-old_get = """DesktopEnv* DesktopEnv::getDesktopEnv() {
-  QString currentDesktopEnv = getDesktopEnvName();
-  if (currentDesktopEnv == "Budgie") {
-    static std::unique_ptr<BudgieDesktopEnv> budgie(new BudgieDesktopEnv);
-    return budgie.get();
-  } else if (currentDesktopEnv == "Hyprland") {
-    static std::unique_ptr<HyprlandDesktopEnv> hyprland(new HyprlandDesktopEnv);
-    return hyprland.get();
-  } else if (currentDesktopEnv == "KDE") {
-    static std::unique_ptr<KdeDesktopEnv> kde(new KdeDesktopEnv);
-    return kde.get();
-  } else if (currentDesktopEnv == "labwc") {
-    static std::unique_ptr<LabwcDesktopEnv> labwc(new LabwcDesktopEnv);
-    return labwc.get();
-  } else if (currentDesktopEnv == "LXQt") {
-    static std::unique_ptr<LxqtDesktopEnv> lxqt(new LxqtDesktopEnv);
-    return lxqt.get();
-  } else if (currentDesktopEnv == "niri") {
-    static std::unique_ptr<NiriDesktopEnv> niri(new NiriDesktopEnv);
-    return niri.get();
-  } else if (currentDesktopEnv == "sway") {
-    static std::unique_ptr<SwayDesktopEnv> sway(new SwayDesktopEnv);
-    return sway.get();
-  } else if (currentDesktopEnv == "Wayfire") {
-    static std::unique_ptr<WayfireDesktopEnv> wayfire(new WayfireDesktopEnv);
-    return wayfire.get();
-  }
-
-  static std::unique_ptr<DesktopEnv> generic(new DesktopEnv);
-  return generic.get();
-}
-"""
 
 new_get = """DesktopEnv* DesktopEnv::getDesktopEnv() {
   QString currentDesktopEnv = getDesktopEnvName();
@@ -201,13 +147,27 @@ new_get = """DesktopEnv* DesktopEnv::getDesktopEnv() {
 }
 """
 
-if old_includes not in text:
-    raise SystemExit("expected upstream desktop_env include block not found")
-if old_get not in text:
+exclude_headers = {
+    '#include "budgie_desktop_env.h"',
+    '#include "hyprland_desktop_env.h"',
+    '#include "kde_desktop_env.h"',
+    '#include "lxqt_desktop_env.h"',
+    '#include "niri_desktop_env.h"',
+    '#include "sway_desktop_env.h"',
+    '#include "wayfire_desktop_env.h"',
+}
+lines = [line for line in text.splitlines(True) if line.rstrip('\n') not in exclude_headers]
+text = ''.join(lines)
+text, count = re.subn(
+    r'DesktopEnv\* DesktopEnv::getDesktopEnv\(\) \{\n.*?\n\}\n',
+    new_get,
+    text,
+    count=1,
+    flags=re.S,
+)
+if count != 1:
     raise SystemExit("expected upstream DesktopEnv::getDesktopEnv block not found")
 
-text = text.replace(old_includes, new_includes, 1)
-text = text.replace(old_get, new_get, 1)
 path.write_text(text)
 PY
 }
