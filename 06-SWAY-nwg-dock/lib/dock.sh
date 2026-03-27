@@ -27,9 +27,7 @@ apt_yes_args() {
 }
 
 detect_target_user() {
-  if [[ -n "${NWG_TARGET_USER:-}" ]] && id "$NWG_TARGET_USER" >/dev/null 2>&1; then
-    :
-  elif [[ -n "${LABWC_TARGET_USER:-}" ]] && id "$LABWC_TARGET_USER" >/dev/null 2>&1; then
+  if [[ -n "${LABWC_TARGET_USER:-}" ]] && id "$LABWC_TARGET_USER" >/dev/null 2>&1; then
     NWG_TARGET_USER="$LABWC_TARGET_USER"
   elif [[ -n "${SUDO_USER:-}" ]] && [[ "${SUDO_USER:-}" != "root" ]] && id "${SUDO_USER:-}" >/dev/null 2>&1; then
     NWG_TARGET_USER="$SUDO_USER"
