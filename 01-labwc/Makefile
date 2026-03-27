@@ -1,5 +1,4 @@
 SHELL := /usr/bin/env bash
-RUN_INSTALL = if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh; else sudo bash ./install.sh; fi
 
 .PHONY: help doctor detect install render enable verify reconfigure print-env nuke
 
@@ -18,31 +17,31 @@ help:
 	  '  nuke        Remove generated state and disable installed wiring'
 
 doctor:
-	@$(RUN_INSTALL) --phase doctor
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase doctor; else sudo bash ./install.sh --phase doctor; fi
 
 detect:
-	@$(RUN_INSTALL) --phase detect
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase detect; else sudo bash ./install.sh --phase detect; fi
 
 install:
-	@$(RUN_INSTALL) --phase all
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase all; else sudo bash ./install.sh --phase all; fi
 
 render:
-	@$(RUN_INSTALL) --phase render
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase render; else sudo bash ./install.sh --phase render; fi
 
 enable:
-	@$(RUN_INSTALL) --phase enable
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase enable; else sudo bash ./install.sh --phase enable; fi
 
 verify:
-	@$(RUN_INSTALL) --phase verify
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase verify; else sudo bash ./install.sh --phase verify; fi
 
 reconfigure:
-	@$(RUN_INSTALL) --phase detect
-	@$(RUN_INSTALL) --phase render
-	@$(RUN_INSTALL) --phase enable
-	@$(RUN_INSTALL) --phase verify
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase detect; else sudo bash ./install.sh --phase detect; fi
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase render; else sudo bash ./install.sh --phase render; fi
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase enable; else sudo bash ./install.sh --phase enable; fi
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase verify; else sudo bash ./install.sh --phase verify; fi
 
 print-env:
-	@$(RUN_INSTALL) --phase print-env
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase print-env; else sudo bash ./install.sh --phase print-env; fi
 
 nuke:
-	@$(RUN_INSTALL) --phase nuke
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase nuke; else sudo bash ./install.sh --phase nuke; fi

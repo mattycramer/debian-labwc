@@ -1,5 +1,4 @@
 SHELL := /usr/bin/env bash
-RUN_INSTALL = if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh; else sudo bash ./install.sh; fi
 
 .PHONY: help doctor install verify nuke
 
@@ -13,13 +12,13 @@ help:
 	  '  nuke    Remove NVIDIA packages'
 
 doctor:
-	@$(RUN_INSTALL) --phase doctor
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase doctor; else sudo bash ./install.sh --phase doctor; fi
 
 install:
-	@$(RUN_INSTALL) --phase all
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase all; else sudo bash ./install.sh --phase all; fi
 
 verify:
-	@$(RUN_INSTALL) --phase verify
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase verify; else sudo bash ./install.sh --phase verify; fi
 
 nuke:
-	@$(RUN_INSTALL) --phase nuke
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase nuke; else sudo bash ./install.sh --phase nuke; fi
