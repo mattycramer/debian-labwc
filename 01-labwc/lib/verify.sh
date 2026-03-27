@@ -29,6 +29,7 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.config/labwc/rc.xml"
   require_file "$LABWC_TARGET_HOME/.config/labwc/menu.xml"
   require_file "$LABWC_TARGET_HOME/.config/labwc/autostart"
+  require_file "$LABWC_TARGET_HOME/.config/labwc/environment"
   require_file "$LABWC_TARGET_HOME/.config/labwc/shutdown"
   require_file "$LABWC_TARGET_HOME/.config/waybar/config.jsonc"
   require_file "$LABWC_TARGET_HOME/.config/kanshi/config"
@@ -78,6 +79,8 @@ verify_labwc_config_semantics() {
   grep -F '<device category="touchpad">' "$rc_path" >/dev/null || die "rc.xml missing touchpad libinput profile"
   grep -F '<device category="non-touch">' "$rc_path" >/dev/null || die "rc.xml missing non-touch libinput profile"
   grep -F "<naturalScroll>${LABWC_NATURAL_SCROLL}</naturalScroll>" "$rc_path" >/dev/null || die "rc.xml missing requested naturalScroll policy"
+  grep -F "XCURSOR_THEME=${LABWC_XCURSOR_THEME}" "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing XCURSOR_THEME"
+  grep -F "XCURSOR_SIZE=${LABWC_XCURSOR_SIZE}" "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing XCURSOR_SIZE"
 }
 
 verify_greetd_semantics() {

@@ -9,7 +9,6 @@ readonly NORMAL_BOOTSTRAP_PACKAGES=(
 
 readonly NORMAL_TOOLS_PACKAGES=(
   code
-  thorium-browser
   mullvad-browser-alpha
   mullvad-vpn
 )
@@ -60,7 +59,7 @@ write_text_file() {
   local temp_file
   temp_file="$(mktemp)"
   printf '%s' "$content" >"$temp_file"
-  install -D -m 0644 "$temp_file" "$destination"
+  run_cmd install -D -m 0644 "$temp_file" "$destination"
   rm -f -- "$temp_file"
 }
 
@@ -69,8 +68,7 @@ install_repository_files() {
   run_cmd install -D -o root -g root -m 0644 /tmp/microsoft.gpg /usr/share/keyrings/microsoft.gpg
   run_cmd rm -f /tmp/microsoft.gpg
   write_text_file "/etc/apt/sources.list.d/vscode.sources" $'Types: deb\nURIs: https://packages.microsoft.com/repos/code\nSuites: stable\nComponents: main\nArchitectures: amd64\nSigned-By: /usr/share/keyrings/microsoft.gpg\n'
-
-  write_text_file "/etc/apt/sources.list.d/thorium.sources" $'Types: deb\nURIs: https://dl.thorium.rocks/debian/\nSuites: stable\nComponents: main\nArchitectures: amd64\nTrusted: yes\n'
+  run_cmd rm -f /etc/apt/sources.list.d/thorium.sources /etc/apt/sources.list.d/thorium.list
 
   run_cmd curl -fsSLo /usr/share/keyrings/mullvad-keyring.asc https://repository.mullvad.net/deb/mullvad-keyring.asc
   write_text_file "/etc/apt/sources.list.d/mullvad.sources" $'Types: deb\nURIs: https://repository.mullvad.net/deb/stable\nSuites: stable\nComponents: main\nArchitectures: amd64\nSigned-By: /usr/share/keyrings/mullvad-keyring.asc\n'
@@ -103,7 +101,24 @@ install_deb_url() {
   run_cmd rm -f "$output_path"
 }
 
+resolve_latest_thorium_url() {
+  local index_html
+  local latest_deb
+  index_html="$(curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error "$THORIUM_INDEX_URL")"
+  latest_deb="$(
+    printf '%s' "$index_html" \
+      | grep -o 'thorium-browser_[0-9][0-9A-Za-z.+:~-]*_amd64\.deb' \
+      | sort -Vu \
+      | tail -n1
+  )"
+  [[ -n "$latest_deb" ]] || die "could not resolve latest Thorium .deb"
+  THORIUM_URL="${THORIUM_INDEX_URL}${latest_deb}"
+  export THORIUM_URL
+}
+
 install_deb_tools() {
+  resolve_latest_thorium_url
+  install_deb_url "$THORIUM_URL" /tmp/thorium-browser_amd64.deb
   install_deb_url "$BITWARDEN_URL" /tmp/bitwarden_amd64.deb
   install_deb_url "$OBSIDIAN_URL" /tmp/obsidian_amd64.deb
   install_deb_url "$FILEN_URL" /tmp/filen_amd64.deb
@@ -135,11 +150,11 @@ verify_tools_install() {
   for pkg in "${NORMAL_TOOLS_PACKAGES[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}"; do
     package_is_installed "$pkg" || die "package '$pkg' is not installed"
   done
+  package_is_installed thorium-browser || die "thorium-browser package is not installed"
   package_is_installed bitwarden || die "bitwarden package is not installed"
   package_pattern_installed '^obsidian($|[-])' || die "obsidian package is not installed"
   package_pattern_installed 'filen' || die "filen package is not installed"
   [[ -f "/etc/apt/sources.list.d/vscode.sources" ]] || die "missing vscode.sources"
-  [[ -f "/etc/apt/sources.list.d/thorium.sources" ]] || die "missing thorium.sources"
   [[ -f "/etc/apt/sources.list.d/mullvad.sources" ]] || die "missing mullvad.sources"
   [[ -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf" ]] || die "missing mpv.conf"
   [[ "$(stat -c '%U:%G' "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf")" == "$TOOLS_TARGET_USER:$TOOLS_TARGET_USER" ]] || die "mpv.conf ownership is wrong"
@@ -148,8 +163,8 @@ verify_tools_install() {
 remove_tools_install() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}" bitwarden obsidian filen || true
-  run_cmd rm -f /etc/apt/sources.list.d/vscode.sources /etc/apt/sources.list.d/thorium.sources /etc/apt/sources.list.d/mullvad.sources
+  run_cmd env DEBIAN_FRONTEND=noninteractive apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}" thorium-browser bitwarden obsidian filen || true
+  run_cmd rm -f /etc/apt/sources.list.d/vscode.sources /etc/apt/sources.list.d/thorium.sources /etc/apt/sources.list.d/thorium.list /etc/apt/sources.list.d/mullvad.sources
   run_cmd rm -f /usr/share/keyrings/microsoft.gpg /usr/share/keyrings/mullvad-keyring.asc
   run_cmd rm -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf"
 }

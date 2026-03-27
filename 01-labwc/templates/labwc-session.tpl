@@ -6,6 +6,8 @@ export XDG_SESSION_TYPE=wayland
 export XDG_CURRENT_DESKTOP=wlroots
 export XDG_SESSION_DESKTOP=labwc
 export DESKTOP_SESSION=labwc
+export XCURSOR_THEME=Adwaita
+export XCURSOR_SIZE=24
 
 if [[ -r "@RUNTIME_ENV_PATH@" ]]; then
   # shellcheck disable=SC1090,SC1091

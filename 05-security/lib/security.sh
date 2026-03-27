@@ -19,6 +19,7 @@ readonly BOOTSTRAP_PACKAGES=(
   libjansson-dev
   libgmp-dev
   libreadline-dev
+  libedit-dev
   libacl1-dev
   libattr1-dev
   libselinux1-dev

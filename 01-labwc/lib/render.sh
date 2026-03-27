@@ -26,6 +26,16 @@ render_runtime_env() {
   install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$1" "$runtime_dir/runtime.env"
 }
 
+render_labwc_environment() {
+  local environment_file
+  environment_file="$(cat <<EOF
+XCURSOR_THEME=${LABWC_XCURSOR_THEME}
+XCURSOR_SIZE=${LABWC_XCURSOR_SIZE}
+EOF
+)"
+  render_user_file "$LABWC_TARGET_HOME/.config/labwc/environment" "$environment_file"
+}
+
 ensure_user_base_dirs() {
   install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
     "$LABWC_TARGET_HOME/.config" \
@@ -281,7 +291,7 @@ IFS=\$'\\n\\t'
 
 export XDG_CURRENT_DESKTOP=wlroots
 if [[ -n "\${DBUS_SESSION_BUS_ADDRESS:-}" ]] && command -v systemctl >/dev/null 2>&1; then
-  dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=wlroots >/dev/null 2>&1 || true
+  dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=wlroots XCURSOR_THEME=${LABWC_XCURSOR_THEME} XCURSOR_SIZE=${LABWC_XCURSOR_SIZE} >/dev/null 2>&1 || true
 fi
 
 pgrep -x foot >/dev/null 2>&1 || foot --server &
@@ -387,6 +397,8 @@ render_waybar_config() {
     },
     "tooltip-format": "{desc}",
     "scroll-step": 5,
+    "reverse-scrolling": true,
+    "reverse-mouse-scrolling": true,
     "on-click": "pavucontrol",
     "on-click-middle": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
     "on-click-right": "/usr/local/bin/debian-labwc-module-menu audio menu"
@@ -412,8 +424,8 @@ render_waybar_config() {
     "format-icons": ["󰃞", "󰃟", "󰃠"],
     "scroll-step": 5,
     "tooltip-format": "Brightness {percent}%",
-    "reverse-scrolling": false,
-    "reverse-mouse-scrolling": false,
+    "reverse-scrolling": true,
+    "reverse-mouse-scrolling": true,
     "on-click-right": "/usr/local/bin/debian-labwc-module-menu brightness menu"
   },
   "cpu": {
@@ -684,7 +696,7 @@ EOF
 }
 
 render_wofi() {
-  render_user_file "$LABWC_TARGET_HOME/.config/wofi/config" $'show=drun\nwidth=34%\nheight=48%\nprompt=Run\nallow_images=true\ninsensitive=true\n'
+  render_user_file "$LABWC_TARGET_HOME/.config/wofi/config" $'show=drun\nwidth=720\nheight=540\nprompt=Run\nallow_images=true\ninsensitive=true\ngtk_dark=true\n'
   render_user_file "$LABWC_TARGET_HOME/.config/wofi/style.css" $'window {\n  margin: 0;\n  padding: 14px;\n  border: 1px solid rgba(111, 124, 143, 0.32);\n  border-radius: 18px;\n  background-color: rgba(12, 17, 24, 0.96);\n}\n#outer-box {\n  padding: 4px;\n}\n#input {\n  margin: 0 0 12px 0;\n  padding: 12px 14px;\n  border-radius: 12px;\n  border: 1px solid rgba(80, 97, 119, 0.35);\n  background-color: rgba(24, 31, 43, 0.92);\n  color: #edf2f7;\n}\n#entry {\n  padding: 10px 12px;\n  border-radius: 12px;\n}\n#entry:selected {\n  background: linear-gradient(180deg, rgba(109, 196, 237, 0.92), rgba(71, 167, 214, 0.92));\n  color: #07111b;\n}\n#text {\n  color: inherit;\n}\n'
 }
 
@@ -736,6 +748,7 @@ render_all_configs() {
   render_home_dirs
   render_shell_startup_files
   install_wallpaper
+  render_labwc_environment
   render_labwc_rc_xml
   render_labwc_menu_xml
   render_labwc_autostart

@@ -106,6 +106,8 @@ install_node_runtime() {
   run_cmd ln -sfn "${current_link}/bin/node" /usr/local/bin/node
   run_cmd ln -sfn "${current_link}/bin/npm" /usr/local/bin/npm
   run_cmd ln -sfn "${current_link}/bin/npx" /usr/local/bin/npx
+  run_cmd rm -f "${current_link}/bin/corepack" "${current_link}/bin/pnpm" "${current_link}/bin/pnpx"
+  run_cmd rm -rf "${current_link}/lib/node_modules/corepack" "${current_link}/lib/node_modules/pnpm"
   run_cmd "${current_link}/bin/npm" --prefix "$current_link" install --global "$COREPACK_NPM_SPEC"
   run_cmd ln -sfn "${current_link}/bin/corepack" /usr/local/bin/corepack
   run_cmd "${current_link}/bin/npm" --prefix "$current_link" install --global "$PNPM_NPM_SPEC"

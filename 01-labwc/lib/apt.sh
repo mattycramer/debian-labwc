@@ -24,6 +24,7 @@ readonly BACKPORTS_PACKAGES=(
   pipewire-pulse
   wireplumber
   dbus-user-session
+  at-spi2-core
   greetd
   tuigreet
   gammastep
@@ -56,6 +57,7 @@ readonly BACKPORTS_PACKAGES=(
   starship
   fonts-material-design-icons-iconfont
   fonts-weather-icons
+  adwaita-icon-theme-full
   file-roller
   ripgrep
   fd-find
