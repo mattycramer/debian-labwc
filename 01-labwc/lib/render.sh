@@ -154,6 +154,10 @@ EOF
   render_user_file "$LABWC_TARGET_HOME/.config/starship.toml" "$starship"
 }
 
+render_xfce_helpers() {
+  render_user_file "$LABWC_TARGET_HOME/.config/xfce4/helpers.rc" $'TerminalEmulator=foot\n'
+}
+
 render_labwc_rc_xml() {
   case "${LABWC_NATURAL_SCROLL:-}" in
     yes|no) ;;
@@ -749,6 +753,7 @@ render_all_configs() {
     "$config_root/labwc" \
     "$config_root/waybar" \
     "$config_root/kanshi" \
+    "$config_root/xfce4" \
     "$config_root/wofi" \
     "$config_root/mako" \
     "$config_root/swaylock" \
@@ -763,6 +768,7 @@ render_all_configs() {
   render_runtime_env "$env_file"
   render_home_dirs
   render_shell_startup_files
+  render_xfce_helpers
   install_wallpaper
   render_labwc_environment
   render_labwc_rc_xml

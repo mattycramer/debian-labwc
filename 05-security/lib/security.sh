@@ -44,7 +44,7 @@ readonly CROWDSEC_SOURCE_PATH="/etc/apt/sources.list.d/crowdsec_crowdsec.sources
 readonly CROWDSEC_PREFS_PATH="/etc/apt/preferences.d/crowdsec"
 readonly CROWDSEC_ACQUIS_PATH="/etc/crowdsec/acquis.d/debian-labwc-security.yaml"
 readonly CROWDSEC_BOUNCER_KEY_PATH="/etc/crowdsec/bouncers/debian-labwc-firewall-bouncer.key"
-readonly CROWDSEC_BOUNCER_LOCAL_PATH="/etc/crowdsec/bouncers/debian-labwc-firewall-bouncer.yaml.local"
+readonly CROWDSEC_BOUNCER_CONFIG_PATH="/etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml"
 readonly CROWDSEC_CONSOLE_MARKER="/etc/crowdsec/.console-enrolled-by-debian-labwc-security"
 readonly NFTABLES_CONF_PATH="/etc/nftables.conf"
 readonly NFTABLES_DROPIN_DIR="/etc/systemd/system/nftables.service.d"
@@ -395,6 +395,18 @@ ensure_crowdsec_bouncer_key() {
   export CROWDSEC_BOUNCER_API_KEY
 }
 
+wait_for_crowdsec_lapi() {
+  local attempt=1
+  while (( attempt <= 30 )); do
+    if cscli lapi status >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+    attempt=$((attempt + 1))
+  done
+  die "crowdsec local API did not become ready"
+}
+
 render_all_configs() {
   run_cmd install -d -m 0755 "$NFTABLES_RULES_DIR" "$NFTABLES_DROPIN_DIR" /etc/crowdsec/acquis.d /etc/crowdsec/bouncers "$AIDE_CONF_DIR" "$AIDE_DB_DIR"
 
@@ -433,9 +445,10 @@ initialize_nftables() {
 
 initialize_crowdsec() {
   run_cmd systemctl enable --now crowdsec.service
+  wait_for_crowdsec_lapi
   run_cmd cscli collections install crowdsecurity/linux crowdsecurity/sshd
   ensure_crowdsec_bouncer_key
-  write_text_file "$CROWDSEC_BOUNCER_LOCAL_PATH" "mode: nftables
+  write_text_file "$CROWDSEC_BOUNCER_CONFIG_PATH" "mode: nftables
 api_url: http://127.0.0.1:8080/
 api_key: ${CROWDSEC_BOUNCER_API_KEY}
 update_frequency: 10s
@@ -489,13 +502,13 @@ verify_security_install() {
   local installed_nft_version installed_aide_version installed_crowdsec_version installed_bouncer_version
 
   verify_path_exists "$CROWDSEC_KEYRING_PATH"
-  verify_path_exists "$CROWDSEC_LIST_PATH"
+  verify_path_exists "$CROWDSEC_SOURCE_PATH"
   verify_path_exists "$CROWDSEC_PREFS_PATH"
   verify_path_exists "$NFTABLES_CONF_PATH"
   verify_path_exists "$NFTABLES_CROWDSEC_RULES_PATH"
   verify_path_exists "$NFTABLES_DROPIN_PATH"
   verify_path_exists "$CROWDSEC_ACQUIS_PATH"
-  verify_path_exists "$CROWDSEC_BOUNCER_LOCAL_PATH"
+  verify_path_exists "$CROWDSEC_BOUNCER_CONFIG_PATH"
   verify_path_exists "$AIDE_CONF_PATH"
   verify_path_exists "$AIDE_DB_PATH"
   verify_path_exists "$AIDE_CHECK_SERVICE_PATH"
@@ -525,7 +538,8 @@ verify_security_install() {
   installed_bouncer_version="$(crowdsec-firewall-bouncer -version 2>/dev/null | grep -o '[0-9][0-9.]*' | head -n1)"
   [[ "$installed_bouncer_version" == "$CROWDSEC_BOUNCER_VERSION" ]] || die "expected firewall bouncer ${CROWDSEC_BOUNCER_VERSION}, found ${installed_bouncer_version:-unknown}"
 
-  grep -F 'set-only: true' "$CROWDSEC_BOUNCER_LOCAL_PATH" >/dev/null || die "bouncer config missing nftables set-only mode"
+  grep -F 'set-only: true' "$CROWDSEC_BOUNCER_CONFIG_PATH" >/dev/null || die "bouncer config missing nftables set-only mode"
+  grep -F 'api_url: http://127.0.0.1:8080/' "$CROWDSEC_BOUNCER_CONFIG_PATH" >/dev/null || die "bouncer config missing expected api url"
   grep -F '/data/workspace' "$AIDE_CONF_PATH" >/dev/null || die "AIDE config missing /data/workspace exclusion"
   grep -F '/var/log' "$AIDE_CONF_PATH" >/dev/null || die "AIDE config missing /var/log exclusion"
   grep -F '/tmp' "$AIDE_CONF_PATH" >/dev/null || die "AIDE config missing /tmp exclusion"
@@ -552,7 +566,7 @@ remove_security_install() {
   run_cmd rm -f -- "$NFTABLES_CONF_PATH" "$NFTABLES_CROWDSEC_RULES_PATH" "$NFTABLES_DROPIN_PATH"
   run_cmd rmdir --ignore-fail-on-non-empty "$NFTABLES_DROPIN_DIR" >/dev/null 2>&1 || true
   run_cmd rmdir --ignore-fail-on-non-empty "$NFTABLES_RULES_DIR" >/dev/null 2>&1 || true
-  run_cmd rm -f -- "$CROWDSEC_ACQUIS_PATH" "$CROWDSEC_BOUNCER_LOCAL_PATH" "$CROWDSEC_BOUNCER_KEY_PATH" "$CROWDSEC_CONSOLE_MARKER"
+  run_cmd rm -f -- "$CROWDSEC_ACQUIS_PATH" "$CROWDSEC_BOUNCER_CONFIG_PATH" "$CROWDSEC_BOUNCER_KEY_PATH" "$CROWDSEC_CONSOLE_MARKER"
   run_cmd rm -f -- "$AIDE_CONF_PATH" "$AIDE_CHECK_SERVICE_PATH" "$AIDE_CHECK_TIMER_PATH" "$AIDE_DB_PATH" "$AIDE_DB_NEW_PATH"
   run_cmd rmdir --ignore-fail-on-non-empty "$AIDE_CONF_DIR" >/dev/null 2>&1 || true
   run_cmd rmdir --ignore-fail-on-non-empty "$AIDE_DB_DIR" >/dev/null 2>&1 || true

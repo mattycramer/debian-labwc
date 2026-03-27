@@ -26,6 +26,10 @@ verify_paths() {
   require_file "/usr/local/bin/debian-labwc-launcher-menu"
   require_file "/usr/local/bin/debian-labwc-module-menu"
   require_file "/usr/local/bin/debian-labwc-player-status"
+  require_file "/usr/bin/labwc-tweaks"
+  require_file "/usr/share/applications/labwc_tweaks.desktop"
+  require_file "/usr/share/metainfo/labwc_tweaks.appdata.xml"
+  require_file "/usr/share/icons/hicolor/scalable/apps/labwc_tweaks.svg"
   require_file "$LABWC_TARGET_HOME/.config/labwc/rc.xml"
   require_file "$LABWC_TARGET_HOME/.config/labwc/menu.xml"
   require_file "$LABWC_TARGET_HOME/.config/labwc/autostart"
@@ -33,6 +37,7 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.config/labwc/shutdown"
   require_file "$LABWC_TARGET_HOME/.config/waybar/config.jsonc"
   require_file "$LABWC_TARGET_HOME/.config/kanshi/config"
+  require_file "$LABWC_TARGET_HOME/.config/xfce4/helpers.rc"
   require_file "$LABWC_TARGET_HOME/.config/xdg-desktop-portal/portals.conf"
   require_file "$LABWC_TARGET_HOME/.config/debian-labwc/runtime.env"
   require_file "$LABWC_TARGET_HOME/.config/starship.toml"
@@ -109,6 +114,14 @@ verify_waybar_config_semantics() {
   grep -F '"/usr/local/bin/debian-labwc-player-status"' "$waybar_path" >/dev/null || die "waybar config missing player status helper"
 }
 
+verify_thunar_terminal_semantics() {
+  grep -F 'TerminalEmulator=foot' "$LABWC_TARGET_HOME/.config/xfce4/helpers.rc" >/dev/null || die "xfce helpers missing foot terminal mapping"
+}
+
+verify_labwc_tweaks_semantics() {
+  grep -F 'Exec=labwc-tweaks' /usr/share/applications/labwc_tweaks.desktop >/dev/null || die "labwc-tweaks desktop file missing expected Exec"
+}
+
 verify_gpg_agent_semantics() {
   local shutdown_path="$LABWC_TARGET_HOME/.config/labwc/shutdown"
   local override_path="$LABWC_TARGET_HOME/.config/systemd/user/gpg-agent.service.d/override.conf"
@@ -157,6 +170,8 @@ verify_install() {
   verify_greetd_semantics
   verify_labwc_config_semantics
   verify_waybar_config_semantics
+  verify_thunar_terminal_semantics
+  verify_labwc_tweaks_semantics
   verify_gpg_agent_semantics
   verify_shell_config_semantics
   log_info "verification completed"

@@ -25,6 +25,8 @@ source "$SCRIPT_DIR/lib/session.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/services.sh"
 # shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/tweaks.sh"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/verify.sh"
 
 usage() {
@@ -96,11 +98,22 @@ phase_render() {
   render_all_configs "$ENV_FILE"
 }
 
+phase_build_doctor() {
+  require_command runuser
+  require_command curl
+  require_command tar
+  require_command cmake
+  require_command ctest
+  require_command ninja
+}
+
 phase_enable() {
   log_info "phase: enable"
   phase_doctor
   load_env_file
   enable_all_services "$ENV_FILE"
+  phase_build_doctor
+  install_labwc_tweaks
 }
 
 phase_verify() {
