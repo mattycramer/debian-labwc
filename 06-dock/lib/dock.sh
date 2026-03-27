@@ -3,6 +3,34 @@
 readonly CRYSTAL_DOCK_AUTOSTART_MARKER_BEGIN="# >>> MANAGED BY 06-dock >>>"
 readonly CRYSTAL_DOCK_AUTOSTART_MARKER_END="# <<< MANAGED BY 06-dock <<<"
 readonly CRYSTAL_DOCK_WRAPPER_PATH="/usr/local/bin/debian-labwc-crystal-dock"
+readonly CRYSTAL_DOCK_BIN_PATH="/usr/bin/crystal-dock"
+readonly CRYSTAL_DOCK_DESKTOP_PATH="/usr/share/applications/crystal-dock.desktop"
+readonly CRYSTAL_DOCK_BUILD_ROOT="/usr/local/src/06-dock"
+readonly CRYSTAL_DOCK_SOURCE_DIR="$CRYSTAL_DOCK_BUILD_ROOT/source"
+readonly CRYSTAL_DOCK_BUILD_DIR="$CRYSTAL_DOCK_BUILD_ROOT/build"
+
+readonly CRYSTAL_DOCK_BUILD_PACKAGES=(
+  ca-certificates
+  curl
+  build-essential
+  cmake
+  pkg-config
+  qt6-base-dev
+  qt6-base-private-dev
+  qt6-wayland-dev
+  liblayershellqtinterface-dev
+  libwayland-dev
+)
+
+readonly CRYSTAL_DOCK_RUNTIME_PACKAGES=(
+  liblayershellqtinterface6
+  libqt6core6t64
+  libqt6dbus6
+  libqt6gui6
+  libqt6widgets6
+  libqt6waylandclient6
+  libwayland-client0
+)
 
 apt_yes_args() {
   if [[ "${ASSUME_YES:-1}" -eq 1 ]]; then
@@ -29,6 +57,13 @@ apt_update() {
   run_cmd env DEBIAN_FRONTEND=noninteractive apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
+install_crystal_dock_dependencies() {
+  local -a apt_args=()
+  mapfile -t apt_args < <(apt_yes_args)
+  run_cmd env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_RUNTIME_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_BUILD_PACKAGES[@]}"
+}
+
 write_root_file() {
   local destination="$1"
   local mode="$2"
@@ -51,19 +86,20 @@ write_user_file() {
   run_cmd rm -f -- "$temp_file"
 }
 
-install_crystal_dock_package() {
-  local -a apt_args=()
-  local temp_deb
-  mapfile -t apt_args < <(apt_yes_args)
-  temp_deb="$(mktemp --suffix=.deb)"
-  log_info "downloading Crystal Dock ${CRYSTAL_DOCK_VERSION}"
-  run_cmd curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 180 --silent --show-error -o "$temp_deb" "$CRYSTAL_DOCK_DEB_URL"
-  if [[ "${DRY_RUN:-0}" -eq 0 ]]; then
-    printf '%s  %s\n' "$CRYSTAL_DOCK_DEB_SHA256" "$temp_deb" | sha256sum --check --status || die "Crystal Dock sha256 mismatch"
-    dpkg-deb -f "$temp_deb" Package | grep -Fx "crystal-dock" >/dev/null || die "downloaded package is not crystal-dock"
-  fi
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends "${apt_args[@]}" "$temp_deb"
-  run_cmd rm -f -- "$temp_deb"
+install_crystal_dock_from_source() {
+  local archive_path
+  archive_path="$(mktemp --suffix=.tar.gz)"
+  log_info "building Crystal Dock ${CRYSTAL_DOCK_VERSION} from source"
+  run_cmd install -d -m 0755 "$CRYSTAL_DOCK_BUILD_ROOT"
+  run_cmd rm -rf -- "$CRYSTAL_DOCK_SOURCE_DIR"
+  run_cmd rm -rf -- "$CRYSTAL_DOCK_BUILD_DIR"
+  run_cmd install -d -m 0755 "$CRYSTAL_DOCK_SOURCE_DIR"
+  run_cmd curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 180 --silent --show-error -o "$archive_path" "$CRYSTAL_DOCK_SOURCE_URL"
+  run_cmd tar -xzf "$archive_path" -C "$CRYSTAL_DOCK_SOURCE_DIR" --strip-components=1
+  run_cmd rm -f -- "$archive_path"
+  run_cmd cmake -S "$CRYSTAL_DOCK_SOURCE_DIR/src" -B "$CRYSTAL_DOCK_BUILD_DIR" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr
+  run_cmd cmake --build "$CRYSTAL_DOCK_BUILD_DIR" --parallel
+  run_cmd cmake --install "$CRYSTAL_DOCK_BUILD_DIR"
 }
 
 render_wrapper_script() {
@@ -193,16 +229,13 @@ render_crystal_dock_config() {
     "$DOCK_TARGET_HOME/.config/labwc/autostart.d"
 }
 
-package_is_installed() {
-  dpkg-query -W -f='${Status}\n' "$1" 2>/dev/null | grep -F "install ok installed" >/dev/null
-}
-
 verify_crystal_dock_install() {
   local appearance_path="$DOCK_TARGET_HOME/.config/crystal-dock/labwc/appearance.conf"
   local panel_path="$DOCK_TARGET_HOME/.config/crystal-dock/labwc/panel_1.conf"
   local fragment_path="$DOCK_TARGET_HOME/.config/labwc/autostart.d/50-crystal-dock.sh"
 
-  package_is_installed crystal-dock || die "crystal-dock package is not installed"
+  require_file "$CRYSTAL_DOCK_BIN_PATH"
+  require_file "$CRYSTAL_DOCK_DESKTOP_PATH"
   require_file "$CRYSTAL_DOCK_WRAPPER_PATH"
   require_file "$appearance_path"
   require_file "$panel_path"
@@ -224,10 +257,11 @@ verify_crystal_dock_install() {
 }
 
 remove_crystal_dock_install() {
-  local -a apt_args=()
-  mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt remove "${apt_args[@]}" crystal-dock || true
+  run_cmd rm -f -- "$CRYSTAL_DOCK_BIN_PATH"
+  run_cmd rm -f -- "$CRYSTAL_DOCK_DESKTOP_PATH"
   run_cmd rm -f -- "$CRYSTAL_DOCK_WRAPPER_PATH"
+  run_cmd rm -rf -- "$CRYSTAL_DOCK_SOURCE_DIR"
+  run_cmd rm -rf -- "$CRYSTAL_DOCK_BUILD_DIR"
   run_cmd rm -rf -- "$DOCK_TARGET_HOME/.config/crystal-dock"
   run_cmd rm -f -- "$DOCK_TARGET_HOME/.config/labwc/autostart.d/50-crystal-dock.sh"
 

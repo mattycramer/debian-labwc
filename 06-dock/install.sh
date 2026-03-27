@@ -63,12 +63,11 @@ phase_doctor() {
   require_amd64
   require_command apt
   require_command curl
-  require_command sha256sum
-  require_command dpkg-deb
   require_command getent
   require_command install
   require_command awk
   require_command sed
+  require_command tar
 }
 
 phase_install() {
@@ -77,7 +76,8 @@ phase_install() {
   load_env_file
   detect_target_user
   apt_update
-  install_crystal_dock_package
+  install_crystal_dock_dependencies
+  install_crystal_dock_from_source
   render_crystal_dock_config
 }
 
