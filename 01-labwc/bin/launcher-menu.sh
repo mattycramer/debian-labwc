@@ -8,6 +8,10 @@ choose() {
   printf '%s\n' "$@" | wofi --dmenu --prompt "$prompt"
 }
 
+has_command() {
+  command -v "$1" >/dev/null 2>&1
+}
+
 run_gui() {
   command -v "$1" >/dev/null 2>&1 || exit 0
   nohup "$@" >/dev/null 2>&1 &
@@ -23,20 +27,36 @@ run_terminal() {
   fi
 }
 
-selection="$(
-  choose "Launch" \
-    "󰆍  Applications" \
-    "  Terminal" \
-    "  Files" \
-    "󰖟  Browser" \
-    "󰇩  Qutebrowser" \
-    "󰨞  Code Insiders" \
-    "󰠮  Obsidian" \
-    "󰌾  Mullvad VPN" \
-    "󰟀  Bitwarden" \
-    "󰒓  Network" \
-    "  Power"
-)"
+entries=(
+  "󰆍  Applications"
+  "  Terminal"
+  "  Files"
+)
+
+if has_command thorium-browser; then
+  entries+=("󰖟  Browser")
+fi
+if has_command qutebrowser; then
+  entries+=("󰇩  Qutebrowser")
+fi
+if has_command code; then
+  entries+=("󰨞  Code")
+fi
+if has_command obsidian; then
+  entries+=("󰠮  Obsidian")
+fi
+if has_command mullvad-vpn; then
+  entries+=("󰌾  Mullvad VPN")
+fi
+if has_command bitwarden; then
+  entries+=("󰟀  Bitwarden")
+fi
+if has_command nmtui; then
+  entries+=("󰒓  Network")
+fi
+entries+=("  Power")
+
+selection="$(choose "Launch" "${entries[@]}")"
 
 case "$selection" in
   "󰆍  Applications") exec wofi --show drun ;;
@@ -44,7 +64,7 @@ case "$selection" in
   "  Files") run_gui thunar ;;
   "󰖟  Browser") run_gui thorium-browser ;;
   "󰇩  Qutebrowser") run_gui qutebrowser ;;
-  "󰨞  Code Insiders") run_gui code-insiders ;;
+  "󰨞  Code") run_gui code ;;
   "󰠮  Obsidian") run_gui obsidian ;;
   "󰌾  Mullvad VPN") run_gui mullvad-vpn ;;
   "󰟀  Bitwarden") run_gui bitwarden ;;

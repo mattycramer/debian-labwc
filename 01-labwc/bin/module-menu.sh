@@ -12,6 +12,10 @@ choose() {
   printf '%s\n' "$@" | wofi --dmenu --prompt "$prompt"
 }
 
+has_command() {
+  command -v "$1" >/dev/null 2>&1
+}
+
 run_gui() {
   command -v "$1" >/dev/null 2>&1 || exit 0
   nohup "$@" >/dev/null 2>&1 &
@@ -79,15 +83,17 @@ case "$category:$action" in
     run_terminal "Network" 'exec nmtui'
     ;;
   network:menu)
-    selection="$(
-      choose "Network" \
-        "󰒓  Open network manager" \
-        "  Toggle Wi-Fi ($(wifi_state))" \
-        "󰌨  Toggle networking ($(networking_state))" \
-        "󰑐  Rescan Wi-Fi" \
-        "󰍹  Connection details" \
-        "󰌾  Mullvad VPN"
-    )"
+    entries=(
+      "󰒓  Open network manager"
+      "  Toggle Wi-Fi ($(wifi_state))"
+      "󰌨  Toggle networking ($(networking_state))"
+      "󰑐  Rescan Wi-Fi"
+      "󰍹  Connection details"
+    )
+    if has_command mullvad-vpn; then
+      entries+=("󰌾  Mullvad VPN")
+    fi
+    selection="$(choose "Network" "${entries[@]}")"
     case "$selection" in
       "󰒓  Open network manager") run_terminal "Network" 'exec nmtui' ;;
       "  Toggle Wi-Fi ("*) toggle_wifi ;;

@@ -8,7 +8,7 @@ readonly NORMAL_BOOTSTRAP_PACKAGES=(
 )
 
 readonly NORMAL_TOOLS_PACKAGES=(
-  code-insiders
+  code
   thorium-browser
   mullvad-browser-alpha
   mullvad-vpn
