@@ -23,9 +23,11 @@ readonly BACKPORTS_PACKAGES=(
   pipewire
   pipewire-pulse
   wireplumber
+  dbus-user-session
   greetd
   tuigreet
   gammastep
+  xdg-user-dirs
   xdg-utils
   xdg-desktop-portal
   xdg-desktop-portal-wlr

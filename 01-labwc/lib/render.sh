@@ -26,6 +26,14 @@ render_runtime_env() {
   install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$1" "$runtime_dir/runtime.env"
 }
 
+ensure_user_base_dirs() {
+  install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
+    "$LABWC_TARGET_HOME/.config" \
+    "$LABWC_TARGET_HOME/.local" \
+    "$LABWC_TARGET_HOME/.local/share"
+  chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.config" "$LABWC_TARGET_HOME/.local"
+}
+
 render_home_dirs() {
   local -a dirs=(
     "$LABWC_TARGET_HOME/Desktop"
@@ -171,6 +179,9 @@ ${title_bind}
       <action name="Execute"><command>${LABWC_TERMINAL}</command></action>
     </keybind>
     <keybind key="W-d">
+      <action name="Execute"><command>${LABWC_LAUNCHER_CMD}</command></action>
+    </keybind>
+    <keybind key="W-space">
       <action name="Execute"><command>${LABWC_LAUNCHER_CMD}</command></action>
     </keybind>
     <keybind key="W-e">
@@ -470,6 +481,7 @@ install_wallpaper() {
 render_all_configs() {
   local env_file="$1"
   local config_root="$LABWC_TARGET_HOME/.config"
+  ensure_user_base_dirs
   install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
     "$config_root/labwc" \
     "$config_root/waybar" \
@@ -500,4 +512,5 @@ render_all_configs() {
   render_foot
   render_gammastep
   render_portals
+  chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.config" "$LABWC_TARGET_HOME/.local"
 }
