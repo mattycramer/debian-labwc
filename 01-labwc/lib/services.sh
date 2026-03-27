@@ -19,6 +19,10 @@ ensure_greeter_runtime_dirs() {
   install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet/.local/state
 }
 
+validate_greetd_settings() {
+  [[ "${LABWC_GREETD_VT:-}" =~ ^[1-9][0-9]*$ ]] || die "LABWC_GREETD_VT must be a positive integer, found '${LABWC_GREETD_VT:-}'"
+}
+
 render_template_to_file() {
   local template_path="$1"
   local destination="$2"
@@ -26,6 +30,7 @@ render_template_to_file() {
   local temp_file
   temp_file="$(mktemp)"
   sed \
+    -e "s|@GREETD_VT@|$LABWC_GREETD_VT|g" \
     -e "s|@TARGET_USER@|$LABWC_TARGET_USER|g" \
     -e "s|@TARGET_HOME@|$LABWC_TARGET_HOME|g" \
     -e "s|@RUNTIME_ENV_PATH@|$LABWC_TARGET_HOME/.config/debian-labwc/runtime.env|g" \
@@ -50,9 +55,11 @@ install_helper_script() {
 }
 
 install_root_files() {
+  validate_greetd_settings
   ensure_greeter_user
   ensure_greeter_runtime_dirs
   render_template_to_file "$SCRIPT_DIR/templates/greetd-config.toml.tpl" "/etc/greetd/config.toml" 0644
+  render_template_to_file "$SCRIPT_DIR/templates/greetd-vt.conf.tpl" "/etc/systemd/system/greetd.service.d/10-vt.conf" 0644
   render_template_to_file "$SCRIPT_DIR/templates/labwc.desktop.tpl" "/usr/share/wayland-sessions/labwc.desktop" 0644
   render_template_to_file "$SCRIPT_DIR/templates/labwc-session.tpl" "/usr/local/bin/debian-labwc-session" 0755
 
@@ -157,6 +164,8 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/debian-labwc-refresh-outputs"
   remove_if_present "/usr/share/wayland-sessions/labwc.desktop"
   remove_if_present "/etc/greetd/config.toml"
+  remove_if_present "/etc/systemd/system/greetd.service.d/10-vt.conf"
+  rmdir --ignore-fail-on-non-empty "/etc/systemd/system/greetd.service.d" >/dev/null 2>&1 || true
 
   log_info "removing target user systemd user unit links"
   disable_target_user_unit pipewire.service

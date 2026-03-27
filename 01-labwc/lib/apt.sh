@@ -56,6 +56,11 @@ readonly BACKPORTS_PACKAGES=(
   starship
   fonts-material-design-icons-iconfont
   fonts-weather-icons
+  file-roller
+  ripgrep
+  find-fd
+  ncdu
+  fzf
 )
 
 readonly GRAPHICS_PACKAGES=(

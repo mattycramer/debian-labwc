@@ -15,6 +15,7 @@ verify_packages() {
 
 verify_paths() {
   require_file "/etc/greetd/config.toml"
+  require_file "/etc/systemd/system/greetd.service.d/10-vt.conf"
   require_file "/usr/share/wayland-sessions/labwc.desktop"
   require_file "/usr/local/bin/debian-labwc-session"
   require_file "/usr/local/bin/debian-labwc-power-menu"
@@ -69,6 +70,19 @@ verify_labwc_config_semantics() {
   grep -F '<windowSwitcher preview="yes" outlines="yes" unshade="yes" order="focus">' "$rc_path" >/dev/null || die "rc.xml missing window switcher config"
   grep -F '<context name="Title">' "$rc_path" >/dev/null || die "rc.xml missing title mouse context"
   grep -F '<action name="ToggleMaximize" />' "$rc_path" >/dev/null || die "rc.xml missing titlebar double-click maximize"
+  grep -F '<device category="touchpad">' "$rc_path" >/dev/null || die "rc.xml missing touchpad libinput profile"
+  grep -F '<device category="non-touch">' "$rc_path" >/dev/null || die "rc.xml missing non-touch libinput profile"
+  grep -F "<naturalScroll>${LABWC_NATURAL_SCROLL}</naturalScroll>" "$rc_path" >/dev/null || die "rc.xml missing requested naturalScroll policy"
+}
+
+verify_greetd_semantics() {
+  local greetd_config="/etc/greetd/config.toml"
+  local greetd_dropin="/etc/systemd/system/greetd.service.d/10-vt.conf"
+  grep -F "vt = ${LABWC_GREETD_VT}" "$greetd_config" >/dev/null || die "greetd config missing expected vt"
+  grep -F 'switch = true' "$greetd_config" >/dev/null || die "greetd config missing explicit vt switch"
+  grep -F 'tuigreet --time --asterisks --cmd /usr/local/bin/debian-labwc-session --sessions /usr/share/wayland-sessions' "$greetd_config" >/dev/null || die "greetd config missing expected tuigreet command"
+  grep -F "Conflicts=getty@tty${LABWC_GREETD_VT}.service" "$greetd_dropin" >/dev/null || die "greetd drop-in missing getty conflict"
+  grep -F "Before=getty@tty${LABWC_GREETD_VT}.service" "$greetd_dropin" >/dev/null || die "greetd drop-in missing getty ordering"
 }
 
 verify_shell_config_semantics() {
@@ -92,6 +106,7 @@ verify_install() {
   verify_services_enabled
   verify_greeter_user
   verify_ownership
+  verify_greetd_semantics
   verify_labwc_config_semantics
   verify_shell_config_semantics
   log_info "verification completed"

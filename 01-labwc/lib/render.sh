@@ -142,6 +142,10 @@ EOF
 }
 
 render_labwc_rc_xml() {
+  case "${LABWC_NATURAL_SCROLL:-}" in
+    yes|no) ;;
+    *) die "LABWC_NATURAL_SCROLL must be 'yes' or 'no', found '${LABWC_NATURAL_SCROLL:-}'" ;;
+  esac
   local title_bind
   title_bind="$(cat <<'EOF'
     <context name="Title">
@@ -179,6 +183,17 @@ EOF
     </context>
 ${title_bind}
   </mouse>
+  <libinput>
+    <device category="default">
+      <naturalScroll>${LABWC_NATURAL_SCROLL}</naturalScroll>
+    </device>
+    <device category="touchpad">
+      <naturalScroll>${LABWC_NATURAL_SCROLL}</naturalScroll>
+    </device>
+    <device category="non-touch">
+      <naturalScroll>${LABWC_NATURAL_SCROLL}</naturalScroll>
+    </device>
+  </libinput>
   <keyboard>
     <default />
     <keybind key="A-Tab">
