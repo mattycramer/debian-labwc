@@ -24,6 +24,7 @@ readonly DEV_PACKAGES=(
 readonly SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
 readonly SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
 readonly DEBIAN_ARCHIVE_KEYRING_PATH="/usr/share/keyrings/debian-archive-keyring.gpg"
+readonly SID_REPO_URI="https://deb.debian.org/debian"
 
 detect_dev_download_user() {
   if [[ -n "${DEV_DOWNLOAD_USER:-}" ]] && id "$DEV_DOWNLOAD_USER" >/dev/null 2>&1; then
@@ -72,8 +73,7 @@ apt_update() {
 write_text_file() {
   local destination="$1"
   local content="$2"
-  local temp_file
-  temp_file="$(mktemp)"
+  local temp_file="/tmp/debian-labwc-04-dev-write-text.tmp"
   printf '%s' "$content" >"$temp_file"
   run_cmd install -D -m 0644 "$temp_file" "$destination"
   run_cmd rm -f -- "$temp_file"
@@ -92,7 +92,7 @@ download_as_dev_user() {
   local url="$1"
   local path="$2"
   prepare_dev_download_path "$path"
-  run_cmd sudo -u "$DEV_DOWNLOAD_USER" env HOME="$DEV_DOWNLOAD_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 300 --silent --show-error -o "$path" "$url"
+  run_cmd runuser -u "$DEV_DOWNLOAD_USER" -- env HOME="$DEV_DOWNLOAD_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 300 --silent --show-error -o "$path" "$url"
   run_cmd chmod 0644 "$path"
 }
 
@@ -104,7 +104,7 @@ install_bootstrap_packages() {
 
 install_sid_repository() {
   [[ -f "$DEBIAN_ARCHIVE_KEYRING_PATH" ]] || die "missing Debian archive keyring: $DEBIAN_ARCHIVE_KEYRING_PATH"
-  write_text_file "$SID_SOURCE_PATH" $'Types: deb\nURIs: http://ftp.dk.debian.org/debian\nSuites: sid\nComponents: main\nArchitectures: amd64\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg\n'
+  write_text_file "$SID_SOURCE_PATH" $'Types: deb\nURIs: https://deb.debian.org/debian\nSuites: sid\nComponents: main\nArchitectures: amd64\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg\n'
   write_text_file "$SID_PREFERENCES_PATH" $'Package: *\nPin: release n=sid\nPin-Priority: 100\n'
 }
 
@@ -117,9 +117,9 @@ install_dev_packages() {
 resolve_node_release() {
   local shasums_url="${NODE_DIST_BASE}/SHASUMS256.txt"
   local shasums_file
-  shasums_file="$(mktemp)"
+  shasums_file="$(mktemp -p /tmp debian-labwc-04-dev-shasums.XXXXXX)"
   run_cmd chown "$DEV_DOWNLOAD_USER:$DEV_DOWNLOAD_GROUP" "$shasums_file"
-  run_cmd sudo -u "$DEV_DOWNLOAD_USER" env HOME="$DEV_DOWNLOAD_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error -o "$shasums_file" "$shasums_url"
+  run_cmd runuser -u "$DEV_DOWNLOAD_USER" -- env HOME="$DEV_DOWNLOAD_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error -o "$shasums_file" "$shasums_url"
   local line
   line="$(awk '/ node-v[0-9]+\.[0-9]+\.[0-9]+-linux-x64\.tar\.xz$/ {print $1, $2; exit}' "$shasums_file")"
   rm -f -- "$shasums_file"
@@ -144,7 +144,7 @@ install_node_runtime() {
   run_cmd install -d -m 0755 /usr/local/bin
 
   if [[ ! -x "$install_dir/bin/node" ]]; then
-    tmpdir="$(mktemp -d)"
+    tmpdir="$(mktemp -d -p /tmp debian-labwc-04-dev-node.XXXXXX)"
     tarball_path="${tmpdir}/${NODE_TARBALL}"
     run_cmd chown "$DEV_DOWNLOAD_USER:$DEV_DOWNLOAD_GROUP" "$tmpdir"
     download_as_dev_user "${NODE_DIST_BASE}/${NODE_TARBALL}" "$tarball_path"
@@ -166,7 +166,7 @@ install_node_runtime() {
   run_cmd rm -f "${current_link}/bin/pnpm" "${current_link}/bin/pnpx"
   run_cmd rm -rf "${current_link}/lib/node_modules/pnpm"
   run_cmd chown -R "$DEV_DOWNLOAD_USER:$DEV_DOWNLOAD_GROUP" "$install_dir"
-  run_cmd sudo -u "$DEV_DOWNLOAD_USER" env HOME="$DEV_DOWNLOAD_HOME" TMPDIR=/tmp "${current_link}/bin/npm" --prefix "$current_link" install --global --force "$PNPM_NPM_SPEC"
+  run_cmd runuser -u "$DEV_DOWNLOAD_USER" -- env HOME="$DEV_DOWNLOAD_HOME" TMPDIR=/tmp "${current_link}/bin/npm" --prefix "$current_link" install --global --force "$PNPM_NPM_SPEC"
   run_cmd chown -R root:root "$install_dir"
   run_cmd ln -sfn "${current_link}/bin/pnpm" /usr/local/bin/pnpm
   run_cmd ln -sfn "${current_link}/bin/pnpx" /usr/local/bin/pnpx
@@ -202,7 +202,7 @@ verify_dev_install() {
   done
   [[ -f "$SID_SOURCE_PATH" ]] || die "missing sid sources file"
   [[ -f "$SID_PREFERENCES_PATH" ]] || die "missing sid preferences file"
-  grep -F 'URIs: http://ftp.dk.debian.org/debian' "$SID_SOURCE_PATH" >/dev/null || die "sid source file missing ftp.dk.debian.org/debian"
+  grep -F "URIs: ${SID_REPO_URI}" "$SID_SOURCE_PATH" >/dev/null || die "sid source file missing ${SID_REPO_URI}"
   grep -F 'Suites: sid' "$SID_SOURCE_PATH" >/dev/null || die "sid source file missing sid suite"
   grep -F 'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg' "$SID_SOURCE_PATH" >/dev/null || die "sid source file missing Signed-By"
   grep -F 'Pin-Priority: 100' "$SID_PREFERENCES_PATH" >/dev/null || die "sid preferences missing pin priority 100"

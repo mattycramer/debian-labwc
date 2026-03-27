@@ -70,7 +70,7 @@ phase_doctor() {
   require_command python3
   require_command install
   require_command libtool
-  require_command sudo
+  require_command runuser
   require_command systemctl
   require_command openssl
   require_command make
@@ -83,7 +83,6 @@ phase_install() {
   phase_doctor
   load_env_file
   detect_security_download_user
-  apt_update
   install_bootstrap_packages
   install_crowdsec_repository
   apt_update

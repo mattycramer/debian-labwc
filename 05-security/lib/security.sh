@@ -116,20 +116,19 @@ download_as_security_user() {
   local url="$1"
   local path="$2"
   prepare_security_download_path "$path"
-  run_cmd sudo -u "$SECURITY_DOWNLOAD_USER" env HOME="$SECURITY_DOWNLOAD_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 300 --silent --show-error -o "$path" "$url"
+  run_cmd runuser -u "$SECURITY_DOWNLOAD_USER" -- env HOME="$SECURITY_DOWNLOAD_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 300 --silent --show-error -o "$path" "$url"
   run_cmd chmod 0644 "$path"
 }
 
 fetch_as_security_user() {
   local url="$1"
-  sudo -u "$SECURITY_DOWNLOAD_USER" env HOME="$SECURITY_DOWNLOAD_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error "$url"
+  runuser -u "$SECURITY_DOWNLOAD_USER" -- env HOME="$SECURITY_DOWNLOAD_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error "$url"
 }
 
 write_text_file() {
   local destination="$1"
   local content="$2"
-  local temp_file
-  temp_file="$(mktemp)"
+  local temp_file="/tmp/debian-labwc-05-security-write-text.tmp"
   printf '%s' "$content" >"$temp_file"
   run_cmd install -D -m 0644 "$temp_file" "$destination"
   rm -f -- "$temp_file"
@@ -268,7 +267,7 @@ install_latest_libmnl() {
   resolve_libmnl_release
 
   local tmpdir archive_path source_dir stage_root
-  tmpdir="$(mktemp -d)"
+  tmpdir="$(mktemp -d -p /tmp debian-labwc-05-security-libmnl.XXXXXX)"
   archive_path="${tmpdir}/${LIBMNL_TARBALL}"
   source_dir="${tmpdir}/libmnl-${LIBMNL_VERSION}"
   stage_root="${tmpdir}/stage"
@@ -297,7 +296,7 @@ install_latest_libnftnl() {
   resolve_libnftnl_release
 
   local tmpdir archive_path source_dir stage_root
-  tmpdir="$(mktemp -d)"
+  tmpdir="$(mktemp -d -p /tmp debian-labwc-05-security-libnftnl.XXXXXX)"
   archive_path="${tmpdir}/${LIBNFTNL_TARBALL}"
   source_dir="${tmpdir}/libnftnl-${LIBNFTNL_VERSION}"
   stage_root="${tmpdir}/stage"
@@ -330,7 +329,7 @@ install_latest_nftables() {
   resolve_nftables_release
 
   local tmpdir archive_path source_dir stage_root
-  tmpdir="$(mktemp -d)"
+  tmpdir="$(mktemp -d -p /tmp debian-labwc-05-security-nftables.XXXXXX)"
   archive_path="${tmpdir}/${NFTABLES_TARBALL}"
   source_dir="${tmpdir}/nftables-${NFTABLES_VERSION}"
   stage_root="${tmpdir}/stage"
@@ -361,7 +360,7 @@ install_latest_aide() {
   resolve_aide_release
 
   local tmpdir archive_path source_dir stage_root
-  tmpdir="$(mktemp -d)"
+  tmpdir="$(mktemp -d -p /tmp debian-labwc-05-security-aide.XXXXXX)"
   archive_path="${tmpdir}/${AIDE_TARBALL}"
   source_dir="${tmpdir}/aide-${AIDE_VERSION}"
   stage_root="${tmpdir}/stage"

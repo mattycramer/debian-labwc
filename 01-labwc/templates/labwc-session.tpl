@@ -3,7 +3,7 @@ set -Eeuo pipefail
 IFS=$'\n\t'
 
 export XDG_SESSION_TYPE=wayland
-export XDG_CURRENT_DESKTOP=labwc
+export XDG_CURRENT_DESKTOP=labwc:wlroots
 export XDG_SESSION_DESKTOP=labwc
 export DESKTOP_SESSION=labwc
 export XCURSOR_THEME=@XCURSOR_THEME@

@@ -67,7 +67,7 @@ phase_doctor() {
   require_command install
   require_command awk
   require_command tar
-  require_command sudo
+  require_command runuser
 }
 
 phase_install() {

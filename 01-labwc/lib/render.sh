@@ -289,9 +289,9 @@ render_labwc_autostart() {
 set -Eeuo pipefail
 IFS=\$'\\n\\t'
 
-export XDG_CURRENT_DESKTOP=labwc
+export XDG_CURRENT_DESKTOP=labwc:wlroots
 if [[ -n "\${DBUS_SESSION_BUS_ADDRESS:-}" ]] && command -v systemctl >/dev/null 2>&1; then
-  dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=labwc XDG_SESSION_DESKTOP=labwc DESKTOP_SESSION=labwc XCURSOR_THEME=${LABWC_XCURSOR_THEME} XCURSOR_SIZE=${LABWC_XCURSOR_SIZE} >/dev/null 2>&1 || true
+  dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=labwc:wlroots XDG_SESSION_DESKTOP=labwc DESKTOP_SESSION=labwc XCURSOR_THEME=${LABWC_XCURSOR_THEME} XCURSOR_SIZE=${LABWC_XCURSOR_SIZE} >/dev/null 2>&1 || true
 fi
 
 pgrep -x foot >/dev/null 2>&1 || foot --server &

@@ -69,7 +69,7 @@ install_crystal_dock_package() {
   log_info "installing Crystal Dock ${CRYSTAL_DOCK_VERSION} from pinned .deb release"
   run_cmd install -d -m 0755 -o "$DOCK_TARGET_USER" -g "$DOCK_TARGET_USER" "$CRYSTAL_DOCK_DOWNLOAD_DIR"
   run_cmd rm -f -- "$deb_path" "$tmp_path"
-  run_cmd sudo -u "$DOCK_TARGET_USER" env TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 180 --silent --show-error -o "$tmp_path" "$CRYSTAL_DOCK_DEB_URL"
+  run_cmd runuser -u "$DOCK_TARGET_USER" -- env HOME="$DOCK_TARGET_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 180 --silent --show-error -o "$tmp_path" "$CRYSTAL_DOCK_DEB_URL"
   run_cmd mv -- "$tmp_path" "$deb_path"
   run_cmd chown "$DOCK_TARGET_USER:$DOCK_TARGET_USER" "$deb_path"
   run_cmd chmod 0644 "$deb_path"
@@ -110,7 +110,7 @@ render_wrapper_script() {
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-export XDG_CURRENT_DESKTOP="labwc"
+export XDG_CURRENT_DESKTOP="labwc:wlroots"
 export XDG_SESSION_DESKTOP="labwc"
 if [[ -z "${XDG_CONFIG_DIRS:-}" ]]; then
   export XDG_CONFIG_DIRS="/etc/xdg"
@@ -243,7 +243,7 @@ verify_crystal_dock_install() {
   require_file "$panel_path"
   require_file "$fragment_path"
 
-  grep -F 'XDG_CURRENT_DESKTOP="labwc"' "$CRYSTAL_DOCK_WRAPPER_PATH" >/dev/null || die "wrapper missing labwc desktop override"
+  grep -F 'XDG_CURRENT_DESKTOP="labwc:wlroots"' "$CRYSTAL_DOCK_WRAPPER_PATH" >/dev/null || die "wrapper missing labwc/wlroots desktop override"
   grep -F "panelStyle=${CRYSTAL_DOCK_PANEL_STYLE}" "$appearance_path" >/dev/null || die "appearance config missing expected panel style"
   grep -F "position=${CRYSTAL_DOCK_POSITION}" "$panel_path" >/dev/null || die "panel config missing expected position"
   grep -F "showTaskManager=${CRYSTAL_DOCK_SHOW_TASK_MANAGER}" "$panel_path" >/dev/null || die "panel config missing expected task manager state"
