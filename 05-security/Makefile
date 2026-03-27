@@ -22,4 +22,4 @@ nuke:
 	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase nuke; else sudo bash ./install.sh --phase nuke; fi
 
 print-env:
-	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase print-env; else sudo bash ./install.sh --phase print-env; fi
+	@bash ./install.sh --phase print-env

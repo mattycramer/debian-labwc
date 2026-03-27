@@ -73,10 +73,8 @@ install_crystal_dock_package() {
   run_cmd mv -- "$tmp_path" "$deb_path"
   run_cmd chown "$DOCK_TARGET_USER:$DOCK_TARGET_USER" "$deb_path"
   run_cmd chmod 0644 "$deb_path"
-  if [[ "${DRY_RUN:-0}" -eq 0 ]]; then
-    printf '%s  %s\n' "$CRYSTAL_DOCK_DEB_SHA256" "$deb_path" | sha256sum --check --status || die "Crystal Dock deb sha256 mismatch"
-    [[ "$(dpkg-deb -f "$deb_path" Package 2>/dev/null)" == "crystal-dock" ]] || die "downloaded package is not crystal-dock"
-  fi
+  printf '%s  %s\n' "$CRYSTAL_DOCK_DEB_SHA256" "$deb_path" | sha256sum --check --status || die "Crystal Dock deb sha256 mismatch"
+  [[ "$(dpkg-deb -f "$deb_path" Package 2>/dev/null)" == "crystal-dock" ]] || die "downloaded package is not crystal-dock"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$CRYSTAL_DOCK_SID_SUITE" install --no-install-recommends "${apt_args[@]}" "$deb_path"
   run_cmd rm -f -- "$deb_path"
 }
@@ -85,22 +83,19 @@ write_root_file() {
   local destination="$1"
   local mode="$2"
   local content="$3"
-  local temp_file
-  temp_file="$(mktemp)"
-  printf '%s' "$content" >"$temp_file"
-  run_cmd install -D -m "$mode" "$temp_file" "$destination"
-  run_cmd rm -f -- "$temp_file"
+  run_cmd install -D -m "$mode" /dev/null "$destination"
+  printf '%s' "$content" >"$destination"
+  run_cmd chmod "$mode" "$destination"
 }
 
 write_user_file() {
   local destination="$1"
   local mode="$2"
   local content="$3"
-  local temp_file
-  temp_file="$(mktemp)"
-  printf '%s' "$content" >"$temp_file"
-  run_cmd install -D -m "$mode" -o "$DOCK_TARGET_USER" -g "$DOCK_TARGET_USER" "$temp_file" "$destination"
-  run_cmd rm -f -- "$temp_file"
+  run_cmd install -D -m "$mode" -o "$DOCK_TARGET_USER" -g "$DOCK_TARGET_USER" /dev/null "$destination"
+  printf '%s' "$content" >"$destination"
+  run_cmd chown "$DOCK_TARGET_USER:$DOCK_TARGET_USER" "$destination"
+  run_cmd chmod "$mode" "$destination"
 }
 
 render_wrapper_script() {
@@ -142,7 +137,24 @@ EOF
 
 ensure_labwc_autostart_hook() {
   local autostart_path="$DOCK_TARGET_HOME/.config/labwc/autostart"
-  [[ -f "$autostart_path" ]] || return 0
+  if [[ ! -f "$autostart_path" ]]; then
+    local autostart_content
+    autostart_content="$(cat <<EOF
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=\$'\\n\\t'
+
+autostart_dir="$DOCK_TARGET_HOME/.config/labwc/autostart.d"
+if [[ -d "\$autostart_dir" ]]; then
+  while IFS= read -r -d '' autostart_fragment; do
+    bash "\$autostart_fragment" >/dev/null 2>&1 || true
+  done < <(find "\$autostart_dir" -maxdepth 1 -type f -name '*.sh' -print0 | sort -z)
+fi
+EOF
+)"
+    write_user_file "$autostart_path" 0755 "$autostart_content"
+    return 0
+  fi
   grep -F '.config/labwc/autostart.d' "$autostart_path" >/dev/null && return 0
   grep -F "$CRYSTAL_DOCK_AUTOSTART_MARKER_BEGIN" "$autostart_path" >/dev/null && return 0
   local hook
@@ -158,10 +170,6 @@ fi
 $CRYSTAL_DOCK_AUTOSTART_MARKER_END
 EOF
 )"
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    printf '[dry-run] append managed autostart hook to %s\n' "$autostart_path"
-    return 0
-  fi
   printf '%s' "$hook" >>"$autostart_path"
   run_cmd chown "$DOCK_TARGET_USER:$DOCK_TARGET_USER" "$autostart_path"
 }
@@ -234,6 +242,7 @@ verify_crystal_dock_install() {
   local appearance_path="$DOCK_TARGET_HOME/.config/crystal-dock/labwc/appearance.conf"
   local panel_path="$DOCK_TARGET_HOME/.config/crystal-dock/labwc/panel_1.conf"
   local fragment_path="$DOCK_TARGET_HOME/.config/labwc/autostart.d/50-crystal-dock.sh"
+  local autostart_path="$DOCK_TARGET_HOME/.config/labwc/autostart"
 
   [[ "$(dpkg-query -W -f='${Status}\n' crystal-dock 2>/dev/null || true)" == *"install ok installed"* ]] || die "crystal-dock package is not installed"
   require_file "$CRYSTAL_DOCK_BIN_PATH"
@@ -242,6 +251,7 @@ verify_crystal_dock_install() {
   require_file "$appearance_path"
   require_file "$panel_path"
   require_file "$fragment_path"
+  require_file "$autostart_path"
 
   grep -F 'XDG_CURRENT_DESKTOP="labwc:wlroots"' "$CRYSTAL_DOCK_WRAPPER_PATH" >/dev/null || die "wrapper missing labwc/wlroots desktop override"
   grep -F "panelStyle=${CRYSTAL_DOCK_PANEL_STYLE}" "$appearance_path" >/dev/null || die "appearance config missing expected panel style"
@@ -249,9 +259,7 @@ verify_crystal_dock_install() {
   grep -F "showTaskManager=${CRYSTAL_DOCK_SHOW_TASK_MANAGER}" "$panel_path" >/dev/null || die "panel config missing expected task manager state"
   grep -F '/usr/local/bin/debian-labwc-crystal-dock >/dev/null 2>&1 &' "$fragment_path" >/dev/null || die "autostart fragment missing dock launcher"
 
-  if [[ -f "$DOCK_TARGET_HOME/.config/labwc/autostart" ]]; then
-    grep -F '.config/labwc/autostart.d' "$DOCK_TARGET_HOME/.config/labwc/autostart" >/dev/null || die "labwc autostart missing autostart.d hook"
-  fi
+  grep -F '.config/labwc/autostart.d' "$autostart_path" >/dev/null || die "labwc autostart missing autostart.d hook"
 
   [[ "$(stat -c '%U:%G' "$appearance_path")" == "$DOCK_TARGET_USER:$DOCK_TARGET_USER" ]] || die "appearance config ownership is wrong"
   [[ "$(stat -c '%U:%G' "$panel_path")" == "$DOCK_TARGET_USER:$DOCK_TARGET_USER" ]] || die "panel config ownership is wrong"
@@ -268,11 +276,7 @@ remove_crystal_dock_install() {
 
   local autostart_path="$DOCK_TARGET_HOME/.config/labwc/autostart"
   if [[ -f "$autostart_path" ]]; then
-    if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-      printf '[dry-run] remove managed autostart hook from %s\n' "$autostart_path"
-    else
-      sed -i "/$CRYSTAL_DOCK_AUTOSTART_MARKER_BEGIN/,/$CRYSTAL_DOCK_AUTOSTART_MARKER_END/d" "$autostart_path"
-      run_cmd chown "$DOCK_TARGET_USER:$DOCK_TARGET_USER" "$autostart_path"
-    fi
+    sed -i "/$CRYSTAL_DOCK_AUTOSTART_MARKER_BEGIN/,/$CRYSTAL_DOCK_AUTOSTART_MARKER_END/d" "$autostart_path"
+    run_cmd chown "$DOCK_TARGET_USER:$DOCK_TARGET_USER" "$autostart_path"
   fi
 }

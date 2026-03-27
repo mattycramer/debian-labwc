@@ -31,8 +31,7 @@ render_template_to_file() {
   local template_path="$1"
   local destination="$2"
   local mode="$3"
-  local temp_file
-  temp_file="$(mktemp)"
+  run_cmd install -D -m "$mode" /dev/null "$destination"
   sed \
     -e "s|@GREETD_VT@|$LABWC_GREETD_VT|g" \
     -e "s|@TARGET_USER@|$LABWC_TARGET_USER|g" \
@@ -41,23 +40,20 @@ render_template_to_file() {
     -e "s|@XCURSOR_SIZE@|$LABWC_XCURSOR_SIZE|g" \
     -e "s|@RUNTIME_ENV_PATH@|$LABWC_TARGET_HOME/.config/debian-labwc/runtime.env|g" \
     -e "s|@SESSION_WRAPPER@|/usr/local/bin/debian-labwc-session|g" \
-    "$template_path" >"$temp_file"
-  run_cmd install -D -m "$mode" "$temp_file" "$destination"
-  run_cmd rm -f -- "$temp_file"
+    "$template_path" >"$destination"
+  run_cmd chmod "$mode" "$destination"
 }
 
 install_helper_script() {
   local source_path="$1"
   local destination="$2"
-  local temp_file
-  temp_file="$(mktemp)"
+  run_cmd install -D -m 0755 /dev/null "$destination"
   sed \
     -e "s|@TARGET_HOME@|$LABWC_TARGET_HOME|g" \
     -e "s|@RUNTIME_ENV_PATH@|$LABWC_TARGET_HOME/.config/debian-labwc/runtime.env|g" \
     -e "s|@REPO_ENV_PATH@|$SCRIPT_DIR/.env|g" \
-    "$source_path" >"$temp_file"
-  run_cmd install -D -m 0755 "$temp_file" "$destination"
-  run_cmd rm -f -- "$temp_file"
+    "$source_path" >"$destination"
+  run_cmd chmod 0755 "$destination"
 }
 
 install_root_files() {

@@ -112,6 +112,10 @@ verify_waybar_config_semantics() {
 verify_gpg_agent_semantics() {
   local shutdown_path="$LABWC_TARGET_HOME/.config/labwc/shutdown"
   local override_path="$LABWC_TARGET_HOME/.config/systemd/user/gpg-agent.service.d/override.conf"
+  grep -F 'pkill -x "waybar"' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing waybar stop"
+  grep -F 'wireplumber.service' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing wireplumber stop"
+  grep -F 'pipewire.service' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing pipewire stop"
+  grep -F 'xdg-desktop-portal.service' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing portal stop"
   grep -F 'systemctl --user stop \' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing gpg-agent socket stop"
   grep -F 'gpgconf --kill gpg-agent' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing gpg-agent kill"
   grep -F 'TimeoutStopSec=10s' "$override_path" >/dev/null || die "gpg-agent override missing reduced stop timeout"

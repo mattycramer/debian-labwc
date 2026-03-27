@@ -3,21 +3,18 @@
 render_user_file() {
   local destination="$1"
   local content="$2"
-  local temp_file
-  temp_file="$(mktemp)"
-  printf '%s' "$content" >"$temp_file"
-  run_cmd install -D -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$temp_file" "$destination"
-  run_cmd rm -f -- "$temp_file"
+  run_cmd install -D -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" /dev/null "$destination"
+  printf '%s' "$content" >"$destination"
+  run_cmd chown "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$destination"
 }
 
 render_user_script() {
   local destination="$1"
   local content="$2"
-  local temp_file
-  temp_file="$(mktemp)"
-  printf '%s' "$content" >"$temp_file"
-  run_cmd install -D -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$temp_file" "$destination"
-  run_cmd rm -f -- "$temp_file"
+  run_cmd install -D -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" /dev/null "$destination"
+  printf '%s' "$content" >"$destination"
+  run_cmd chown "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$destination"
+  run_cmd chmod 0755 "$destination"
 }
 
 render_runtime_env() {
@@ -328,8 +325,30 @@ render_labwc_shutdown() {
 set -Eeuo pipefail
 IFS=$'\n\t'
 
+# Stop session clients first so they do not keep poking D-Bus or PipeWire
+# while the compositor and user bus are already shutting down.
+for proc_name in \
+  waybar \
+  kanshi \
+  mako \
+  lxpolkit \
+  swayidle \
+  crystal-dock \
+  nwg-dock
+do
+  pkill -x "$proc_name" >/dev/null 2>&1 || true
+done
+
 if command -v systemctl >/dev/null 2>&1; then
   systemctl --user stop \
+    xdg-desktop-portal.service \
+    xdg-desktop-portal-gtk.service \
+    xdg-desktop-portal-wlr.service \
+    wireplumber.service \
+    pipewire-pulse.service \
+    pipewire.service \
+    pipewire-pulse.socket \
+    pipewire.socket \
     gpg-agent-ssh.socket \
     gpg-agent-browser.socket \
     gpg-agent-extra.socket \

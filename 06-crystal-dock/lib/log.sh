@@ -22,15 +22,5 @@ die() {
 }
 
 run_cmd() {
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    printf '[dry-run] %q' "$1"
-    shift
-    while (($#)); do
-      printf ' %q' "$1"
-      shift
-    done
-    printf '\n'
-    return 0
-  fi
   "$@"
 }

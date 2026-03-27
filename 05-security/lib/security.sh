@@ -105,11 +105,8 @@ apt_update() {
 
 prepare_security_download_path() {
   local path="$1"
-  run_cmd install -d -m 0755 -o "$SECURITY_DOWNLOAD_USER" -g "$SECURITY_DOWNLOAD_GROUP" "$(dirname "$path")"
-  run_cmd rm -f -- "$path"
-  run_cmd touch "$path"
-  run_cmd chown "$SECURITY_DOWNLOAD_USER:$SECURITY_DOWNLOAD_GROUP" "$path"
-  run_cmd chmod 0644 "$path"
+  run_cmd runuser -u "$SECURITY_DOWNLOAD_USER" -- mkdir -p "$(dirname "$path")"
+  run_cmd runuser -u "$SECURITY_DOWNLOAD_USER" -- rm -f -- "$path"
 }
 
 download_as_security_user() {
@@ -128,10 +125,8 @@ fetch_as_security_user() {
 write_text_file() {
   local destination="$1"
   local content="$2"
-  local temp_file="/tmp/debian-labwc-05-security-write-text.tmp"
-  printf '%s' "$content" >"$temp_file"
-  run_cmd install -D -m 0644 "$temp_file" "$destination"
-  rm -f -- "$temp_file"
+  run_cmd install -D -m 0644 /dev/null "$destination"
+  printf '%s' "$content" >"$destination"
 }
 
 install_bootstrap_packages() {
@@ -144,7 +139,7 @@ install_crowdsec_repository() {
   local key_path="/tmp/crowdsec-packagecloud.key"
   run_cmd install -d -m 0755 /etc/apt/keyrings
   download_as_security_user "https://packagecloud.io/crowdsec/crowdsec/gpgkey" "$key_path"
-  run_cmd bash -lc "gpg --dearmor < '$key_path' > '$CROWDSEC_KEYRING_PATH'"
+  run_cmd gpg --dearmor --yes --output "$CROWDSEC_KEYRING_PATH" "$key_path"
   run_cmd rm -f -- "$key_path"
   run_cmd chmod 0644 "$CROWDSEC_KEYRING_PATH"
   write_text_file "$CROWDSEC_LIST_PATH" $'deb [signed-by=/etc/apt/keyrings/crowdsec_crowdsec-archive-keyring.gpg] https://packagecloud.io/crowdsec/crowdsec/any any main\ndeb-src [signed-by=/etc/apt/keyrings/crowdsec_crowdsec-archive-keyring.gpg] https://packagecloud.io/crowdsec/crowdsec/any any main\n'
@@ -235,11 +230,6 @@ copy_staged_tree() {
   run_cmd install -d -m 0755 "$MANIFEST_ROOT"
   remove_manifest_files "$manifest_path"
 
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    run_cmd bash -lc "cp -a '$stage_root'/. /"
-    return 0
-  fi
-
   : >"$manifest_path"
   while IFS= read -r -d '' staged_path; do
     local relative_path="${staged_path#$stage_root}"
@@ -255,10 +245,6 @@ netfilter_pkg_config_path() {
 }
 
 finalize_local_libtool_install() {
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    run_cmd libtool --finish /usr/local/lib
-    return 0
-  fi
   run_cmd libtool --finish /usr/local/lib
   run_cmd ldconfig
 }
@@ -267,7 +253,9 @@ install_latest_libmnl() {
   resolve_libmnl_release
 
   local tmpdir archive_path source_dir stage_root
-  tmpdir="$(mktemp -d -p /tmp debian-labwc-05-security-libmnl.XXXXXX)"
+  tmpdir="${SECURITY_RUNTIME_ROOT}/build-libmnl"
+  run_cmd rm -rf -- "$tmpdir"
+  run_cmd install -d -m 0755 "$tmpdir"
   archive_path="${tmpdir}/${LIBMNL_TARBALL}"
   source_dir="${tmpdir}/libmnl-${LIBMNL_VERSION}"
   stage_root="${tmpdir}/stage"
@@ -275,18 +263,12 @@ install_latest_libmnl() {
   run_cmd chown "$SECURITY_DOWNLOAD_USER:$SECURITY_DOWNLOAD_GROUP" "$tmpdir"
   download_as_security_user "$LIBMNL_URL" "$archive_path"
   run_cmd tar -xjf "$archive_path" -C "$tmpdir"
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    run_cmd bash -lc "cd '$source_dir' && ./configure --prefix=/usr/local"
-    run_cmd bash -lc "cd '$source_dir' && make -j$(nproc)"
-    run_cmd bash -lc "cd '$source_dir' && make DESTDIR='$stage_root' install"
-  else
-    (
-      cd "$source_dir"
-      run_cmd ./configure --prefix=/usr/local
-      run_cmd make -j"$(nproc)"
-      run_cmd make DESTDIR="$stage_root" install
-    )
-  fi
+  (
+    cd "$source_dir"
+    run_cmd ./configure --prefix=/usr/local
+    run_cmd make -j"$(nproc)"
+    run_cmd make DESTDIR="$stage_root" install
+  )
   copy_staged_tree "$stage_root" "libmnl"
   finalize_local_libtool_install
   run_cmd rm -rf -- "$tmpdir"
@@ -296,7 +278,9 @@ install_latest_libnftnl() {
   resolve_libnftnl_release
 
   local tmpdir archive_path source_dir stage_root
-  tmpdir="$(mktemp -d -p /tmp debian-labwc-05-security-libnftnl.XXXXXX)"
+  tmpdir="${SECURITY_RUNTIME_ROOT}/build-libnftnl"
+  run_cmd rm -rf -- "$tmpdir"
+  run_cmd install -d -m 0755 "$tmpdir"
   archive_path="${tmpdir}/${LIBNFTNL_TARBALL}"
   source_dir="${tmpdir}/libnftnl-${LIBNFTNL_VERSION}"
   stage_root="${tmpdir}/stage"
@@ -304,20 +288,14 @@ install_latest_libnftnl() {
   run_cmd chown "$SECURITY_DOWNLOAD_USER:$SECURITY_DOWNLOAD_GROUP" "$tmpdir"
   download_as_security_user "$LIBNFTNL_URL" "$archive_path"
   run_cmd tar -xJf "$archive_path" -C "$tmpdir"
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    run_cmd bash -lc "cd '$source_dir' && export PKG_CONFIG_PATH='$(netfilter_pkg_config_path)' && ./configure --prefix=/usr/local"
-    run_cmd bash -lc "cd '$source_dir' && export PKG_CONFIG_PATH='$(netfilter_pkg_config_path)' && make -j$(nproc)"
-    run_cmd bash -lc "cd '$source_dir' && export PKG_CONFIG_PATH='$(netfilter_pkg_config_path)' && make DESTDIR='$stage_root' install"
-  else
-    (
-      export PKG_CONFIG_PATH
-      PKG_CONFIG_PATH="$(netfilter_pkg_config_path)"
-      cd "$source_dir"
-      run_cmd ./configure --prefix=/usr/local
-      run_cmd make -j"$(nproc)"
-      run_cmd make DESTDIR="$stage_root" install
-    )
-  fi
+  (
+    export PKG_CONFIG_PATH
+    PKG_CONFIG_PATH="$(netfilter_pkg_config_path)"
+    cd "$source_dir"
+    run_cmd ./configure --prefix=/usr/local
+    run_cmd make -j"$(nproc)"
+    run_cmd make DESTDIR="$stage_root" install
+  )
   copy_staged_tree "$stage_root" "libnftnl"
   finalize_local_libtool_install
   run_cmd rm -rf -- "$tmpdir"
@@ -329,7 +307,9 @@ install_latest_nftables() {
   resolve_nftables_release
 
   local tmpdir archive_path source_dir stage_root
-  tmpdir="$(mktemp -d -p /tmp debian-labwc-05-security-nftables.XXXXXX)"
+  tmpdir="${SECURITY_RUNTIME_ROOT}/build-nftables"
+  run_cmd rm -rf -- "$tmpdir"
+  run_cmd install -d -m 0755 "$tmpdir"
   archive_path="${tmpdir}/${NFTABLES_TARBALL}"
   source_dir="${tmpdir}/nftables-${NFTABLES_VERSION}"
   stage_root="${tmpdir}/stage"
@@ -337,20 +317,14 @@ install_latest_nftables() {
   run_cmd chown "$SECURITY_DOWNLOAD_USER:$SECURITY_DOWNLOAD_GROUP" "$tmpdir"
   download_as_security_user "$NFTABLES_URL" "$archive_path"
   run_cmd tar -xJf "$archive_path" -C "$tmpdir"
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    run_cmd bash -lc "cd '$source_dir' && export PKG_CONFIG_PATH='$(netfilter_pkg_config_path)' && ./configure --prefix=/usr/local"
-    run_cmd bash -lc "cd '$source_dir' && export PKG_CONFIG_PATH='$(netfilter_pkg_config_path)' && make -j$(nproc)"
-    run_cmd bash -lc "cd '$source_dir' && export PKG_CONFIG_PATH='$(netfilter_pkg_config_path)' && make DESTDIR='$stage_root' install"
-  else
-    (
-      export PKG_CONFIG_PATH
-      PKG_CONFIG_PATH="$(netfilter_pkg_config_path)"
-      cd "$source_dir"
-      run_cmd ./configure --prefix=/usr/local
-      run_cmd make -j"$(nproc)"
-      run_cmd make DESTDIR="$stage_root" install
-    )
-  fi
+  (
+    export PKG_CONFIG_PATH
+    PKG_CONFIG_PATH="$(netfilter_pkg_config_path)"
+    cd "$source_dir"
+    run_cmd ./configure --prefix=/usr/local
+    run_cmd make -j"$(nproc)"
+    run_cmd make DESTDIR="$stage_root" install
+  )
   copy_staged_tree "$stage_root" "nftables"
   finalize_local_libtool_install
   run_cmd rm -rf -- "$tmpdir"
@@ -360,7 +334,9 @@ install_latest_aide() {
   resolve_aide_release
 
   local tmpdir archive_path source_dir stage_root
-  tmpdir="$(mktemp -d -p /tmp debian-labwc-05-security-aide.XXXXXX)"
+  tmpdir="${SECURITY_RUNTIME_ROOT}/build-aide"
+  run_cmd rm -rf -- "$tmpdir"
+  run_cmd install -d -m 0755 "$tmpdir"
   archive_path="${tmpdir}/${AIDE_TARBALL}"
   source_dir="${tmpdir}/aide-${AIDE_VERSION}"
   stage_root="${tmpdir}/stage"
@@ -368,18 +344,12 @@ install_latest_aide() {
   run_cmd chown "$SECURITY_DOWNLOAD_USER:$SECURITY_DOWNLOAD_GROUP" "$tmpdir"
   download_as_security_user "$AIDE_URL" "$archive_path"
   run_cmd tar -xzf "$archive_path" -C "$tmpdir"
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    run_cmd bash -lc "cd '$source_dir' && ./configure --prefix=/usr/local"
-    run_cmd bash -lc "cd '$source_dir' && make -j$(nproc)"
-    run_cmd bash -lc "cd '$source_dir' && make DESTDIR='$stage_root' install"
-  else
-    (
-      cd "$source_dir"
-      run_cmd ./configure --prefix=/usr/local
-      run_cmd make -j"$(nproc)"
-      run_cmd make DESTDIR="$stage_root" install
-    )
-  fi
+  (
+    cd "$source_dir"
+    run_cmd ./configure --prefix=/usr/local
+    run_cmd make -j"$(nproc)"
+    run_cmd make DESTDIR="$stage_root" install
+  )
   copy_staged_tree "$stage_root" "aide"
   run_cmd ldconfig
   run_cmd rm -rf -- "$tmpdir"
@@ -418,10 +388,8 @@ ensure_crowdsec_bouncer_key() {
       run_cmd cscli bouncers delete "$CROWDSEC_BOUNCER_NAME" || true
       run_cmd cscli bouncers add "$CROWDSEC_BOUNCER_NAME" --key "$api_key"
     fi
-    if [[ "${DRY_RUN:-0}" -eq 0 ]]; then
-      printf '%s\n' "$api_key" >"$CROWDSEC_BOUNCER_KEY_PATH"
-      chmod 0600 "$CROWDSEC_BOUNCER_KEY_PATH"
-    fi
+    printf '%s\n' "$api_key" >"$CROWDSEC_BOUNCER_KEY_PATH"
+    chmod 0600 "$CROWDSEC_BOUNCER_KEY_PATH"
     CROWDSEC_BOUNCER_API_KEY="$api_key"
   fi
   export CROWDSEC_BOUNCER_API_KEY

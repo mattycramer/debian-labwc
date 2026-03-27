@@ -6,10 +6,9 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
 readonly ENV_FILE="$SCRIPT_DIR/.env"
 
-DRY_RUN=0
 ASSUME_YES=1
 PHASE="all"
-export DRY_RUN ASSUME_YES
+export ASSUME_YES
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/log.sh"
@@ -20,7 +19,7 @@ source "$SCRIPT_DIR/lib/apt.sh"
 
 usage() {
   cat <<'EOF'
-Usage: ./install.sh --phase doctor|install|verify|print-env|nuke|all [--dry-run] [--yes]
+Usage: ./install.sh --phase doctor|install|verify|print-env|nuke|all [--yes]
 EOF
 }
 
@@ -30,10 +29,6 @@ parse_args() {
       --phase)
         PHASE="${2:-}"
         shift 2
-        ;;
-      --dry-run)
-        DRY_RUN=1
-        shift
         ;;
       --yes)
         ASSUME_YES=1

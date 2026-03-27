@@ -50,7 +50,7 @@ if [[ "$external_120" != "yes" && -n "$current_mode" && -n "$current_hz" ]]; the
   external_hz="$current_hz"
 fi
 
-tmp_file="$(mktemp)"
+tmp_file="$(dirname "$runtime_env")/.runtime.env.tmp.$$"
 awk \
   -v ext_mode="$external_mode" \
   -v ext_hz="$external_hz" \
@@ -64,7 +64,7 @@ awk \
 mv -- "$tmp_file" "$runtime_env"
 
 if [[ -w "$repo_env" ]]; then
-  tmp_file="$(mktemp)"
+  tmp_file="$(dirname "$repo_env")/.repo.env.tmp.$$"
   awk \
     -v ext_mode="$external_mode" \
     -v ext_hz="$external_hz" \

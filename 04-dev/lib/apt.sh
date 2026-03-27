@@ -73,19 +73,14 @@ apt_update() {
 write_text_file() {
   local destination="$1"
   local content="$2"
-  local temp_file="/tmp/debian-labwc-04-dev-write-text.tmp"
-  printf '%s' "$content" >"$temp_file"
-  run_cmd install -D -m 0644 "$temp_file" "$destination"
-  run_cmd rm -f -- "$temp_file"
+  run_cmd install -D -m 0644 /dev/null "$destination"
+  printf '%s' "$content" >"$destination"
 }
 
 prepare_dev_download_path() {
   local path="$1"
-  run_cmd install -d -m 0755 -o "$DEV_DOWNLOAD_USER" -g "$DEV_DOWNLOAD_GROUP" "$(dirname "$path")"
-  run_cmd rm -f -- "$path"
-  run_cmd touch "$path"
-  run_cmd chown "$DEV_DOWNLOAD_USER:$DEV_DOWNLOAD_GROUP" "$path"
-  run_cmd chmod 0644 "$path"
+  run_cmd runuser -u "$DEV_DOWNLOAD_USER" -- mkdir -p "$(dirname "$path")"
+  run_cmd runuser -u "$DEV_DOWNLOAD_USER" -- rm -f -- "$path"
 }
 
 download_as_dev_user() {
@@ -116,9 +111,7 @@ install_dev_packages() {
 
 resolve_node_release() {
   local shasums_url="${NODE_DIST_BASE}/SHASUMS256.txt"
-  local shasums_file
-  shasums_file="$(mktemp -p /tmp debian-labwc-04-dev-shasums.XXXXXX)"
-  run_cmd chown "$DEV_DOWNLOAD_USER:$DEV_DOWNLOAD_GROUP" "$shasums_file"
+  local shasums_file="/tmp/debian-labwc-04-dev-shasums.$$"
   run_cmd runuser -u "$DEV_DOWNLOAD_USER" -- env HOME="$DEV_DOWNLOAD_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error -o "$shasums_file" "$shasums_url"
   local line
   line="$(awk '/ node-v[0-9]+\.[0-9]+\.[0-9]+-linux-x64\.tar\.xz$/ {print $1, $2; exit}' "$shasums_file")"
@@ -144,16 +137,15 @@ install_node_runtime() {
   run_cmd install -d -m 0755 /usr/local/bin
 
   if [[ ! -x "$install_dir/bin/node" ]]; then
-    tmpdir="$(mktemp -d -p /tmp debian-labwc-04-dev-node.XXXXXX)"
+    tmpdir="/tmp/debian-labwc-04-dev-node.$$"
+    run_cmd runuser -u "$DEV_DOWNLOAD_USER" -- rm -rf -- "$tmpdir"
+    run_cmd runuser -u "$DEV_DOWNLOAD_USER" -- mkdir -p "$tmpdir"
     tarball_path="${tmpdir}/${NODE_TARBALL}"
-    run_cmd chown "$DEV_DOWNLOAD_USER:$DEV_DOWNLOAD_GROUP" "$tmpdir"
     download_as_dev_user "${NODE_DIST_BASE}/${NODE_TARBALL}" "$tarball_path"
-    if [[ "${DRY_RUN:-0}" -eq 0 ]]; then
-      local actual_sha
-      actual_sha="$(sha256sum "$tarball_path" | awk '{print $1}')"
-      [[ "$actual_sha" == "$NODE_SHA256" ]] || die "Node.js tarball checksum mismatch for ${NODE_TARBALL}"
-    fi
-    run_cmd tar -xJf "$tarball_path" -C "$tmpdir"
+    local actual_sha
+    actual_sha="$(sha256sum "$tarball_path" | awk '{print $1}')"
+    [[ "$actual_sha" == "$NODE_SHA256" ]] || die "Node.js tarball checksum mismatch for ${NODE_TARBALL}"
+    run_cmd runuser -u "$DEV_DOWNLOAD_USER" -- tar -xJf "$tarball_path" -C "$tmpdir"
     run_cmd rm -rf -- "$install_dir"
     run_cmd mv -- "${tmpdir}/${NODE_DIRNAME}" "$install_dir"
     run_cmd rm -rf -- "$tmpdir"

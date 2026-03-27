@@ -26,7 +26,6 @@ readonly BACKPORTS_TOOLS_PACKAGES=(
   aptitude
 )
 
-readonly TOOLS_TMP_ROOT="/tmp/debian-labwc-03-tools"
 readonly TOOLS_KEYRING_DIR="/usr/share/keyrings"
 
 apt_yes_args() {
@@ -36,9 +35,7 @@ apt_yes_args() {
 }
 
 detect_tools_target_user() {
-  if [[ -n "${TOOLS_TARGET_USER:-}" ]] && id "$TOOLS_TARGET_USER" >/dev/null 2>&1; then
-    :
-  elif [[ -n "${SUDO_USER:-}" ]] && [[ "${SUDO_USER:-}" != "root" ]] && id "${SUDO_USER:-}" >/dev/null 2>&1; then
+  if [[ -n "${SUDO_USER:-}" ]] && [[ "${SUDO_USER:-}" != "root" ]] && id "${SUDO_USER:-}" >/dev/null 2>&1; then
     TOOLS_TARGET_USER="$SUDO_USER"
   else
     TOOLS_TARGET_USER="$(getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $7 !~ /(false|nologin)$/ {print $1; exit}')"
@@ -60,34 +57,13 @@ install_repo_bootstrap() {
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${NORMAL_BOOTSTRAP_PACKAGES[@]}"
 }
 
-write_text_file() {
-  local destination="$1"
-  local content="$2"
-  local temp_file="${TOOLS_TMP_ROOT}/write-text.$$"
-  run_cmd install -d -m 1777 /tmp
-  run_cmd install -d -m 0755 "$TOOLS_TMP_ROOT"
-  printf '%s' "$content" >"$temp_file"
-  run_cmd install -D -m 0644 "$temp_file" "$destination"
-  rm -f -- "$temp_file"
-}
-
 prepare_tools_download_path() {
   local path="$1"
+  local path_dir
   [[ "$path" == /tmp/* ]] || die "download path must stay under /tmp: $path"
-  run_cmd install -d -m 1777 /tmp
-  run_cmd install -d -m 0755 -o "$TOOLS_TARGET_USER" -g "$TOOLS_TARGET_GROUP" "$(dirname "$path")"
-  run_cmd rm -f -- "$path"
-  run_cmd touch "$path"
-  run_cmd chown "$TOOLS_TARGET_USER:$TOOLS_TARGET_GROUP" "$path"
-  run_cmd chmod 0644 "$path"
-}
-
-remove_legacy_source_file_if_matching() {
-  local path="$1"
-  local needle="$2"
-  [[ -f "$path" ]] || return 0
-  grep -F "$needle" "$path" >/dev/null || return 0
-  run_cmd rm -f -- "$path"
+  path_dir="$(dirname "$path")"
+  run_cmd runuser -u "$TOOLS_TARGET_USER" -- mkdir -p "$path_dir"
+  run_cmd runuser -u "$TOOLS_TARGET_USER" -- rm -f -- "$path"
 }
 
 download_as_tools_user() {
@@ -105,21 +81,25 @@ fetch_as_tools_user() {
 
 install_repository_files() {
   local microsoft_key_asc="/tmp/microsoft-packages.asc"
-  local microsoft_key_gpg="/tmp/microsoft-packages.gpg"
+  local microsoft_key_gpg="${TOOLS_KEYRING_DIR}/microsoft.gpg"
+  local mullvad_key_asc="/tmp/mullvad-keyring.asc"
+  local mullvad_key_gpg="${TOOLS_KEYRING_DIR}/mullvad-keyring.gpg"
   run_cmd install -d -m 0755 "$TOOLS_KEYRING_DIR"
   download_as_tools_user "https://packages.microsoft.com/keys/microsoft.asc" "$microsoft_key_asc"
   run_cmd gpg --dearmor --yes --output "$microsoft_key_gpg" "$microsoft_key_asc"
-  run_cmd install -D -o root -g root -m 0644 "$microsoft_key_gpg" "${TOOLS_KEYRING_DIR}/microsoft.gpg"
-  run_cmd rm -f -- "$microsoft_key_asc" "$microsoft_key_gpg"
-  remove_legacy_source_file_if_matching "/etc/apt/sources.list.d/vscode.list" "packages.microsoft.com/repos/code"
-  write_text_file "/etc/apt/sources.list.d/vscode.sources" $'Types: deb\nURIs: https://packages.microsoft.com/repos/code\nSuites: stable\nComponents: main\nArchitectures: amd64\nSigned-By: /usr/share/keyrings/microsoft.gpg\n'
+  run_cmd chmod 0644 "$microsoft_key_gpg"
+  run_cmd rm -f -- "$microsoft_key_asc"
+  printf '%s' 'deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/code stable main
+' > /etc/apt/sources.list.d/vscode.list
+  run_cmd chmod 0644 /etc/apt/sources.list.d/vscode.list
 
-  local mullvad_key="/tmp/mullvad-keyring.asc"
-  download_as_tools_user "https://repository.mullvad.net/deb/mullvad-keyring.asc" "$mullvad_key"
-  run_cmd install -D -o root -g root -m 0644 "$mullvad_key" "${TOOLS_KEYRING_DIR}/mullvad-keyring.asc"
-  run_cmd rm -f -- "$mullvad_key"
-  remove_legacy_source_file_if_matching "/etc/apt/sources.list.d/mullvad.sources" "repository.mullvad.net/deb/stable"
-  write_text_file "/etc/apt/sources.list.d/mullvad.list" $'deb [signed-by=/usr/share/keyrings/mullvad-keyring.asc arch=amd64] https://repository.mullvad.net/deb/stable stable main\n'
+  download_as_tools_user "https://repository.mullvad.net/deb/mullvad-keyring.asc" "$mullvad_key_asc"
+  run_cmd gpg --dearmor --yes --output "$mullvad_key_gpg" "$mullvad_key_asc"
+  run_cmd chmod 0644 "$mullvad_key_gpg"
+  run_cmd rm -f -- "$mullvad_key_asc"
+  printf '%s' 'deb [signed-by=/usr/share/keyrings/mullvad-keyring.gpg arch=amd64] https://repository.mullvad.net/deb/stable stable main
+' > /etc/apt/sources.list.d/mullvad.list
+  run_cmd chmod 0644 /etc/apt/sources.list.d/mullvad.list
 }
 
 install_normal_tools() {
@@ -142,9 +122,7 @@ install_deb_url() {
   [[ "$output_path" == *.deb ]] || die "deb output path must end in .deb: $output_path"
   mapfile -t apt_args < <(apt_yes_args)
   download_as_tools_user "$url" "$output_path"
-  if [[ "${DRY_RUN:-0}" -eq 0 ]]; then
-    dpkg-deb -f "$output_path" Package >/dev/null 2>&1 || die "downloaded file is not a valid Debian package: $output_path"
-  fi
+  dpkg-deb -f "$output_path" Package >/dev/null 2>&1 || die "downloaded file is not a valid Debian package: $output_path"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install "${apt_args[@]}" "$output_path"
   run_cmd rm -f "$output_path"
 }
@@ -179,9 +157,8 @@ render_mpv_config() {
   run_cmd chown -R "$TOOLS_TARGET_USER:$TOOLS_TARGET_USER" "$TOOLS_TARGET_HOME/.config" "$TOOLS_TARGET_HOME/.local"
   local config_dir="$TOOLS_TARGET_HOME/.config/mpv"
   run_cmd install -d -m 0755 -o "$TOOLS_TARGET_USER" -g "$TOOLS_TARGET_USER" "$config_dir"
-  printf '%s\n' 'vo=gpu' 'gpu-api=opengl' 'hwdec=auto-safe' > /tmp/mpv.conf.codex
-  run_cmd install -m 0644 -o "$TOOLS_TARGET_USER" -g "$TOOLS_TARGET_USER" /tmp/mpv.conf.codex "$config_dir/mpv.conf"
-  run_cmd rm -f /tmp/mpv.conf.codex
+  run_cmd install -m 0644 -o "$TOOLS_TARGET_USER" -g "$TOOLS_TARGET_USER" /dev/null "$config_dir/mpv.conf"
+  run_cmd runuser -u "$TOOLS_TARGET_USER" -- sh -c "printf '%s\n' 'vo=gpu' 'gpu-api=opengl' 'hwdec=auto-safe' > '$config_dir/mpv.conf'"
 }
 
 package_is_installed() {
@@ -202,15 +179,15 @@ verify_tools_install() {
   package_is_installed bitwarden || die "bitwarden package is not installed"
   package_pattern_installed '^obsidian($|[-])' || die "obsidian package is not installed"
   package_pattern_installed 'filen' || die "filen package is not installed"
-  [[ -f "/etc/apt/sources.list.d/vscode.sources" ]] || die "missing vscode.sources"
+  [[ -f "/etc/apt/sources.list.d/vscode.list" ]] || die "missing vscode.list"
   [[ -f "/etc/apt/sources.list.d/mullvad.list" ]] || die "missing mullvad.list"
   [[ -f "/usr/share/keyrings/microsoft.gpg" ]] || die "missing microsoft keyring"
-  [[ -f "/usr/share/keyrings/mullvad-keyring.asc" ]] || die "missing mullvad keyring"
-  grep -F 'Architectures: amd64' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing amd64 architecture"
-  grep -F 'Signed-By: /usr/share/keyrings/microsoft.gpg' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing microsoft signed-by key"
-  grep -F 'URIs: https://packages.microsoft.com/repos/code' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing expected repo uri"
+  [[ -f "/usr/share/keyrings/mullvad-keyring.gpg" ]] || die "missing mullvad keyring"
+  grep -F 'arch=amd64' /etc/apt/sources.list.d/vscode.list >/dev/null || die "vscode source missing amd64 architecture"
+  grep -F 'signed-by=/usr/share/keyrings/microsoft.gpg' /etc/apt/sources.list.d/vscode.list >/dev/null || die "vscode source missing microsoft signed-by key"
+  grep -F 'https://packages.microsoft.com/repos/code stable main' /etc/apt/sources.list.d/vscode.list >/dev/null || die "vscode source missing expected repo uri"
   grep -F 'arch=amd64' /etc/apt/sources.list.d/mullvad.list >/dev/null || die "mullvad source missing amd64 architecture"
-  grep -F 'signed-by=/usr/share/keyrings/mullvad-keyring.asc' /etc/apt/sources.list.d/mullvad.list >/dev/null || die "mullvad source missing mullvad signed-by key"
+  grep -F 'signed-by=/usr/share/keyrings/mullvad-keyring.gpg' /etc/apt/sources.list.d/mullvad.list >/dev/null || die "mullvad source missing mullvad signed-by key"
   grep -F 'https://repository.mullvad.net/deb/stable stable main' /etc/apt/sources.list.d/mullvad.list >/dev/null || die "mullvad source missing expected repo uri"
   [[ -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf" ]] || die "missing mpv.conf"
   [[ "$(stat -c '%U:%G' "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf")" == "$TOOLS_TARGET_USER:$TOOLS_TARGET_USER" ]] || die "mpv.conf ownership is wrong"
@@ -221,6 +198,6 @@ remove_tools_install() {
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}" thorium-browser bitwarden obsidian filen || true
   run_cmd rm -f /etc/apt/sources.list.d/vscode.sources /etc/apt/sources.list.d/vscode.list /etc/apt/sources.list.d/thorium.sources /etc/apt/sources.list.d/thorium.list /etc/apt/sources.list.d/mullvad.sources /etc/apt/sources.list.d/mullvad.list
-  run_cmd rm -f /usr/share/keyrings/microsoft.gpg /usr/share/keyrings/mullvad-keyring.asc
+  run_cmd rm -f /usr/share/keyrings/microsoft.gpg /usr/share/keyrings/mullvad-keyring.asc /usr/share/keyrings/mullvad-keyring.gpg
   run_cmd rm -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf"
 }

@@ -103,8 +103,8 @@ write_autogen_block() {
   local env_file="$1"
   local runtime_env_path="$LABWC_TARGET_HOME/.config/debian-labwc/runtime.env"
   local temp_file block_file
-  temp_file="$(mktemp)"
-  block_file="$(mktemp)"
+  temp_file="$(dirname "$env_file")/.env.tmp.$$"
+  block_file="$(dirname "$env_file")/.env.block.$$"
 
   cat >"$block_file" <<EOF
 $AUTOGEN_BEGIN

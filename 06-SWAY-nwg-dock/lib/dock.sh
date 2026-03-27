@@ -57,31 +57,25 @@ write_root_file() {
   local destination="$1"
   local mode="$2"
   local content="$3"
-  local temp_file
-  temp_file="$(mktemp)"
-  printf '%s' "$content" >"$temp_file"
-  run_cmd install -D -m "$mode" "$temp_file" "$destination"
-  run_cmd rm -f -- "$temp_file"
+  run_cmd install -D -m "$mode" /dev/null "$destination"
+  printf '%s' "$content" >"$destination"
+  run_cmd chmod "$mode" "$destination"
 }
 
 write_user_file() {
   local destination="$1"
   local mode="$2"
   local content="$3"
-  local temp_file
-  temp_file="$(mktemp)"
-  printf '%s' "$content" >"$temp_file"
-  run_cmd install -D -m "$mode" -o "$NWG_TARGET_USER" -g "$NWG_TARGET_USER" "$temp_file" "$destination"
-  run_cmd rm -f -- "$temp_file"
+  run_cmd install -D -m "$mode" -o "$NWG_TARGET_USER" -g "$NWG_TARGET_USER" /dev/null "$destination"
+  printf '%s' "$content" >"$destination"
+  run_cmd chown "$NWG_TARGET_USER:$NWG_TARGET_USER" "$destination"
+  run_cmd chmod "$mode" "$destination"
 }
 
 prepare_nwg_download_path() {
   local path="$1"
-  run_cmd install -d -m 0755 -o "$NWG_TARGET_USER" -g "$NWG_TARGET_GROUP" "$(dirname "$path")"
-  run_cmd rm -f -- "$path"
-  run_cmd touch "$path"
-  run_cmd chown "$NWG_TARGET_USER:$NWG_TARGET_GROUP" "$path"
-  run_cmd chmod 0644 "$path"
+  run_cmd runuser -u "$NWG_TARGET_USER" -- mkdir -p "$(dirname "$path")"
+  run_cmd runuser -u "$NWG_TARGET_USER" -- rm -f -- "$path"
 }
 
 install_nwg_dock_from_source() {
@@ -255,10 +249,6 @@ fi
 $NWG_DOCK_AUTOSTART_MARKER_END
 EOF
 )"
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    printf '[dry-run] append managed autostart hook to %s\n' "$autostart_path"
-    return 0
-  fi
   printf '%s' "$hook" >>"$autostart_path"
   run_cmd chown "$NWG_TARGET_USER:$NWG_TARGET_USER" "$autostart_path"
 }
@@ -302,11 +292,7 @@ remove_nwg_dock_install() {
 
   local autostart_path="$NWG_TARGET_HOME/.config/labwc/autostart"
   if [[ -f "$autostart_path" ]]; then
-    if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-      printf '[dry-run] remove managed autostart hook from %s\n' "$autostart_path"
-    else
-      sed -i "/$NWG_DOCK_AUTOSTART_MARKER_BEGIN/,/$NWG_DOCK_AUTOSTART_MARKER_END/d" "$autostart_path"
-      run_cmd chown "$NWG_TARGET_USER:$NWG_TARGET_USER" "$autostart_path"
-    fi
+    sed -i "/$NWG_DOCK_AUTOSTART_MARKER_BEGIN/,/$NWG_DOCK_AUTOSTART_MARKER_END/d" "$autostart_path"
+    run_cmd chown "$NWG_TARGET_USER:$NWG_TARGET_USER" "$autostart_path"
   fi
 }
