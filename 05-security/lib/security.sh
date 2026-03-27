@@ -123,6 +123,28 @@ resolve_nftables_release() {
   export NFTABLES_TARBALL NFTABLES_VERSION NFTABLES_URL
 }
 
+resolve_libmnl_release() {
+  local page
+  page="$(curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error https://www.netfilter.org/projects/libmnl/downloads.html)"
+  LIBMNL_TARBALL="$(printf '%s' "$page" | grep -o 'libmnl-[0-9][0-9.]*\.tar\.bz2' | head -n1)"
+  [[ -n "${LIBMNL_TARBALL:-}" ]] || die "could not resolve latest libmnl release"
+  LIBMNL_VERSION="${LIBMNL_TARBALL#libmnl-}"
+  LIBMNL_VERSION="${LIBMNL_VERSION%.tar.bz2}"
+  LIBMNL_URL="https://www.netfilter.org/projects/libmnl/files/${LIBMNL_TARBALL}"
+  export LIBMNL_TARBALL LIBMNL_VERSION LIBMNL_URL
+}
+
+resolve_libnftnl_release() {
+  local page
+  page="$(curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error https://www.netfilter.org/projects/libnftnl/downloads.html)"
+  LIBNFTNL_TARBALL="$(printf '%s' "$page" | grep -o 'libnftnl-[0-9][0-9.]*\.tar\.xz' | head -n1)"
+  [[ -n "${LIBNFTNL_TARBALL:-}" ]] || die "could not resolve latest libnftnl release"
+  LIBNFTNL_VERSION="${LIBNFTNL_TARBALL#libnftnl-}"
+  LIBNFTNL_VERSION="${LIBNFTNL_VERSION%.tar.xz}"
+  LIBNFTNL_URL="https://www.netfilter.org/projects/libnftnl/files/${LIBNFTNL_TARBALL}"
+  export LIBNFTNL_TARBALL LIBNFTNL_VERSION LIBNFTNL_URL
+}
+
 resolve_aide_release() {
   local json
   json="$(curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error https://api.github.com/repos/aide/aide/releases/latest)"
@@ -183,7 +205,71 @@ copy_staged_tree() {
   done < <(find "$stage_root" -mindepth 1 \( -type f -o -type l \) -print0 | sort -z)
 }
 
+netfilter_pkg_config_path() {
+  printf '/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig%s' "${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+}
+
+install_latest_libmnl() {
+  resolve_libmnl_release
+
+  local tmpdir archive_path source_dir stage_root
+  tmpdir="$(mktemp -d)"
+  archive_path="${tmpdir}/${LIBMNL_TARBALL}"
+  source_dir="${tmpdir}/libmnl-${LIBMNL_VERSION}"
+  stage_root="${tmpdir}/stage"
+
+  run_cmd curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 300 --silent --show-error -o "$archive_path" "$LIBMNL_URL"
+  run_cmd tar -xjf "$archive_path" -C "$tmpdir"
+  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
+    run_cmd bash -lc "cd '$source_dir' && ./configure --prefix=/usr/local"
+    run_cmd bash -lc "cd '$source_dir' && make -j$(nproc)"
+    run_cmd bash -lc "cd '$source_dir' && make DESTDIR='$stage_root' install"
+  else
+    (
+      cd "$source_dir"
+      run_cmd ./configure --prefix=/usr/local
+      run_cmd make -j"$(nproc)"
+      run_cmd make DESTDIR="$stage_root" install
+    )
+  fi
+  copy_staged_tree "$stage_root" "libmnl"
+  run_cmd ldconfig
+  run_cmd rm -rf -- "$tmpdir"
+}
+
+install_latest_libnftnl() {
+  resolve_libnftnl_release
+
+  local tmpdir archive_path source_dir stage_root
+  tmpdir="$(mktemp -d)"
+  archive_path="${tmpdir}/${LIBNFTNL_TARBALL}"
+  source_dir="${tmpdir}/libnftnl-${LIBNFTNL_VERSION}"
+  stage_root="${tmpdir}/stage"
+
+  run_cmd curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 300 --silent --show-error -o "$archive_path" "$LIBNFTNL_URL"
+  run_cmd tar -xJf "$archive_path" -C "$tmpdir"
+  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
+    run_cmd bash -lc "cd '$source_dir' && export PKG_CONFIG_PATH='$(netfilter_pkg_config_path)' && ./configure --prefix=/usr/local"
+    run_cmd bash -lc "cd '$source_dir' && export PKG_CONFIG_PATH='$(netfilter_pkg_config_path)' && make -j$(nproc)"
+    run_cmd bash -lc "cd '$source_dir' && export PKG_CONFIG_PATH='$(netfilter_pkg_config_path)' && make DESTDIR='$stage_root' install"
+  else
+    (
+      export PKG_CONFIG_PATH
+      PKG_CONFIG_PATH="$(netfilter_pkg_config_path)"
+      cd "$source_dir"
+      run_cmd ./configure --prefix=/usr/local
+      run_cmd make -j"$(nproc)"
+      run_cmd make DESTDIR="$stage_root" install
+    )
+  fi
+  copy_staged_tree "$stage_root" "libnftnl"
+  run_cmd ldconfig
+  run_cmd rm -rf -- "$tmpdir"
+}
+
 install_latest_nftables() {
+  install_latest_libmnl
+  install_latest_libnftnl
   resolve_nftables_release
 
   local tmpdir archive_path source_dir stage_root
@@ -195,11 +281,13 @@ install_latest_nftables() {
   run_cmd curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 300 --silent --show-error -o "$archive_path" "$NFTABLES_URL"
   run_cmd tar -xJf "$archive_path" -C "$tmpdir"
   if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    run_cmd bash -lc "cd '$source_dir' && ./configure --prefix=/usr/local"
-    run_cmd bash -lc "cd '$source_dir' && make -j$(nproc)"
-    run_cmd bash -lc "cd '$source_dir' && make DESTDIR='$stage_root' install"
+    run_cmd bash -lc "cd '$source_dir' && export PKG_CONFIG_PATH='$(netfilter_pkg_config_path)' && ./configure --prefix=/usr/local"
+    run_cmd bash -lc "cd '$source_dir' && export PKG_CONFIG_PATH='$(netfilter_pkg_config_path)' && make -j$(nproc)"
+    run_cmd bash -lc "cd '$source_dir' && export PKG_CONFIG_PATH='$(netfilter_pkg_config_path)' && make DESTDIR='$stage_root' install"
   else
     (
+      export PKG_CONFIG_PATH
+      PKG_CONFIG_PATH="$(netfilter_pkg_config_path)"
       cd "$source_dir"
       run_cmd ./configure --prefix=/usr/local
       run_cmd make -j"$(nproc)"
@@ -388,6 +476,8 @@ verify_security_install() {
   verify_path_exists "$AIDE_CHECK_TIMER_PATH"
   verify_path_exists "${MANIFEST_ROOT}/nftables.files"
   verify_path_exists "${MANIFEST_ROOT}/aide.files"
+  verify_path_exists "${MANIFEST_ROOT}/libmnl.files"
+  verify_path_exists "${MANIFEST_ROOT}/libnftnl.files"
 
   for cmd in /usr/local/sbin/nft /usr/local/bin/aide crowdsec cscli crowdsec-firewall-bouncer; do
     command_is_available "$cmd" || die "missing command: $cmd"
@@ -428,6 +518,8 @@ remove_security_install() {
 
   remove_manifest_files "${MANIFEST_ROOT}/aide.files"
   remove_manifest_files "${MANIFEST_ROOT}/nftables.files"
+  remove_manifest_files "${MANIFEST_ROOT}/libmnl.files"
+  remove_manifest_files "${MANIFEST_ROOT}/libnftnl.files"
   run_cmd rm -rf -- "$MANIFEST_ROOT"
 
   run_cmd rm -f -- "$CROWDSEC_KEYRING_PATH" "$CROWDSEC_LIST_PATH" "$CROWDSEC_PREFS_PATH"
