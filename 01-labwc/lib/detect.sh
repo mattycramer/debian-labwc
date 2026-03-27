@@ -153,15 +153,15 @@ EOF
     }
   ' "$env_file" >"$temp_file"
 
-  mv -- "$temp_file" "$env_file"
-  rm -f -- "$block_file"
+  run_cmd mv -- "$temp_file" "$env_file"
+  run_cmd rm -f -- "$block_file"
 
   awk -v runtime_env="$runtime_env_path" -v repo_env="$env_file" '
     /^LABWC_RUNTIME_ENV_PATH=/ {$0 = "LABWC_RUNTIME_ENV_PATH=\"" runtime_env "\""}
     /^LABWC_REPO_ENV_PATH=/ {$0 = "LABWC_REPO_ENV_PATH=\"" repo_env "\""}
     {print}
   ' "$env_file" >"$temp_file"
-  mv -- "$temp_file" "$env_file"
+  run_cmd mv -- "$temp_file" "$env_file"
 }
 
 detect_hardware() {

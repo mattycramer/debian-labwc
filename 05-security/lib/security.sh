@@ -25,6 +25,7 @@ readonly BOOTSTRAP_PACKAGES=(
   libselinux1-dev
   libaudit-dev
   libcap-dev
+  nettle-dev
   zlib1g-dev
   libpcre2-dev
   nftables

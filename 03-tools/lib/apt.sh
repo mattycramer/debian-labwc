@@ -125,15 +125,15 @@ install_deb_tools() {
 }
 
 render_mpv_config() {
-  install -d -m 0755 -o "$TOOLS_TARGET_USER" -g "$TOOLS_TARGET_USER" \
+  run_cmd install -d -m 0755 -o "$TOOLS_TARGET_USER" -g "$TOOLS_TARGET_USER" \
     "$TOOLS_TARGET_HOME/.config" \
     "$TOOLS_TARGET_HOME/.local"
-  chown -R "$TOOLS_TARGET_USER:$TOOLS_TARGET_USER" "$TOOLS_TARGET_HOME/.config" "$TOOLS_TARGET_HOME/.local"
+  run_cmd chown -R "$TOOLS_TARGET_USER:$TOOLS_TARGET_USER" "$TOOLS_TARGET_HOME/.config" "$TOOLS_TARGET_HOME/.local"
   local config_dir="$TOOLS_TARGET_HOME/.config/mpv"
-  install -d -m 0755 -o "$TOOLS_TARGET_USER" -g "$TOOLS_TARGET_USER" "$config_dir"
+  run_cmd install -d -m 0755 -o "$TOOLS_TARGET_USER" -g "$TOOLS_TARGET_USER" "$config_dir"
   printf '%s\n' 'vo=gpu' 'gpu-api=opengl' 'hwdec=auto-safe' > /tmp/mpv.conf.codex
-  install -m 0644 -o "$TOOLS_TARGET_USER" -g "$TOOLS_TARGET_USER" /tmp/mpv.conf.codex "$config_dir/mpv.conf"
-  rm -f /tmp/mpv.conf.codex
+  run_cmd install -m 0644 -o "$TOOLS_TARGET_USER" -g "$TOOLS_TARGET_USER" /tmp/mpv.conf.codex "$config_dir/mpv.conf"
+  run_cmd rm -f /tmp/mpv.conf.codex
 }
 
 package_is_installed() {

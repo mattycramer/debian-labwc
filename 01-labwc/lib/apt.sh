@@ -57,7 +57,7 @@ readonly BACKPORTS_PACKAGES=(
   starship
   fonts-material-design-icons-iconfont
   fonts-weather-icons
-  adwaita-icon-theme-full
+  adwaita-icon-theme
   file-roller
   ripgrep
   fd-find

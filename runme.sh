@@ -112,7 +112,12 @@ main() {
   apt_update
   install_bootstrap
   repair_target_home
-  log "next: cd '$REPO_ROOT/01-labwc' && make install"
+  log "next:"
+  log "  cd '$REPO_ROOT/01-labwc' && make install"
+  log "  cd '$REPO_ROOT/02-nvidia' && make install   # optional, NVIDIA hosts only"
+  log "  cd '$REPO_ROOT/03-tools' && make install"
+  log "  cd '$REPO_ROOT/04-dev' && make install"
+  log "  cd '$REPO_ROOT/05-security' && make install"
 }
 
 main "$@"

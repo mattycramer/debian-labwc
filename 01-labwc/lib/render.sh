@@ -6,8 +6,8 @@ render_user_file() {
   local temp_file
   temp_file="$(mktemp)"
   printf '%s' "$content" >"$temp_file"
-  install -D -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$temp_file" "$destination"
-  rm -f -- "$temp_file"
+  run_cmd install -D -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$temp_file" "$destination"
+  run_cmd rm -f -- "$temp_file"
 }
 
 render_user_script() {
@@ -16,14 +16,14 @@ render_user_script() {
   local temp_file
   temp_file="$(mktemp)"
   printf '%s' "$content" >"$temp_file"
-  install -D -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$temp_file" "$destination"
-  rm -f -- "$temp_file"
+  run_cmd install -D -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$temp_file" "$destination"
+  run_cmd rm -f -- "$temp_file"
 }
 
 render_runtime_env() {
   local runtime_dir="$LABWC_TARGET_HOME/.config/debian-labwc"
-  install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$runtime_dir"
-  install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$1" "$runtime_dir/runtime.env"
+  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$runtime_dir"
+  run_cmd install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$1" "$runtime_dir/runtime.env"
 }
 
 render_labwc_environment() {
@@ -37,11 +37,11 @@ EOF
 }
 
 ensure_user_base_dirs() {
-  install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
+  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
     "$LABWC_TARGET_HOME/.config" \
     "$LABWC_TARGET_HOME/.local" \
     "$LABWC_TARGET_HOME/.local/share"
-  chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.config" "$LABWC_TARGET_HOME/.local"
+  run_cmd chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.config" "$LABWC_TARGET_HOME/.local"
 }
 
 render_home_dirs() {
@@ -57,7 +57,7 @@ render_home_dirs() {
   )
   local dir
   for dir in "${dirs[@]}"; do
-    install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$dir"
+    run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$dir"
   done
   render_user_file "$LABWC_TARGET_HOME/.config/user-dirs.dirs" $'XDG_DESKTOP_DIR="$HOME/Desktop"\nXDG_DOWNLOAD_DIR="$HOME/Downloads"\nXDG_TEMPLATES_DIR="$HOME/Templates"\nXDG_PUBLICSHARE_DIR="$HOME/Public"\nXDG_DOCUMENTS_DIR="$HOME/Documents"\nXDG_MUSIC_DIR="$HOME/Music"\nXDG_PICTURES_DIR="$HOME/Pictures"\nXDG_VIDEOS_DIR="$HOME/Videos"\n'
   render_user_file "$LABWC_TARGET_HOME/.config/user-dirs.locale" $'en_US.UTF-8\n'
@@ -721,15 +721,15 @@ render_portals() {
 }
 
 install_wallpaper() {
-  install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.local/share/debian-labwc"
-  install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$SCRIPT_DIR/wallpaper/labwall2-1920x1080.png" "$LABWC_TARGET_HOME/.local/share/debian-labwc/labwall2-1920x1080.png"
+  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.local/share/debian-labwc"
+  run_cmd install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$SCRIPT_DIR/wallpaper/labwall2-1920x1080.png" "$LABWC_TARGET_HOME/.local/share/debian-labwc/labwall2-1920x1080.png"
 }
 
 render_all_configs() {
   local env_file="$1"
   local config_root="$LABWC_TARGET_HOME/.config"
   ensure_user_base_dirs
-  install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
+  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
     "$config_root/labwc" \
     "$config_root/waybar" \
     "$config_root/kanshi" \
@@ -763,5 +763,5 @@ render_all_configs() {
   render_foot
   render_gammastep
   render_portals
-  chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.config" "$LABWC_TARGET_HOME/.local"
+  run_cmd chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.config" "$LABWC_TARGET_HOME/.local"
 }

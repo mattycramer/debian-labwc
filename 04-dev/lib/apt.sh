@@ -106,11 +106,9 @@ install_node_runtime() {
   run_cmd ln -sfn "${current_link}/bin/node" /usr/local/bin/node
   run_cmd ln -sfn "${current_link}/bin/npm" /usr/local/bin/npm
   run_cmd ln -sfn "${current_link}/bin/npx" /usr/local/bin/npx
-  run_cmd rm -f "${current_link}/bin/corepack" "${current_link}/bin/pnpm" "${current_link}/bin/pnpx"
-  run_cmd rm -rf "${current_link}/lib/node_modules/corepack" "${current_link}/lib/node_modules/pnpm"
-  run_cmd "${current_link}/bin/npm" --prefix "$current_link" install --global "$COREPACK_NPM_SPEC"
-  run_cmd ln -sfn "${current_link}/bin/corepack" /usr/local/bin/corepack
-  run_cmd "${current_link}/bin/npm" --prefix "$current_link" install --global "$PNPM_NPM_SPEC"
+  run_cmd rm -f "${current_link}/bin/pnpm" "${current_link}/bin/pnpx"
+  run_cmd rm -rf "${current_link}/lib/node_modules/pnpm"
+  run_cmd "${current_link}/bin/npm" --prefix "$current_link" install --global --force "$PNPM_NPM_SPEC"
   run_cmd ln -sfn "${current_link}/bin/pnpm" /usr/local/bin/pnpm
   run_cmd ln -sfn "${current_link}/bin/pnpx" /usr/local/bin/pnpx
 }
@@ -140,7 +138,7 @@ verify_dev_install() {
   for pkg in "${DEV_PACKAGES[@]}"; do
     package_is_installed "$pkg" || die "package '$pkg' is not installed"
   done
-  for cmd in node npm npx corepack pnpm pnpx nmap strace lsof netstat ss jq yamllint valgrind perf pipx pkg-config htop; do
+  for cmd in node npm npx pnpm pnpx nmap strace lsof netstat ss jq yamllint valgrind perf pipx pkg-config htop; do
     command_is_available "$cmd" || die "command '$cmd' is not available"
   done
   verify_node_runtime
@@ -160,7 +158,6 @@ remove_dev_install() {
   remove_managed_link /usr/local/bin/node
   remove_managed_link /usr/local/bin/npm
   remove_managed_link /usr/local/bin/npx
-  remove_managed_link /usr/local/bin/corepack
   remove_managed_link /usr/local/bin/pnpm
   remove_managed_link /usr/local/bin/pnpx
   run_cmd rm -rf -- "$NODE_INSTALL_ROOT"

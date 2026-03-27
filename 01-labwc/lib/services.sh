@@ -13,10 +13,10 @@ ensure_greeter_user() {
 }
 
 ensure_greeter_runtime_dirs() {
-  install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet
-  install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet/.cache
-  install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet/.local
-  install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet/.local/state
+  run_cmd install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet
+  run_cmd install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet/.cache
+  run_cmd install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet/.local
+  run_cmd install -d -m 0755 -o greeter -g greeter /var/cache/tuigreet/.local/state
 }
 
 validate_greetd_settings() {
@@ -33,11 +33,13 @@ render_template_to_file() {
     -e "s|@GREETD_VT@|$LABWC_GREETD_VT|g" \
     -e "s|@TARGET_USER@|$LABWC_TARGET_USER|g" \
     -e "s|@TARGET_HOME@|$LABWC_TARGET_HOME|g" \
+    -e "s|@XCURSOR_THEME@|$LABWC_XCURSOR_THEME|g" \
+    -e "s|@XCURSOR_SIZE@|$LABWC_XCURSOR_SIZE|g" \
     -e "s|@RUNTIME_ENV_PATH@|$LABWC_TARGET_HOME/.config/debian-labwc/runtime.env|g" \
     -e "s|@SESSION_WRAPPER@|/usr/local/bin/debian-labwc-session|g" \
     "$template_path" >"$temp_file"
-  install -D -m "$mode" "$temp_file" "$destination"
-  rm -f -- "$temp_file"
+  run_cmd install -D -m "$mode" "$temp_file" "$destination"
+  run_cmd rm -f -- "$temp_file"
 }
 
 install_helper_script() {
@@ -50,8 +52,8 @@ install_helper_script() {
     -e "s|@RUNTIME_ENV_PATH@|$LABWC_TARGET_HOME/.config/debian-labwc/runtime.env|g" \
     -e "s|@REPO_ENV_PATH@|$SCRIPT_DIR/.env|g" \
     "$source_path" >"$temp_file"
-  install -D -m 0755 "$temp_file" "$destination"
-  rm -f -- "$temp_file"
+  run_cmd install -D -m 0755 "$temp_file" "$destination"
+  run_cmd rm -f -- "$temp_file"
 }
 
 install_root_files() {
@@ -91,9 +93,9 @@ enable_target_user_unit() {
   local unit_path
   local wants_dir="$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants"
   unit_path="$(resolve_user_unit_path "$unit_name")"
-  install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$wants_dir"
-  ln -sfn "$unit_path" "$wants_dir/$unit_name"
-  chown -h "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$wants_dir/$unit_name"
+  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$wants_dir"
+  run_cmd ln -sfn "$unit_path" "$wants_dir/$unit_name"
+  run_cmd chown -h "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$wants_dir/$unit_name"
 }
 
 enable_user_services() {
@@ -128,7 +130,7 @@ enable_all_services() {
 remove_if_present() {
   local path="$1"
   if [[ -e "$path" || -L "$path" ]]; then
-    rm -rf -- "$path"
+    run_cmd rm -rf -- "$path"
   fi
 }
 
