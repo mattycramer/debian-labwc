@@ -27,6 +27,8 @@ readonly BACKPORTS_TOOLS_PACKAGES=(
 )
 
 readonly TOOLS_KEYRING_DIR="/usr/share/keyrings"
+readonly BITWARDEN_WRAPPER_PATH="/usr/local/bin/bitwarden"
+readonly BITWARDEN_DESKTOP_OVERRIDE_PATH="/usr/local/share/applications/bitwarden.desktop"
 
 apt_yes_args() {
   if [[ "${ASSUME_YES:-1}" -eq 1 ]]; then
@@ -158,6 +160,47 @@ install_deb_tools() {
   install_deb_url "$BITWARDEN_URL" /tmp/bitwarden_amd64.deb
   install_deb_url "$OBSIDIAN_URL" /tmp/obsidian_amd64.deb
   install_deb_url "$FILEN_URL" /tmp/filen_amd64.deb
+  render_bitwarden_wayland_wrapper
+}
+
+render_bitwarden_wayland_wrapper() {
+  run_cmd install -d -m 0755 /usr/local/bin /usr/local/share/applications
+  cat >"$BITWARDEN_WRAPPER_PATH" <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+app_command='/opt/Bitwarden/bitwarden'
+
+if [[ ! -x "$app_command" ]]; then
+  printf 'missing Bitwarden launcher: %s\n' "$app_command" >&2
+  exit 1
+fi
+
+unset USE_X11
+export ELECTRON_OZONE_PLATFORM_HINT=wayland
+
+exec "$app_command" \
+  --enable-features=UseOzonePlatform,WaylandWindowDecorations \
+  --ozone-platform=wayland \
+  "$@"
+EOF
+  run_cmd chmod 0755 "$BITWARDEN_WRAPPER_PATH"
+
+  cat >"$BITWARDEN_DESKTOP_OVERRIDE_PATH" <<'EOF'
+[Desktop Entry]
+Name=Bitwarden
+Exec=/usr/local/bin/bitwarden %U
+Terminal=false
+Type=Application
+Icon=bitwarden
+StartupWMClass=Bitwarden
+GenericName=Password Manager
+Comment=A secure and free password manager for all of your devices.
+MimeType=x-scheme-handler/bitwarden;
+Categories=Utility;
+EOF
+  run_cmd chmod 0644 "$BITWARDEN_DESKTOP_OVERRIDE_PATH"
 }
 
 render_mpv_config() {
@@ -203,6 +246,10 @@ verify_tools_install() {
   grep -F 'URIs: https://repository.mullvad.net/deb/stable' /etc/apt/sources.list.d/mullvad.sources >/dev/null || die "mullvad source missing expected repo uri"
   grep -F 'Suites: stable' /etc/apt/sources.list.d/mullvad.sources >/dev/null || die "mullvad source missing stable suite"
   grep -F 'Components: main' /etc/apt/sources.list.d/mullvad.sources >/dev/null || die "mullvad source missing main component"
+  [[ -f "$BITWARDEN_WRAPPER_PATH" ]] || die "missing managed Bitwarden wrapper"
+  [[ -f "$BITWARDEN_DESKTOP_OVERRIDE_PATH" ]] || die "missing managed Bitwarden desktop override"
+  grep -F -- '--ozone-platform=wayland' "$BITWARDEN_WRAPPER_PATH" >/dev/null || die "managed Bitwarden wrapper is not forcing Wayland"
+  grep -F 'Exec=/usr/local/bin/bitwarden %U' "$BITWARDEN_DESKTOP_OVERRIDE_PATH" >/dev/null || die "managed Bitwarden desktop override is missing the Wayland wrapper Exec"
   [[ -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf" ]] || die "missing mpv.conf"
   [[ "$(stat -c '%U:%G' "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf")" == "$TOOLS_TARGET_USER:$TOOLS_TARGET_USER" ]] || die "mpv.conf ownership is wrong"
 }
@@ -213,5 +260,6 @@ remove_tools_install() {
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}" thorium-browser bitwarden obsidian filen || true
   run_cmd rm -f /etc/apt/sources.list.d/vscode.sources /etc/apt/sources.list.d/vscode.list /etc/apt/sources.list.d/thorium.sources /etc/apt/sources.list.d/thorium.list /etc/apt/sources.list.d/mullvad.sources /etc/apt/sources.list.d/mullvad.list
   run_cmd rm -f /usr/share/keyrings/microsoft.gpg /usr/share/keyrings/mullvad-keyring.asc /usr/share/keyrings/mullvad-keyring.gpg
+  run_cmd rm -f "$BITWARDEN_WRAPPER_PATH" "$BITWARDEN_DESKTOP_OVERRIDE_PATH"
   run_cmd rm -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf"
 }

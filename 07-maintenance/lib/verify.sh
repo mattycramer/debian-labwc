@@ -34,7 +34,9 @@ verify_detection() {
   [[ -n "$MAINTENANCE_ROOT_BTRFS_UUID" ]] || die "missing detected root Btrfs UUID"
   [[ -n "$MAINTENANCE_ROOT_BTRFS_KERNEL_FLAGS" ]] || die "missing derived root Btrfs kernel flags"
   printf '%s\n' "$MAINTENANCE_BTRFS_PARTITION_LIST" | grep -F "$MAINTENANCE_ROOT_BTRFS_SOURCE" >/dev/null || die "root Btrfs source is not in the detected partition list"
-  [[ -z "$MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST" ]] || die "unmounted Btrfs partitions are present and would be skipped by maintenance: ${MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST}"
+  if [[ -n "$MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST" ]]; then
+    log_warn "root-UUID-matching Btrfs partition(s) are currently unmounted and will be skipped until mounted: ${MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST}"
+  fi
 }
 
 verify_timeshift_config() {

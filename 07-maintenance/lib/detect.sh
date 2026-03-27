@@ -64,7 +64,7 @@ detect_grub_kernel_parameters() {
 }
 
 detect_btrfs_layout() {
-  local root_source_raw root_source_raw_fs root_source uuid device mountpoint partition root_options_raw root_flags opt
+  local root_source_raw root_source_raw_fs root_source uuid device mountpoint partition partition_uuid root_options_raw root_flags opt
   local -a devices=()
   local -a mountpoints=()
   local -a partitions=()
@@ -78,6 +78,12 @@ detect_btrfs_layout() {
   root_options_raw="$(findmnt -rn -o OPTIONS / || true)"
   [[ -n "$root_options_raw" ]] || die "could not determine root Btrfs mount options"
 
+  uuid="$(findmnt -rn -o UUID / 2>/dev/null || true)"
+  if [[ -z "$uuid" ]]; then
+    uuid="$(blkid -s UUID -o value "$root_source" 2>/dev/null || true)"
+  fi
+  [[ -n "$uuid" ]] || die "could not determine UUID for root Btrfs device '$root_source'"
+
   while IFS= read -r device; do
     [[ -n "$device" ]] || continue
     devices+=("$device")
@@ -90,22 +96,18 @@ detect_btrfs_layout() {
 
   while IFS= read -r partition; do
     [[ -n "$partition" ]] || continue
+    partition_uuid="$(blkid -s UUID -o value "$partition" 2>/dev/null || true)"
+    [[ "$partition_uuid" == "$uuid" ]] || continue
     partitions+=("$partition")
   done < <(lsblk -rno PATH,TYPE,FSTYPE | awk '$2 == "part" && $3 == "btrfs" {print $1}' | sort -u)
 
-  ((${#partitions[@]} > 0)) || die "no Btrfs partitions were detected via lsblk"
+  ((${#partitions[@]} > 0)) || die "no Btrfs partitions matching root UUID '$uuid' were detected via lsblk"
 
   for partition in "${partitions[@]}"; do
     if [[ " ${devices[*]} " != *" ${partition} "* ]]; then
       unmounted_partitions+=("$partition")
     fi
   done
-
-  uuid="$(findmnt -rn -o UUID / 2>/dev/null || true)"
-  if [[ -z "$uuid" ]]; then
-    uuid="$(blkid -s UUID -o value "$root_source" 2>/dev/null || true)"
-  fi
-  [[ -n "$uuid" ]] || die "could not determine UUID for root Btrfs device '$root_source'"
 
   root_flags=""
   IFS=',' read -r -a root_options_array <<<"$root_options_raw"
