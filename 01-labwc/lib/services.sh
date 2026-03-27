@@ -133,8 +133,8 @@ enable_target_user_unit() {
 }
 
 enable_user_services() {
-  enable_target_user_unit pipewire.service
-  enable_target_user_unit pipewire-pulse.service
+  enable_target_user_unit pipewire.socket
+  enable_target_user_unit pipewire-pulse.socket
   enable_target_user_unit wireplumber.service
   if command -v chsh >/dev/null 2>&1; then
     local current_shell

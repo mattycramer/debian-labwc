@@ -20,6 +20,8 @@ readonly BOOTSTRAP_PACKAGES=(
   libgmp-dev
   libreadline-dev
   libedit-dev
+  libsystemd-dev
+  libxtables-dev
   libacl1-dev
   libattr1-dev
   libselinux1-dev
@@ -46,10 +48,12 @@ readonly CROWDSEC_ACQUIS_PATH="/etc/crowdsec/acquis.d/debian-labwc-security.yaml
 readonly CROWDSEC_BOUNCER_KEY_PATH="/etc/crowdsec/bouncers/debian-labwc-firewall-bouncer.key"
 readonly CROWDSEC_BOUNCER_CONFIG_PATH="/etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml.local"
 readonly CROWDSEC_CONSOLE_MARKER="/etc/crowdsec/.console-enrolled-by-debian-labwc-security"
+readonly NFT_BIN="/usr/local/sbin/nft"
 readonly NFTABLES_CONF_PATH="/etc/nftables.conf"
 readonly NFTABLES_DROPIN_DIR="/etc/systemd/system/nftables.service.d"
 readonly NFTABLES_DROPIN_PATH="/etc/systemd/system/nftables.service.d/override.conf"
 readonly NFTABLES_RULES_DIR="/etc/nftables.d"
+readonly NFTABLES_BASE_RULES_PATH="/etc/nftables.d/10-base-filter.nft"
 readonly NFTABLES_CROWDSEC_RULES_PATH="/etc/nftables.d/50-crowdsec.nft"
 readonly CROWDSEC_BOUNCER_DROPIN_DIR="/etc/systemd/system/crowdsec-firewall-bouncer.service.d"
 readonly CROWDSEC_BOUNCER_DROPIN_PATH="/etc/systemd/system/crowdsec-firewall-bouncer.service.d/override.conf"
@@ -414,9 +418,10 @@ render_all_configs() {
 
   write_text_file "$NFTABLES_CONF_PATH" $'flush ruleset\ninclude "/etc/nftables.d/*.nft"\n'
 
-  write_text_file "$NFTABLES_CROWDSEC_RULES_PATH" $'table ip crowdsec {\n  set crowdsec-blacklists {\n    type ipv4_addr\n    flags timeout\n  }\n\n  chain crowdsec-chain-input {\n    type filter hook input priority filter; policy accept;\n    ip saddr @crowdsec-blacklists drop\n  }\n}\n\ntable ip6 crowdsec6 {\n  set crowdsec6-blacklists {\n    type ipv6_addr\n    flags timeout\n  }\n\n  chain crowdsec6-chain-input {\n    type filter hook input priority filter; policy accept;\n    ip6 saddr @crowdsec6-blacklists drop\n  }\n}\n\ntable inet base-filter {\n  chain input {\n    type filter hook input priority filter + 10; policy accept;\n    ct state invalid drop\n  }\n}\n'
+  write_text_file "$NFTABLES_BASE_RULES_PATH" $'table inet base-filter {\n  chain input {\n    type filter hook input priority filter + 10; policy drop;\n\n    iifname "lo" accept\n    ct state { established, related } accept\n    ct state invalid drop\n\n    icmp type { destination-unreachable, time-exceeded, parameter-problem, echo-request } accept\n    icmpv6 type { destination-unreachable, packet-too-big, time-exceeded, parameter-problem, nd-neighbor-solicit, nd-neighbor-advert, nd-router-advert, nd-redirect, echo-request } accept\n\n    udp sport 67 udp dport 68 accept\n    udp sport 547 udp dport 546 accept\n  }\n\n  chain forward {\n    type filter hook forward priority filter + 10; policy drop;\n  }\n\n  chain output {\n    type filter hook output priority filter + 10; policy accept;\n  }\n}\n'
+  write_text_file "$NFTABLES_CROWDSEC_RULES_PATH" $'table ip crowdsec {\n  set crowdsec-blacklists {\n    type ipv4_addr\n    flags timeout\n  }\n\n  chain crowdsec-chain-input {\n    type filter hook input priority filter - 10; policy accept;\n    ip saddr @crowdsec-blacklists drop\n  }\n}\n\ntable ip6 crowdsec6 {\n  set crowdsec6-blacklists {\n    type ipv6_addr\n    flags timeout\n  }\n\n  chain crowdsec6-chain-input {\n    type filter hook input priority filter - 10; policy accept;\n    ip6 saddr @crowdsec6-blacklists drop\n  }\n}\n'
 
-  write_text_file "$NFTABLES_DROPIN_PATH" $'[Service]\nExecStart=\nExecStart=/usr/local/sbin/nft -f /etc/nftables.conf\n'
+  write_text_file "$NFTABLES_DROPIN_PATH" $'[Unit]\nWants=local-fs.target\nAfter=local-fs.target\n\n[Service]\nExecStart=\nExecStart=/usr/local/sbin/nft -f /etc/nftables.conf\nExecReload=\nExecReload=/usr/local/sbin/nft -f /etc/nftables.conf\nExecStop=\nExecStop=/usr/local/sbin/nft flush ruleset\n'
   write_text_file "$CROWDSEC_BOUNCER_DROPIN_PATH" $'[Unit]\nWants=nftables.service crowdsec.service\nAfter=nftables.service crowdsec.service\n\n[Service]\nRestart=on-failure\nRestartSec=5s\n'
 
   render_crowdsec_acquis
@@ -443,7 +448,7 @@ systemd_daemon_reload() {
 }
 
 validate_nftables_config() {
-  run_cmd /usr/local/sbin/nft -c -f "$NFTABLES_CONF_PATH"
+  run_cmd "$NFT_BIN" -c -f "$NFTABLES_CONF_PATH"
 }
 
 initialize_nftables() {
@@ -466,12 +471,12 @@ nftables:
     enabled: true
     set-only: true
     table: crowdsec
-    chain: crowdsec-chain
+    chain: crowdsec-chain-input
   ipv6:
     enabled: true
     set-only: true
     table: crowdsec6
-    chain: crowdsec6-chain
+    chain: crowdsec6-chain-input
 "
 
   if [[ -n "${CROWDSEC_CONSOLE_ENROLLMENT_KEY:-}" && ! -f "$CROWDSEC_CONSOLE_MARKER" ]]; then
@@ -513,6 +518,7 @@ verify_security_install() {
   verify_path_exists "$CROWDSEC_SOURCE_PATH"
   verify_path_exists "$CROWDSEC_PREFS_PATH"
   verify_path_exists "$NFTABLES_CONF_PATH"
+  verify_path_exists "$NFTABLES_BASE_RULES_PATH"
   verify_path_exists "$NFTABLES_CROWDSEC_RULES_PATH"
   verify_path_exists "$NFTABLES_DROPIN_PATH"
   verify_path_exists "$CROWDSEC_ACQUIS_PATH"
@@ -527,12 +533,12 @@ verify_security_install() {
   verify_path_exists "${MANIFEST_ROOT}/libmnl.files"
   verify_path_exists "${MANIFEST_ROOT}/libnftnl.files"
 
-  for cmd in /usr/local/sbin/nft /usr/local/bin/aide crowdsec cscli crowdsec-firewall-bouncer; do
+  for cmd in "$NFT_BIN" /usr/local/bin/aide crowdsec cscli crowdsec-firewall-bouncer; do
     command_is_available "$cmd" || die "missing command: $cmd"
   done
 
   resolve_nftables_release
-  installed_nft_version="$(/usr/local/sbin/nft --version 2>/dev/null | grep -o '[0-9][0-9.]*' | head -n1)"
+  installed_nft_version="$("$NFT_BIN" --version 2>/dev/null | grep -o '[0-9][0-9.]*' | head -n1)"
   [[ "$installed_nft_version" == "$NFTABLES_VERSION" ]] || die "expected nftables ${NFTABLES_VERSION}, found ${installed_nft_version:-unknown}"
 
   resolve_aide_release
@@ -547,16 +553,28 @@ verify_security_install() {
   installed_bouncer_version="$(crowdsec-firewall-bouncer -version 2>/dev/null | grep -o '[0-9][0-9.]*' | head -n1)"
   [[ "$installed_bouncer_version" == "$CROWDSEC_BOUNCER_VERSION" ]] || die "expected firewall bouncer ${CROWDSEC_BOUNCER_VERSION}, found ${installed_bouncer_version:-unknown}"
 
+  grep -F 'policy drop' "$NFTABLES_BASE_RULES_PATH" >/dev/null || die "nftables base rules missing default drop policy"
+  grep -F 'chain output' "$NFTABLES_BASE_RULES_PATH" >/dev/null || die "nftables base rules missing output chain"
+  grep -F 'policy accept' "$NFTABLES_BASE_RULES_PATH" >/dev/null || die "nftables base rules missing accept policy for output traffic"
+  grep -F 'udp sport 67 udp dport 68 accept' "$NFTABLES_BASE_RULES_PATH" >/dev/null || die "nftables base rules missing DHCPv4 client allowance"
+  grep -F 'udp sport 547 udp dport 546 accept' "$NFTABLES_BASE_RULES_PATH" >/dev/null || die "nftables base rules missing DHCPv6 client allowance"
   grep -F 'set-only: true' "$CROWDSEC_BOUNCER_CONFIG_PATH" >/dev/null || die "bouncer config missing nftables set-only mode"
   grep -F 'api_url: http://127.0.0.1:8080/' "$CROWDSEC_BOUNCER_CONFIG_PATH" >/dev/null || die "bouncer config missing expected api url"
+  grep -F 'chain: crowdsec-chain-input' "$CROWDSEC_BOUNCER_CONFIG_PATH" >/dev/null || die "bouncer config missing expected ipv4 chain"
+  grep -F 'chain: crowdsec6-chain-input' "$CROWDSEC_BOUNCER_CONFIG_PATH" >/dev/null || die "bouncer config missing expected ipv6 chain"
   grep -F 'chain crowdsec-chain-input' "$NFTABLES_CROWDSEC_RULES_PATH" >/dev/null || die "nftables rules missing metrics-safe ipv4 chain name"
   grep -F 'chain crowdsec6-chain-input' "$NFTABLES_CROWDSEC_RULES_PATH" >/dev/null || die "nftables rules missing metrics-safe ipv6 chain name"
   grep -F 'After=nftables.service crowdsec.service' "$CROWDSEC_BOUNCER_DROPIN_PATH" >/dev/null || die "bouncer override missing nftables/crowdsec ordering"
+  grep -F 'After=local-fs.target' "$NFTABLES_DROPIN_PATH" >/dev/null || die "nftables override missing local-fs ordering"
   grep -F '/data/workspace' "$AIDE_CONF_PATH" >/dev/null || die "AIDE config missing /data/workspace exclusion"
   grep -F '/var/log' "$AIDE_CONF_PATH" >/dev/null || die "AIDE config missing /var/log exclusion"
   grep -F '/tmp' "$AIDE_CONF_PATH" >/dev/null || die "AIDE config missing /tmp exclusion"
 
   validate_nftables_config
+  systemctl is-active nftables.service >/dev/null 2>&1 || die "nftables.service is not active"
+  systemctl is-active crowdsec.service >/dev/null 2>&1 || die "crowdsec.service is not active"
+  systemctl is-active crowdsec-firewall-bouncer.service >/dev/null 2>&1 || die "crowdsec-firewall-bouncer.service is not active"
+  systemctl is-active debian-labwc-security-aide-check.timer >/dev/null 2>&1 || die "debian-labwc-security-aide-check.timer is not active"
   systemctl is-enabled nftables.service >/dev/null 2>&1 || die "nftables.service is not enabled"
   systemctl is-enabled crowdsec.service >/dev/null 2>&1 || die "crowdsec.service is not enabled"
   systemctl is-enabled crowdsec-firewall-bouncer.service >/dev/null 2>&1 || die "crowdsec-firewall-bouncer.service is not enabled"
@@ -576,7 +594,7 @@ remove_security_install() {
   run_cmd rm -rf -- "$MANIFEST_ROOT"
 
   run_cmd rm -f -- "$CROWDSEC_KEYRING_PATH" "$CROWDSEC_SOURCE_PATH" "$CROWDSEC_PREFS_PATH"
-  run_cmd rm -f -- "$NFTABLES_CONF_PATH" "$NFTABLES_CROWDSEC_RULES_PATH" "$NFTABLES_DROPIN_PATH" "$CROWDSEC_BOUNCER_DROPIN_PATH"
+  run_cmd rm -f -- "$NFTABLES_CONF_PATH" "$NFTABLES_BASE_RULES_PATH" "$NFTABLES_CROWDSEC_RULES_PATH" "$NFTABLES_DROPIN_PATH" "$CROWDSEC_BOUNCER_DROPIN_PATH"
   run_cmd rmdir --ignore-fail-on-non-empty "$CROWDSEC_BOUNCER_DROPIN_DIR" >/dev/null 2>&1 || true
   run_cmd rmdir --ignore-fail-on-non-empty "$NFTABLES_DROPIN_DIR" >/dev/null 2>&1 || true
   run_cmd rmdir --ignore-fail-on-non-empty "$NFTABLES_RULES_DIR" >/dev/null 2>&1 || true

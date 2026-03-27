@@ -6,6 +6,7 @@ readonly GRUB_BTRFS_CLONE_DIR="/tmp/grub-btrfs"
 readonly GRUB_BTRFS_COMMIT_FILE="${MAINTENANCE_RUNTIME_ROOT}/grub-btrfs.commit"
 readonly TIMESHIFT_CONFIG_DIR="/etc/timeshift"
 readonly TIMESHIFT_CONFIG_PATH="/etc/timeshift/timeshift.json"
+readonly TIMESHIFT_LAUNCHER_PATH="/usr/local/bin/timeshift-launcher"
 readonly GRUB_BTRFS_CONFIG_DIR="/etc/default/grub-btrfs"
 readonly GRUB_BTRFS_CONFIG_PATH="/etc/default/grub-btrfs/config"
 readonly GRUB_BTRFS_SCRIPT_PATH="/etc/grub.d/41_snapshots-btrfs"
@@ -126,6 +127,45 @@ EOF
   write_root_file "$TIMESHIFT_CONFIG_PATH" 0644 "$content"
 }
 
+render_timeshift_launcher() {
+  local content
+  content="$(cat <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+app_command='/usr/bin/timeshift-gtk'
+
+if [[ "$(id -u)" -eq 0 ]]; then
+  exec "$app_command"
+fi
+
+if command -v pkexec >/dev/null 2>&1; then
+  exec pkexec env \
+    DISPLAY="${DISPLAY:-}" \
+    WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-}" \
+    XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-}" \
+    XDG_SESSION_TYPE="${XDG_SESSION_TYPE:-}" \
+    DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-}" \
+    XAUTHORITY="${XAUTHORITY:-}" \
+    "$app_command"
+fi
+
+if command -v sudo >/dev/null 2>&1; then
+  exec x-terminal-emulator -e "sudo ${app_command}"
+fi
+
+if command -v su >/dev/null 2>&1; then
+  exec x-terminal-emulator -e "su - -c '${app_command}'"
+fi
+
+printf 'timeshift-gtk requires root privileges and no supported escalation helper was found.\n' >&2
+exit 1
+EOF
+)"
+  write_root_file "$TIMESHIFT_LAUNCHER_PATH" 0755 "$content"
+}
+
 render_btrfsmaintenance_config() {
   local content
   content="$(cat <<'EOF'
@@ -228,6 +268,7 @@ EOF
 
 render_all_configs() {
   render_timeshift_config
+  render_timeshift_launcher
   render_btrfsmaintenance_config
   render_grub_btrfs_config
   render_grub_btrfs_service
@@ -236,9 +277,10 @@ render_all_configs() {
 
 refresh_grub_menu() {
   require_file "$GRUB_BTRFS_SCRIPT_PATH"
-  run_cmd "$GRUB_BTRFS_SCRIPT_PATH"
   run_cmd update-grub
   require_file "$GRUB_BTRFS_CFG_PATH"
+  run_cmd "$GRUB_BTRFS_SCRIPT_PATH"
+  run_cmd update-grub
   run_cmd grub-script-check "$GRUB_BTRFS_CFG_PATH"
 }
 
@@ -271,7 +313,7 @@ remove_maintenance_install() {
   restore_unit_state "btrfs-trim.timer" "STATE_BTRFS_TRIM_TIMER"
   restore_unit_state "btrfsmaintenance-refresh.path" "STATE_BTRFS_REFRESH_PATH"
 
-  run_cmd rm -f -- "$GRUB_BTRFS_SCRIPT_PATH" "$GRUB_BTRFS_DAEMON_PATH" "$GRUB_BTRFS_SERVICE_PATH" "$GRUB_BTRFS_CONFIG_PATH" "$TIMESHIFT_CONFIG_PATH" "$BTRFSMAINT_CONFIG_PATH"
+  run_cmd rm -f -- "$GRUB_BTRFS_SCRIPT_PATH" "$GRUB_BTRFS_DAEMON_PATH" "$GRUB_BTRFS_SERVICE_PATH" "$GRUB_BTRFS_CONFIG_PATH" "$TIMESHIFT_CONFIG_PATH" "$TIMESHIFT_LAUNCHER_PATH" "$BTRFSMAINT_CONFIG_PATH"
   run_cmd rm -f -- "$BTRFS_SCRUB_DROPIN_PATH" "$BTRFS_BALANCE_DROPIN_PATH"
   run_cmd rmdir --ignore-fail-on-non-empty "$BTRFS_SCRUB_DROPIN_DIR" >/dev/null 2>&1 || true
   run_cmd rmdir --ignore-fail-on-non-empty "$BTRFS_BALANCE_DROPIN_DIR" >/dev/null 2>&1 || true

@@ -22,8 +22,49 @@ strip_findmnt_fsroot() {
   sed 's/\[[^]]*\]$//'
 }
 
+detect_grub_kernel_parameters() {
+  local arg
+  local grub_cmdline_linux=""
+  local grub_cmdline_linux_default=""
+  local grub_cmdline_combined=""
+
+  if [[ -r /etc/default/grub ]]; then
+    # shellcheck disable=SC1091
+    source /etc/default/grub
+    grub_cmdline_linux="${GRUB_CMDLINE_LINUX:-}"
+    grub_cmdline_linux_default="${GRUB_CMDLINE_LINUX_DEFAULT:-}"
+  fi
+
+  if compgen -G '/etc/default/grub.d/*.cfg' >/dev/null 2>&1; then
+    while IFS= read -r grub_dropin; do
+      # shellcheck disable=SC1090
+      source "$grub_dropin"
+    done < <(find /etc/default/grub.d -maxdepth 1 -type f -name '*.cfg' | sort)
+    grub_cmdline_linux="${GRUB_CMDLINE_LINUX:-$grub_cmdline_linux}"
+    grub_cmdline_linux_default="${GRUB_CMDLINE_LINUX_DEFAULT:-$grub_cmdline_linux_default}"
+  fi
+
+  grub_cmdline_combined="${grub_cmdline_linux} ${grub_cmdline_linux_default}"
+  grub_cmdline_combined="$(printf '%s\n' "$grub_cmdline_combined" | awk '{$1=$1; print}')"
+  if [[ -z "$grub_cmdline_combined" ]] && [[ -r /proc/cmdline ]]; then
+    grub_cmdline_combined="$(cat /proc/cmdline 2>/dev/null || true)"
+  fi
+
+  MAINTENANCE_CURRENT_KERNEL_PARAMETERS=""
+  for arg in $grub_cmdline_combined; do
+    case "$arg" in
+      BOOT_IMAGE=*|root=*|rootfstype=*|rootflags=*|ro|rw|initrd=*) continue ;;
+    esac
+    if [[ -n "$MAINTENANCE_CURRENT_KERNEL_PARAMETERS" ]]; then
+      MAINTENANCE_CURRENT_KERNEL_PARAMETERS+=" ${arg}"
+    else
+      MAINTENANCE_CURRENT_KERNEL_PARAMETERS="${arg}"
+    fi
+  done
+}
+
 detect_btrfs_layout() {
-  local root_source_raw root_source_raw_fs root_source uuid device mountpoint partition root_options_raw root_flags opt cmdline_raw cmdline_filtered arg
+  local root_source_raw root_source_raw_fs root_source uuid device mountpoint partition root_options_raw root_flags opt
   local -a devices=()
   local -a mountpoints=()
   local -a partitions=()
@@ -81,24 +122,9 @@ detect_btrfs_layout() {
   done
   [[ -n "$root_flags" ]] || die "could not derive Btrfs rootflags from '$root_options_raw'"
 
-  cmdline_raw="$(cat /proc/cmdline 2>/dev/null || true)"
-  [[ -n "$cmdline_raw" ]] || die "could not read /proc/cmdline"
-  cmdline_filtered=""
-  for arg in $cmdline_raw; do
-    case "$arg" in
-      BOOT_IMAGE=*|root=*|rootfstype=*|rootflags=*|ro|rw|initrd=*) continue ;;
-    esac
-    if [[ -n "$cmdline_filtered" ]]; then
-      cmdline_filtered+=" ${arg}"
-    else
-      cmdline_filtered="${arg}"
-    fi
-  done
-
   MAINTENANCE_ROOT_BTRFS_SOURCE="$root_source"
   MAINTENANCE_ROOT_BTRFS_UUID="$uuid"
   MAINTENANCE_ROOT_BTRFS_KERNEL_FLAGS="rootfstype=btrfs rootflags=${root_flags}"
-  MAINTENANCE_CURRENT_KERNEL_PARAMETERS="$cmdline_filtered"
   MAINTENANCE_BTRFS_PARTITION_LIST="$(IFS=:; printf '%s' "${partitions[*]}")"
   MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST="$(IFS=:; printf '%s' "${unmounted_partitions[*]}")"
   MAINTENANCE_BTRFS_PARTITION_COUNT="${#partitions[@]}"
@@ -168,6 +194,7 @@ detect_host_layout() {
   local env_file="$1"
   detect_target_user
   detect_btrfs_layout
+  detect_grub_kernel_parameters
   write_autogen_block "$env_file"
   if [[ -n "$MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST" ]]; then
     log_warn "detected unmounted Btrfs partition(s): ${MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST}"

@@ -292,8 +292,23 @@ IFS=\$'\\n\\t'
 
 export XDG_CURRENT_DESKTOP=labwc:wlroots
 
+wait_for_user_bus() {
+  local attempt=1
+  while (( attempt <= 20 )); do
+    if systemctl --user --quiet is-active dbus.service >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+    attempt=\$((attempt + 1))
+  done
+  return 0
+}
+
 pgrep -x foot >/dev/null 2>&1 || foot --server &
 pgrep -x swaybg >/dev/null 2>&1 || swaybg -i "$wallpaper_path" -m "${LABWC_WALLPAPER_MODE}" &
+
+wait_for_user_bus
+
 pgrep -x waybar >/dev/null 2>&1 || waybar &
 pgrep -x kanshi >/dev/null 2>&1 || kanshi &
 pgrep -x mako >/dev/null 2>&1 || mako &

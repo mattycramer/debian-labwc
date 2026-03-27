@@ -157,9 +157,7 @@ verify_shell_config_semantics() {
 verify_install() {
   verify_packages
   verify_paths
-  verify_user_unit_enabled pipewire.service
   verify_user_unit_enabled pipewire.socket
-  verify_user_unit_enabled pipewire-pulse.service
   verify_user_unit_enabled pipewire-pulse.socket
   verify_user_unit_enabled wireplumber.service
   verify_services_enabled

@@ -6,13 +6,14 @@ package_is_installed() {
 
 verify_packages() {
   local pkg
-  for pkg in timeshift btrfsmaintenance btrfs-progs inotify-tools grub-common grub2-common; do
+  for pkg in timeshift btrfsmaintenance btrfs-progs inotify-tools grub-common grub2-common pkexec; do
     package_is_installed "$pkg" || die "package '$pkg' is not installed"
   done
 }
 
 verify_paths() {
   require_file "$TIMESHIFT_CONFIG_PATH"
+  require_file "$TIMESHIFT_LAUNCHER_PATH"
   require_file "$GRUB_BTRFS_CONFIG_PATH"
   require_file "$GRUB_BTRFS_SCRIPT_PATH"
   require_file "$GRUB_BTRFS_DAEMON_PATH"
@@ -32,7 +33,6 @@ verify_detection() {
   [[ -n "$MAINTENANCE_ROOT_BTRFS_SOURCE" ]] || die "missing detected root Btrfs source"
   [[ -n "$MAINTENANCE_ROOT_BTRFS_UUID" ]] || die "missing detected root Btrfs UUID"
   [[ -n "$MAINTENANCE_ROOT_BTRFS_KERNEL_FLAGS" ]] || die "missing derived root Btrfs kernel flags"
-  [[ -n "$MAINTENANCE_CURRENT_KERNEL_PARAMETERS" ]] || die "missing detected kernel command-line parameters"
   printf '%s\n' "$MAINTENANCE_BTRFS_PARTITION_LIST" | grep -F "$MAINTENANCE_ROOT_BTRFS_SOURCE" >/dev/null || die "root Btrfs source is not in the detected partition list"
   [[ -z "$MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST" ]] || die "unmounted Btrfs partitions are present and would be skipped by maintenance: ${MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST}"
 }
@@ -40,7 +40,13 @@ verify_detection() {
 verify_timeshift_config() {
   grep -F "\"backup_device_uuid\" : \"${MAINTENANCE_ROOT_BTRFS_UUID}\"" "$TIMESHIFT_CONFIG_PATH" >/dev/null || die "Timeshift config missing root Btrfs snapshot device UUID"
   grep -F '"btrfs_mode" : "true"' "$TIMESHIFT_CONFIG_PATH" >/dev/null || die "Timeshift config is not pinned to Btrfs mode"
+  grep -F "\"schedule_hourly\" : \"${TIMESHIFT_SCHEDULE_HOURLY}\"" "$TIMESHIFT_CONFIG_PATH" >/dev/null || die "Timeshift config missing hourly schedule setting"
   grep -F "\"schedule_weekly\" : \"${TIMESHIFT_SCHEDULE_WEEKLY}\"" "$TIMESHIFT_CONFIG_PATH" >/dev/null || die "Timeshift config missing weekly schedule setting"
+  grep -F "\"schedule_monthly\" : \"${TIMESHIFT_SCHEDULE_MONTHLY}\"" "$TIMESHIFT_CONFIG_PATH" >/dev/null || die "Timeshift config missing monthly schedule setting"
+  grep -F "\"count_hourly\" : \"${TIMESHIFT_COUNT_HOURLY}\"" "$TIMESHIFT_CONFIG_PATH" >/dev/null || die "Timeshift config missing hourly retention cap"
+  grep -F "\"count_weekly\" : \"${TIMESHIFT_COUNT_WEEKLY}\"" "$TIMESHIFT_CONFIG_PATH" >/dev/null || die "Timeshift config missing weekly retention cap"
+  grep -F "\"count_monthly\" : \"${TIMESHIFT_COUNT_MONTHLY}\"" "$TIMESHIFT_CONFIG_PATH" >/dev/null || die "Timeshift config missing monthly retention cap"
+  grep -F 'pkexec env' "$TIMESHIFT_LAUNCHER_PATH" >/dev/null || die "managed Timeshift launcher is missing pkexec environment propagation"
 }
 
 verify_grub_btrfs_config() {

@@ -8,6 +8,7 @@ readonly MAINTENANCE_PACKAGES=(
   git
   grub-common
   grub2-common
+  pkexec
 )
 
 retry_cmd() {
