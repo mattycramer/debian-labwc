@@ -289,9 +289,9 @@ render_labwc_autostart() {
 set -Eeuo pipefail
 IFS=\$'\\n\\t'
 
-export XDG_CURRENT_DESKTOP=wlroots
+export XDG_CURRENT_DESKTOP=labwc
 if [[ -n "\${DBUS_SESSION_BUS_ADDRESS:-}" ]] && command -v systemctl >/dev/null 2>&1; then
-  dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=wlroots XCURSOR_THEME=${LABWC_XCURSOR_THEME} XCURSOR_SIZE=${LABWC_XCURSOR_SIZE} >/dev/null 2>&1 || true
+  dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=labwc XDG_SESSION_DESKTOP=labwc DESKTOP_SESSION=labwc XCURSOR_THEME=${LABWC_XCURSOR_THEME} XCURSOR_SIZE=${LABWC_XCURSOR_SIZE} >/dev/null 2>&1 || true
 fi
 
 pgrep -x foot >/dev/null 2>&1 || foot --server &
@@ -360,7 +360,7 @@ render_waybar_config() {
   "modules-center": ["clock"],
   "modules-right": ["network", "pulseaudio", "battery", "backlight", "cpu", "memory", "disk", "custom/player", "tray", "custom/power"],
   "custom/launcher": {
-    "format": "󱄅  Menu",
+    "format": "Menu",
     "tooltip": false,
     "on-click": "/usr/local/bin/debian-labwc-launcher-menu",
     "on-click-right": "wofi --show drun"
@@ -384,12 +384,11 @@ render_waybar_config() {
   "network": {
     "interval": 5,
     "family": "ipv4",
-    "format-wifi": "{icon}  {essid}",
-    "format-ethernet": "󰈀  {ifname}",
-    "format-linked": "󰈀  {ifname} (no ip)",
-    "format-disconnected": "󰖪  offline",
-    "format-disabled": "󰤭  down",
-    "format-icons": ["󰤟", "󰤢", "󰤥", "󰤨"],
+    "format-wifi": "WiFi  {essid}",
+    "format-ethernet": "LAN  {ifname}",
+    "format-linked": "LAN  {ifname} (no ip)",
+    "format-disconnected": "Net  offline",
+    "format-disabled": "Net  down",
     "tooltip-format-wifi": "{essid}\n{signalStrength}%  {ipaddr}\n↑ {bandwidthUpBytes}  ↓ {bandwidthDownBytes}",
     "tooltip-format-ethernet": "{ifname}\n{ipaddr}\n↑ {bandwidthUpBytes}  ↓ {bandwidthDownBytes}",
     "tooltip-format-disconnected": "Network disconnected",
@@ -397,11 +396,8 @@ render_waybar_config() {
     "on-click-right": "/usr/local/bin/debian-labwc-module-menu network menu"
   },
   "pulseaudio": {
-    "format": "{icon}  {volume}%",
-    "format-muted": "󰖁  muted",
-    "format-icons": {
-      "default": ["", "", ""]
-    },
+    "format": "Vol  {volume}%",
+    "format-muted": "Mute",
     "tooltip-format": "{desc}",
     "scroll-step": 5,
     "reverse-scrolling": true,
@@ -416,19 +412,17 @@ render_waybar_config() {
       "warning": 30,
       "critical": 15
     },
-    "format": "{icon}  {capacity}%",
-    "format-charging": "󰂄  {capacity}%",
-    "format-full": "󱟢  {capacity}%",
-    "format-warning": "󰂃  {capacity}%",
-    "format-critical": "󰁺  {capacity}%",
-    "format-icons": ["", "", "", "", ""],
+    "format": "Bat  {capacity}%",
+    "format-charging": "Charge  {capacity}%",
+    "format-full": "Full  {capacity}%",
+    "format-warning": "Low  {capacity}%",
+    "format-critical": "Crit  {capacity}%",
     "tooltip-format": "{timeTo}\nHealth {health}%  Cycles {cycles}",
     "on-click": "/usr/local/bin/debian-labwc-module-menu battery menu",
     "on-click-right": "/usr/local/bin/debian-labwc-module-menu battery details"
   },
   "backlight": {
-    "format": "{icon}  {percent}%",
-    "format-icons": ["󰃞", "󰃟", "󰃠"],
+    "format": "Bright  {percent}%",
     "scroll-step": 5,
     "tooltip-format": "Brightness {percent}%",
     "reverse-scrolling": true,
@@ -441,7 +435,7 @@ render_waybar_config() {
       "warning": 65,
       "critical": 85
     },
-    "format": "󰍛  {usage}%",
+    "format": "CPU  {usage}%",
     "tooltip": true,
     "on-click": "/usr/local/bin/debian-labwc-module-menu system monitor",
     "on-click-right": "/usr/local/bin/debian-labwc-module-menu system menu"
@@ -452,7 +446,7 @@ render_waybar_config() {
       "warning": 70,
       "critical": 90
     },
-    "format": "󰘚  {percentage}%",
+    "format": "RAM  {percentage}%",
     "tooltip-format": "{used:0.1f} GiB / {total:0.1f} GiB\nSwap {swapUsed:0.1f} / {swapTotal:0.1f} GiB",
     "on-click": "/usr/local/bin/debian-labwc-module-menu system monitor",
     "on-click-right": "/usr/local/bin/debian-labwc-module-menu system memory"
@@ -465,7 +459,7 @@ render_waybar_config() {
       "warning": 75,
       "critical": 90
     },
-    "format": "󰋊  {percentage_used}%",
+    "format": "Disk  {percentage_used}%",
     "tooltip-format": "{used} used of {total}\n{free} free on {path}",
     "on-click": "/usr/local/bin/debian-labwc-module-menu storage ncdu",
     "on-click-right": "/usr/local/bin/debian-labwc-module-menu storage menu"
@@ -483,7 +477,7 @@ render_waybar_config() {
     "on-scroll-down": "playerctl previous"
   },
   "custom/power": {
-    "format": "  Power",
+    "format": "Power",
     "tooltip": false,
     "on-click": "/usr/local/bin/debian-labwc-power-menu"
   }
@@ -748,7 +742,7 @@ render_all_configs() {
     "$config_root/xdg-desktop-portal" \
     "$config_root/debian-labwc" \
     "$config_root/systemd/user/gpg-agent.service.d" \
-    "$config_root/systemd/user/default.target.wants" \
+    "$config_root/systemd/user" \
     "$config_root"
 
   render_runtime_env "$env_file"

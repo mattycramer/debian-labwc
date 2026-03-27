@@ -41,15 +41,21 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.zshrc"
   require_file "$LABWC_TARGET_HOME/.zprofile"
   require_file "$LABWC_TARGET_HOME/.config/systemd/user/gpg-agent.service.d/override.conf"
-  require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/pipewire.service"
-  require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/pipewire.socket"
-  require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/pipewire-pulse.service"
-  require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/pipewire-pulse.socket"
-  require_file "$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/wireplumber.service"
   require_file "$LABWC_TARGET_HOME/.local/share/debian-labwc/labwall2-1920x1080.png"
   require_dir "$LABWC_TARGET_HOME/Music"
   require_dir "$LABWC_TARGET_HOME/Videos"
   require_dir "$LABWC_TARGET_HOME/Documents"
+}
+
+verify_user_unit_enabled() {
+  local unit_name="$1"
+  local unit_path
+  local install_target
+  unit_path="$(resolve_user_unit_path "$unit_name")"
+  while IFS= read -r install_target; do
+    [[ -n "$install_target" ]] || continue
+    require_file "$LABWC_TARGET_HOME/.config/systemd/user/${install_target}.wants/${unit_name}"
+  done < <(unit_install_values "$unit_path" "WantedBy")
 }
 
 verify_services_enabled() {
@@ -136,6 +142,11 @@ verify_shell_config_semantics() {
 verify_install() {
   verify_packages
   verify_paths
+  verify_user_unit_enabled pipewire.service
+  verify_user_unit_enabled pipewire.socket
+  verify_user_unit_enabled pipewire-pulse.service
+  verify_user_unit_enabled pipewire-pulse.socket
+  verify_user_unit_enabled wireplumber.service
   verify_services_enabled
   verify_greeter_user
   verify_ownership

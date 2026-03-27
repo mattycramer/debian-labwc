@@ -53,11 +53,7 @@ phase_doctor() {
   require_amd64
   require_command apt
   require_command install
-  require_command curl
-  require_command wget
-  require_command gpg
-  require_command dpkg-deb
-  require_command sudo
+  require_command runuser
 }
 
 phase_install() {
@@ -65,7 +61,6 @@ phase_install() {
   phase_doctor
   load_env_file
   detect_tools_target_user
-  apt_update
   install_repo_bootstrap
   install_repository_files
   apt_update

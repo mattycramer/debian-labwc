@@ -3,7 +3,7 @@ set -Eeuo pipefail
 IFS=$'\n\t'
 
 export XDG_SESSION_TYPE=wayland
-export XDG_CURRENT_DESKTOP=wlroots
+export XDG_CURRENT_DESKTOP=labwc
 export XDG_SESSION_DESKTOP=labwc
 export DESKTOP_SESSION=labwc
 export XCURSOR_THEME=@XCURSOR_THEME@
@@ -14,4 +14,4 @@ if [[ -r "@RUNTIME_ENV_PATH@" ]]; then
   source "@RUNTIME_ENV_PATH@"
 fi
 
-exec dbus-run-session labwc
+exec labwc

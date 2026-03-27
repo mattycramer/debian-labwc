@@ -92,21 +92,53 @@ resolve_user_unit_path() {
   die "missing systemd user unit: $unit_name"
 }
 
-enable_target_user_unit() {
+unit_install_values() {
+  local unit_path="$1"
+  local field_name="$2"
+  awk -F= -v field_name="$field_name" '
+    /^\[Install\]/ {in_install=1; next}
+    /^\[/ && $0 != "[Install]" {in_install=0}
+    in_install && $1 == field_name {
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2)
+      count = split($2, values, /[[:space:]]+/)
+      for (i = 1; i <= count; i++) {
+        if (values[i] != "") {
+          print values[i]
+        }
+      }
+    }
+  ' "$unit_path"
+}
+
+create_target_user_unit_link() {
   local unit_name="$1"
-  local unit_path
-  local wants_dir="$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants"
-  unit_path="$(resolve_user_unit_path "$unit_name")"
+  local unit_path="$2"
+  local target_name="$3"
+  local wants_dir="$LABWC_TARGET_HOME/.config/systemd/user/${target_name}.wants"
   run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$wants_dir"
   run_cmd ln -sfn "$unit_path" "$wants_dir/$unit_name"
   run_cmd chown -h "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$wants_dir/$unit_name"
 }
 
+enable_target_user_unit() {
+  local unit_name="$1"
+  local unit_path
+  local install_target
+  local also_unit
+  unit_path="$(resolve_user_unit_path "$unit_name")"
+  while IFS= read -r install_target; do
+    [[ -n "$install_target" ]] || continue
+    create_target_user_unit_link "$unit_name" "$unit_path" "$install_target"
+  done < <(unit_install_values "$unit_path" "WantedBy")
+  while IFS= read -r also_unit; do
+    [[ -n "$also_unit" ]] || continue
+    enable_target_user_unit "$also_unit"
+  done < <(unit_install_values "$unit_path" "Also")
+}
+
 enable_user_services() {
   enable_target_user_unit pipewire.service
-  enable_target_user_unit pipewire.socket
   enable_target_user_unit pipewire-pulse.service
-  enable_target_user_unit pipewire-pulse.socket
   enable_target_user_unit wireplumber.service
   if command -v chsh >/dev/null 2>&1; then
     local current_shell
@@ -140,8 +172,11 @@ remove_if_present() {
 
 disable_target_user_unit() {
   local unit_name="$1"
-  local wants_path="$LABWC_TARGET_HOME/.config/systemd/user/default.target.wants/$unit_name"
-  remove_if_present "$wants_path"
+  local systemd_user_dir="$LABWC_TARGET_HOME/.config/systemd/user"
+  local wants_path
+  while IFS= read -r wants_path; do
+    remove_if_present "$wants_path"
+  done < <(find "$systemd_user_dir" -maxdepth 2 \( -type l -o -type f \) -name "$unit_name" 2>/dev/null | sort)
 }
 
 nuke_all_state() {

@@ -2,6 +2,7 @@
 
 readonly NORMAL_BOOTSTRAP_PACKAGES=(
   apt-transport-https
+  ca-certificates
   wget
   gpg
   curl
@@ -59,8 +60,7 @@ install_repo_bootstrap() {
 write_text_file() {
   local destination="$1"
   local content="$2"
-  local temp_file
-  temp_file="$(mktemp)"
+  local temp_file="/tmp/debian-labwc-03-tools-write-text.tmp"
   printf '%s' "$content" >"$temp_file"
   run_cmd install -D -m 0644 "$temp_file" "$destination"
   rm -f -- "$temp_file"
@@ -68,6 +68,7 @@ write_text_file() {
 
 prepare_tools_download_path() {
   local path="$1"
+  [[ "$path" == /tmp/* ]] || die "download path must stay under /tmp: $path"
   run_cmd install -d -m 0755 -o "$TOOLS_TARGET_USER" -g "$TOOLS_TARGET_GROUP" "$(dirname "$path")"
   run_cmd rm -f -- "$path"
   run_cmd touch "$path"
@@ -79,13 +80,13 @@ download_as_tools_user() {
   local url="$1"
   local path="$2"
   prepare_tools_download_path "$path"
-  run_cmd sudo -u "$TOOLS_TARGET_USER" env HOME="$TOOLS_TARGET_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 180 --silent --show-error -o "$path" "$url"
+  run_cmd runuser -u "$TOOLS_TARGET_USER" -- env HOME="$TOOLS_TARGET_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 180 --silent --show-error -o "$path" "$url"
   run_cmd chmod 0644 "$path"
 }
 
 fetch_as_tools_user() {
   local url="$1"
-  sudo -u "$TOOLS_TARGET_USER" env HOME="$TOOLS_TARGET_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error "$url"
+  runuser -u "$TOOLS_TARGET_USER" -- env HOME="$TOOLS_TARGET_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error "$url"
 }
 
 install_repository_files() {
@@ -187,6 +188,10 @@ verify_tools_install() {
   package_pattern_installed 'filen' || die "filen package is not installed"
   [[ -f "/etc/apt/sources.list.d/vscode.sources" ]] || die "missing vscode.sources"
   [[ -f "/etc/apt/sources.list.d/mullvad.sources" ]] || die "missing mullvad.sources"
+  grep -F 'Architectures: amd64' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing amd64 architecture"
+  grep -F 'Signed-By: /usr/share/keyrings/microsoft.gpg' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing microsoft signed-by key"
+  grep -F 'Architectures: amd64' /etc/apt/sources.list.d/mullvad.sources >/dev/null || die "mullvad source missing amd64 architecture"
+  grep -F 'Signed-By: /usr/share/keyrings/mullvad-keyring.asc' /etc/apt/sources.list.d/mullvad.sources >/dev/null || die "mullvad source missing mullvad signed-by key"
   [[ -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf" ]] || die "missing mpv.conf"
   [[ "$(stat -c '%U:%G' "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf")" == "$TOOLS_TARGET_USER:$TOOLS_TARGET_USER" ]] || die "mpv.conf ownership is wrong"
 }
@@ -195,7 +200,7 @@ remove_tools_install() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}" thorium-browser bitwarden obsidian filen || true
-  run_cmd rm -f /etc/apt/sources.list.d/vscode.sources /etc/apt/sources.list.d/thorium.sources /etc/apt/sources.list.d/thorium.list /etc/apt/sources.list.d/mullvad.sources
+  run_cmd rm -f /etc/apt/sources.list.d/vscode.sources /etc/apt/sources.list.d/vscode.list /etc/apt/sources.list.d/thorium.sources /etc/apt/sources.list.d/thorium.list /etc/apt/sources.list.d/mullvad.sources /etc/apt/sources.list.d/mullvad.list
   run_cmd rm -f /usr/share/keyrings/microsoft.gpg /usr/share/keyrings/mullvad-keyring.asc
   run_cmd rm -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf"
 }

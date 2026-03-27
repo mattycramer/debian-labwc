@@ -21,8 +21,10 @@ readonly BACKPORTS_PACKAGES=(
   thunar
   nnn
   pipewire
+  pipewire-audio
   pipewire-pulse
   wireplumber
+  rtkit
   dbus-user-session
   at-spi2-core
   greetd
