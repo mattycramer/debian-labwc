@@ -66,6 +66,7 @@ phase_doctor() {
   require_command getent
   require_command install
   require_command awk
+  require_command python3
   require_command sed
   require_command tar
 }

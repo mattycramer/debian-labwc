@@ -15,6 +15,7 @@ readonly CRYSTAL_DOCK_BUILD_PACKAGES=(
   build-essential
   cmake
   pkg-config
+  python3
   qt6-base-dev
   qt6-base-private-dev
   qt6-wayland-dev
@@ -67,10 +68,72 @@ install_crystal_dock_dependencies() {
 patch_crystal_dock_source_tree() {
   local cmake_path="$CRYSTAL_DOCK_SOURCE_DIR/src/CMakeLists.txt"
   [[ -f "$cmake_path" ]] || die "missing Crystal Dock CMakeLists.txt after source extract"
-  run_cmd sed -i \
-    -e 's/find_package(Qt6 6.6 REQUIRED COMPONENTS DBus Gui Test Widgets)/find_package(Qt6 6.6 REQUIRED COMPONENTS DBus Gui Test Widgets GuiPrivate)/' \
-    -e '/^if (Qt6_VERSION VERSION_GREATER_EQUAL 6\.9\.0)$/,/^endif()$/d' \
-    "$cmake_path"
+  run_cmd python3 - "$cmake_path" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+
+old_find = """find_package(Qt6 6.6 REQUIRED COMPONENTS DBus Gui Test Widgets)
+if (Qt6_VERSION VERSION_GREATER_EQUAL 6.9.0)
+  set(QT_NO_PRIVATE_MODULE_WARNING ON)
+  find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
+endif()
+find_package(Wayland 1.22 REQUIRED COMPONENTS Client)
+find_package(LayerShellQt 6.0 REQUIRED)
+"""
+
+new_find = """find_package(Qt6 6.6 REQUIRED COMPONENTS DBus Gui Test Widgets)
+set(QT_NO_PRIVATE_MODULE_WARNING ON)
+find_package(Qt6 QUIET COMPONENTS GuiPrivate)
+find_package(Wayland 1.22 REQUIRED COMPONENTS Client)
+find_package(LayerShellQt 6.0 REQUIRED)
+"""
+
+old_libs = "set(LIBS Qt6::DBus Qt6::GuiPrivate Qt6::Widgets Wayland::Client LayerShellQt::Interface)\n"
+
+new_libs = """set(LIBS Qt6::DBus Qt6::Widgets Wayland::Client LayerShellQt::Interface)
+if (TARGET Qt6::GuiPrivate)
+  list(APPEND LIBS Qt6::GuiPrivate)
+else()
+  find_path(QTGUI_PRIVATE_INCLUDE_DIR qpa/qplatformwindow_p.h
+    PATHS
+      /usr/include/qt6
+      /usr/include/${CMAKE_LIBRARY_ARCHITECTURE}/qt6
+      /usr/include/x86_64-linux-gnu/qt6
+    PATH_SUFFIXES
+      QtGui/${Qt6_VERSION}/QtGui/private
+      QtGui/${Qt6_VERSION_MAJOR}.${Qt6_VERSION_MINOR}.${Qt6_VERSION_PATCH}/QtGui/private)
+  if (NOT QTGUI_PRIVATE_INCLUDE_DIR)
+    message(FATAL_ERROR "Unable to locate Qt Gui private headers. Install qt6-base-private-dev.")
+  endif()
+  get_filename_component(QTGUI_VERSIONED_INCLUDE_DIR "${QTGUI_PRIVATE_INCLUDE_DIR}" DIRECTORY)
+endif()
+"""
+
+anchor = "add_library(crystal-dock_lib STATIC ${SRCS})\n\n"
+inject = """add_library(crystal-dock_lib STATIC ${SRCS})
+if (NOT TARGET Qt6::GuiPrivate)
+  target_include_directories(crystal-dock_lib PRIVATE
+    "${QTGUI_VERSIONED_INCLUDE_DIR}"
+    "${QTGUI_PRIVATE_INCLUDE_DIR}")
+endif()
+
+"""
+
+if old_find not in text:
+    raise SystemExit("expected upstream Qt find_package block not found")
+if old_libs not in text:
+    raise SystemExit("expected upstream LIBS block not found")
+if anchor not in text:
+    raise SystemExit("expected upstream add_library anchor not found")
+
+text = text.replace(old_find, new_find, 1)
+text = text.replace(old_libs, new_libs, 1)
+text = text.replace(anchor, inject, 1)
+path.write_text(text)
+PY
 }
 
 write_root_file() {
