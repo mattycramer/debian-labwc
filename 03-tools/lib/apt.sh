@@ -22,6 +22,7 @@ readonly BACKPORTS_TOOLS_PACKAGES=(
   bc
   geeqie
   zathura
+  aptitude
 )
 
 apt_yes_args() {
