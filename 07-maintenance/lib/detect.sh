@@ -83,7 +83,7 @@ detect_btrfs_layout() {
   fi
   [[ -n "$uuid" ]] || die "could not determine UUID for root Btrfs device '$root_source'"
 
-  while IFS=$'\t' read -r device mountpoint device_uuid; do
+  while read -r device mountpoint device_uuid; do
     [[ -n "$device" ]] || continue
     [[ "$device_uuid" == "$uuid" ]] || continue
     devices+=("$device")

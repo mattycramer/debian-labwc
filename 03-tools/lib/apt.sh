@@ -170,7 +170,7 @@ render_bitwarden_wayland_wrapper() {
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-app_command='/opt/Bitwarden/bitwarden'
+app_command='/opt/Bitwarden/bitwarden-app'
 
 if [[ ! -x "$app_command" ]]; then
   printf 'missing Bitwarden launcher: %s\n' "$app_command" >&2
@@ -179,6 +179,9 @@ fi
 
 unset USE_X11
 export ELECTRON_OZONE_PLATFORM_HINT=wayland
+if [[ -n "${WAYLAND_DISPLAY:-}" && "${XDG_SESSION_TYPE:-}" == "wayland" ]]; then
+  unset DISPLAY
+fi
 
 exec "$app_command" \
   --enable-features=UseOzonePlatform,WaylandWindowDecorations \
@@ -248,6 +251,7 @@ verify_tools_install() {
   grep -F 'Components: main' /etc/apt/sources.list.d/mullvad.sources >/dev/null || die "mullvad source missing main component"
   [[ -f "$BITWARDEN_WRAPPER_PATH" ]] || die "missing managed Bitwarden wrapper"
   [[ -f "$BITWARDEN_DESKTOP_OVERRIDE_PATH" ]] || die "missing managed Bitwarden desktop override"
+  grep -F '/opt/Bitwarden/bitwarden-app' "$BITWARDEN_WRAPPER_PATH" >/dev/null || die "managed Bitwarden wrapper is not launching the Electron binary directly"
   grep -F -- '--ozone-platform=wayland' "$BITWARDEN_WRAPPER_PATH" >/dev/null || die "managed Bitwarden wrapper is not forcing Wayland"
   grep -F 'Exec=/usr/local/bin/bitwarden %U' "$BITWARDEN_DESKTOP_OVERRIDE_PATH" >/dev/null || die "managed Bitwarden desktop override is missing the Wayland wrapper Exec"
   [[ -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf" ]] || die "missing mpv.conf"
