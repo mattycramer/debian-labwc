@@ -16,6 +16,8 @@ source "$SCRIPT_DIR/lib/log.sh"
 source "$SCRIPT_DIR/lib/assert.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/security.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/udev.sh"
 
 usage() {
   cat <<'EOF'
@@ -60,6 +62,8 @@ phase_doctor() {
   require_command install
   require_command runuser
   require_command systemctl
+  require_command systemd-hwdb
+  require_command udevadm
 }
 
 phase_bootstrap_doctor() {
@@ -88,6 +92,7 @@ phase_install() {
   install_latest_nftables
   install_latest_aide
   render_all_configs
+  apply_thinkpad_hwdb_override
   systemd_daemon_reload
   initialize_nftables
   initialize_crowdsec
@@ -102,6 +107,7 @@ phase_verify() {
   load_env_file
   detect_security_download_user
   verify_security_install
+  verify_thinkpad_hwdb_override
 }
 
 phase_print_env() {
@@ -114,6 +120,7 @@ phase_nuke() {
   log_info "phase: nuke"
   phase_doctor
   load_env_file
+  remove_thinkpad_hwdb_override
   remove_security_install
 }
 
