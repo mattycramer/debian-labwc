@@ -7,6 +7,8 @@ readonly GRUB_BTRFS_COMMIT_FILE="${MAINTENANCE_RUNTIME_ROOT}/grub-btrfs.commit"
 readonly TIMESHIFT_CONFIG_DIR="/etc/timeshift"
 readonly TIMESHIFT_CONFIG_PATH="/etc/timeshift/timeshift.json"
 readonly TIMESHIFT_LAUNCHER_PATH="/usr/local/bin/timeshift-gtk"
+readonly TIMESHIFT_DESKTOP_OVERRIDE_DIR="/usr/local/share/applications"
+readonly TIMESHIFT_DESKTOP_OVERRIDE_PATH="/usr/local/share/applications/timeshift-gtk.desktop"
 readonly GRUB_BTRFS_CONFIG_DIR="/etc/default/grub-btrfs"
 readonly GRUB_BTRFS_CONFIG_PATH="/etc/default/grub-btrfs/config"
 readonly GRUB_BTRFS_SCRIPT_PATH="/etc/grub.d/41_snapshots-btrfs"
@@ -202,6 +204,27 @@ EOF
   write_root_file "$TIMESHIFT_LAUNCHER_PATH" 0755 "$content"
 }
 
+render_timeshift_desktop_override() {
+  local content
+  content="$(cat <<'EOF'
+[Desktop Entry]
+Name=Timeshift
+Exec=/usr/local/bin/timeshift-gtk
+Type=Application
+GenericName=System Restore Utility
+Terminal=false
+Icon=timeshift
+Comment=System Restore Utility
+X-KDE-StartupNotify=false
+Categories=System;
+X-GNOME-UsesNotifications=true
+Keywords=backup;btrfs;rsync;
+EOF
+)"
+  run_cmd install -d -m 0755 "$TIMESHIFT_DESKTOP_OVERRIDE_DIR"
+  write_root_file "$TIMESHIFT_DESKTOP_OVERRIDE_PATH" 0644 "$content"
+}
+
 render_btrfsmaintenance_config() {
   local content
   content="$(cat <<'EOF'
@@ -305,6 +328,7 @@ EOF
 render_all_configs() {
   render_timeshift_config
   render_timeshift_launcher
+  render_timeshift_desktop_override
   render_btrfsmaintenance_config
   render_grub_btrfs_config
   render_grub_btrfs_service
@@ -349,7 +373,7 @@ remove_maintenance_install() {
   restore_unit_state "btrfs-trim.timer" "STATE_BTRFS_TRIM_TIMER"
   restore_unit_state "btrfsmaintenance-refresh.path" "STATE_BTRFS_REFRESH_PATH"
 
-  run_cmd rm -f -- "$GRUB_BTRFS_SCRIPT_PATH" "$GRUB_BTRFS_DAEMON_PATH" "$GRUB_BTRFS_SERVICE_PATH" "$GRUB_BTRFS_CONFIG_PATH" "$TIMESHIFT_CONFIG_PATH" "$TIMESHIFT_LAUNCHER_PATH" "$BTRFSMAINT_CONFIG_PATH"
+  run_cmd rm -f -- "$GRUB_BTRFS_SCRIPT_PATH" "$GRUB_BTRFS_DAEMON_PATH" "$GRUB_BTRFS_SERVICE_PATH" "$GRUB_BTRFS_CONFIG_PATH" "$TIMESHIFT_CONFIG_PATH" "$TIMESHIFT_LAUNCHER_PATH" "$TIMESHIFT_DESKTOP_OVERRIDE_PATH" "$BTRFSMAINT_CONFIG_PATH"
   run_cmd rm -f -- "$BTRFS_SCRUB_DROPIN_PATH" "$BTRFS_BALANCE_DROPIN_PATH"
   run_cmd rmdir --ignore-fail-on-non-empty "$BTRFS_SCRUB_DROPIN_DIR" >/dev/null 2>&1 || true
   run_cmd rmdir --ignore-fail-on-non-empty "$BTRFS_BALANCE_DROPIN_DIR" >/dev/null 2>&1 || true
