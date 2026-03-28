@@ -6,6 +6,7 @@ readonly NORMAL_BOOTSTRAP_PACKAGES=(
   wget
   gpg
   curl
+  desktop-file-utils
 )
 
 readonly NORMAL_TOOLS_PACKAGES=(
@@ -164,6 +165,7 @@ install_deb_tools() {
   install_deb_url "$FILEN_URL" /tmp/filen_amd64.deb
   render_code_kwallet_wrapper
   render_bitwarden_wayland_wrapper
+  refresh_managed_desktop_database
 }
 
 render_code_kwallet_wrapper() {
@@ -251,6 +253,12 @@ EOF
   run_cmd chmod 0644 "$BITWARDEN_DESKTOP_OVERRIDE_PATH"
 }
 
+refresh_managed_desktop_database() {
+  if command -v update-desktop-database >/dev/null 2>&1; then
+    run_cmd update-desktop-database /usr/local/share/applications
+  fi
+}
+
 render_mpv_config() {
   run_cmd install -d -m 0755 -o "$TOOLS_TARGET_USER" -g "$TOOLS_TARGET_USER" \
     "$TOOLS_TARGET_HOME/.config" \
@@ -305,6 +313,8 @@ verify_tools_install() {
   grep -F -- '--password-store=kwallet6' "$BITWARDEN_WRAPPER_PATH" >/dev/null || die "managed Bitwarden wrapper is not forcing KWallet"
   grep -F -- '--ozone-platform=wayland' "$BITWARDEN_WRAPPER_PATH" >/dev/null || die "managed Bitwarden wrapper is not forcing Wayland"
   grep -F 'Exec=/usr/local/bin/bitwarden %U' "$BITWARDEN_DESKTOP_OVERRIDE_PATH" >/dev/null || die "managed Bitwarden desktop override is missing the Wayland wrapper Exec"
+  desktop-file-validate "$CODE_DESKTOP_OVERRIDE_PATH"
+  desktop-file-validate "$BITWARDEN_DESKTOP_OVERRIDE_PATH"
   [[ -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf" ]] || die "missing mpv.conf"
   [[ "$(stat -c '%U:%G' "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf")" == "$TOOLS_TARGET_USER:$TOOLS_TARGET_USER" ]] || die "mpv.conf ownership is wrong"
 }

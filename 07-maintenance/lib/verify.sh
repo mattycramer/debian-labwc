@@ -45,7 +45,9 @@ verify_timeshift_config() {
   grep -F "\"count_hourly\" : \"${TIMESHIFT_COUNT_HOURLY}\"" "$TIMESHIFT_CONFIG_PATH" >/dev/null || die "Timeshift config missing hourly retention cap"
   grep -F "\"count_weekly\" : \"${TIMESHIFT_COUNT_WEEKLY}\"" "$TIMESHIFT_CONFIG_PATH" >/dev/null || die "Timeshift config missing weekly retention cap"
   grep -F "\"count_monthly\" : \"${TIMESHIFT_COUNT_MONTHLY}\"" "$TIMESHIFT_CONFIG_PATH" >/dev/null || die "Timeshift config missing monthly retention cap"
+  [[ ! -f "$TIMESHIFT_DESKTOP_SOURCE_PATH" ]] || die "packaged Timeshift desktop entry should be removed in favor of the managed override"
   grep -F 'Exec=/usr/bin/timeshift-gtk' "$TIMESHIFT_DESKTOP_OVERRIDE_PATH" >/dev/null || die "managed Timeshift desktop override is not pointing directly at timeshift-gtk"
+  desktop-file-validate "$TIMESHIFT_DESKTOP_OVERRIDE_PATH"
 }
 
 verify_grub_btrfs_config() {

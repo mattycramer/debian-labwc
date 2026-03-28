@@ -4,6 +4,7 @@ readonly MAINTENANCE_PACKAGES=(
   timeshift
   btrfsmaintenance
   btrfs-progs
+  desktop-file-utils
   inotify-tools
   git
   grub-common

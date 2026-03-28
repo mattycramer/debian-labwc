@@ -16,6 +16,7 @@ verify_packages() {
 verify_paths() {
   require_file "/etc/greetd/config.toml"
   require_file "/etc/systemd/system/greetd.service.d/10-vt.conf"
+  require_file "/etc/tmpfiles.d/debian-labwc-polkit.conf"
   require_file "/usr/share/wayland-sessions/labwc.desktop"
   require_file "/usr/local/bin/debian-labwc-session"
   require_file "/usr/local/bin/debian-labwc-power-menu"
@@ -39,6 +40,7 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.config/kanshi/config"
   require_file "$LABWC_TARGET_HOME/.config/xfce4/helpers.rc"
   require_file "$LABWC_TARGET_HOME/.config/xdg-desktop-portal/portals.conf"
+  require_dir "/usr/local/share/polkit-1/rules.d"
   require_file "$LABWC_TARGET_HOME/.config/debian-labwc/runtime.env"
   require_file "$LABWC_TARGET_HOME/.config/starship.toml"
   require_file "$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf"
@@ -84,6 +86,14 @@ verify_greeter_user() {
 verify_polkitd_user() {
   getent group polkitd >/dev/null 2>&1 || die "polkitd group is missing"
   getent passwd polkitd >/dev/null 2>&1 || die "polkitd user is missing"
+}
+
+verify_polkit_semantics() {
+  local autostart_path="$LABWC_TARGET_HOME/.config/labwc/autostart"
+  grep -F 'd /run/polkit-1/rules.d 0755 root root -' /etc/tmpfiles.d/debian-labwc-polkit.conf >/dev/null || die "polkit tmpfiles config missing runtime rules directory"
+  grep -F 'lxpolkit &' "$autostart_path" >/dev/null || die "labwc autostart missing lxpolkit auth agent"
+  grep -F 'systemctl --user import-environment' "$autostart_path" >/dev/null || die "labwc autostart missing systemd user environment import"
+  ! grep -F 'is-active dbus.service' "$autostart_path" >/dev/null || die "labwc autostart still waits on dbus.service instead of the session bus socket"
 }
 
 verify_labwc_config_semantics() {
@@ -178,6 +188,7 @@ verify_install() {
   verify_services_enabled
   verify_greeter_user
   verify_polkitd_user
+  verify_polkit_semantics
   verify_ownership
   verify_greetd_semantics
   verify_labwc_config_semantics

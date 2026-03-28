@@ -302,22 +302,37 @@ IFS='
 
 export XDG_CURRENT_DESKTOP=labwc:wlroots
 
+wait_for_session_bus() {
+  bus_socket="\${XDG_RUNTIME_DIR:-/run/user/\$(id -u)}/bus"
+  attempt=1
+  while [ "\$attempt" -le 10 ]; do
+    if [ -n "\${DBUS_SESSION_BUS_ADDRESS:-}" ] || [ -S "\$bus_socket" ]; then
+      return 0
+    fi
+    sleep 1
+    attempt=\$((attempt + 1))
+  done
+  return 1
+}
+
 pgrep -x foot >/dev/null 2>&1 || foot --server &
 pgrep -x swaybg >/dev/null 2>&1 || swaybg -i "$wallpaper_path" -m "${LABWC_WALLPAPER_MODE}" &
 
-attempt=1
-while [ "\$attempt" -le 20 ]; do
-  if systemctl --user --quiet is-active dbus.service >/dev/null 2>&1; then
-    break
-  fi
-  sleep 1
-  attempt=\$((attempt + 1))
-done
+wait_for_session_bus || true
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl --user import-environment \
+    WAYLAND_DISPLAY \
+    XDG_CURRENT_DESKTOP \
+    XDG_SESSION_TYPE \
+    XDG_SESSION_DESKTOP \
+    DESKTOP_SESSION \
+    SSH_AUTH_SOCK >/dev/null 2>&1 || true
+fi
 
+pgrep -x lxpolkit >/dev/null 2>&1 || lxpolkit &
 pgrep -x waybar >/dev/null 2>&1 || waybar &
 pgrep -x kanshi >/dev/null 2>&1 || kanshi &
 pgrep -x mako >/dev/null 2>&1 || mako &
-pgrep -x lxpolkit >/dev/null 2>&1 || lxpolkit &
 pgrep -x swayidle >/dev/null 2>&1 || swayidle \
   timeout "${LABWC_IDLE_LOCK_SECONDS}" 'swaylock -f' \
   timeout "${LABWC_IDLE_DPMS_SECONDS}" '/usr/local/bin/debian-labwc-dpms off' \

@@ -16,6 +16,11 @@ has_command() {
   command -v "$1" >/dev/null 2>&1
 }
 
+power_profiles_available() {
+  has_command powerprofilesctl || return 1
+  powerprofilesctl list >/dev/null 2>&1
+}
+
 run_gui() {
   command -v "$1" >/dev/null 2>&1 || exit 0
   nohup "$@" >/dev/null 2>&1 &
@@ -61,6 +66,10 @@ set_brightness() {
 }
 
 show_profile_menu() {
+  if ! power_profiles_available; then
+    run_terminal "Battery" 'upower -d; printf "\nPower profile service unavailable.\n\nPress Enter to close..."; read -r _'
+    return 0
+  fi
   local choice
   choice="$(
     choose "Power" \

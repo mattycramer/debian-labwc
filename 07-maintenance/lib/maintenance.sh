@@ -6,6 +6,7 @@ readonly GRUB_BTRFS_CLONE_DIR="/tmp/grub-btrfs"
 readonly GRUB_BTRFS_COMMIT_FILE="${MAINTENANCE_RUNTIME_ROOT}/grub-btrfs.commit"
 readonly TIMESHIFT_CONFIG_DIR="/etc/timeshift"
 readonly TIMESHIFT_CONFIG_PATH="/etc/timeshift/timeshift.json"
+readonly TIMESHIFT_DESKTOP_SOURCE_PATH="/usr/share/applications/timeshift-gtk.desktop"
 readonly TIMESHIFT_DESKTOP_OVERRIDE_DIR="/usr/local/share/applications"
 readonly TIMESHIFT_DESKTOP_OVERRIDE_PATH="/usr/local/share/applications/timeshift-gtk.desktop"
 readonly TIMESHIFT_WRAPPER_PATH="/usr/local/bin/timeshift-gtk"
@@ -140,15 +141,19 @@ Type=Application
 GenericName=System Restore Utility
 Terminal=false
 Icon=timeshift
-Comment=System Restore Utility
+Comment=Create and manage system snapshots
 X-KDE-StartupNotify=false
 Categories=System;
 X-GNOME-UsesNotifications=true
 Keywords=backup;btrfs;rsync;
 EOF
 )"
+  run_cmd rm -f -- "$TIMESHIFT_DESKTOP_SOURCE_PATH"
   run_cmd install -d -m 0755 "$TIMESHIFT_DESKTOP_OVERRIDE_DIR"
   write_root_file "$TIMESHIFT_DESKTOP_OVERRIDE_PATH" 0644 "$content"
+  if command -v update-desktop-database >/dev/null 2>&1; then
+    run_cmd update-desktop-database "$TIMESHIFT_DESKTOP_OVERRIDE_DIR"
+  fi
 }
 
 render_btrfsmaintenance_config() {

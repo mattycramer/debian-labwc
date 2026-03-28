@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+readonly POLKIT_TMPFILES_PATH="/etc/tmpfiles.d/debian-labwc-polkit.conf"
+
 ensure_greeter_user() {
   if getent passwd greeter >/dev/null 2>&1; then
     return 0
@@ -27,6 +29,16 @@ ensure_polkitd_service_account() {
     --shell /usr/sbin/nologin \
     --comment "User for polkitd" \
     polkitd
+}
+
+install_polkit_runtime_layout() {
+  run_cmd install -d -m 0755 /usr/local/share/polkit-1/rules.d
+  cat >"$POLKIT_TMPFILES_PATH" <<'EOF'
+d /run/polkit-1 0755 root root -
+d /run/polkit-1/rules.d 0755 root root -
+EOF
+  run_cmd chmod 0644 "$POLKIT_TMPFILES_PATH"
+  run_cmd systemd-tmpfiles --create "$POLKIT_TMPFILES_PATH"
 }
 
 ensure_greeter_runtime_dirs() {
@@ -77,6 +89,7 @@ install_root_files() {
   validate_greetd_settings
   ensure_greeter_user
   ensure_greeter_runtime_dirs
+  install_polkit_runtime_layout
   render_template_to_file "$SCRIPT_DIR/templates/greetd-config.toml.tpl" "/etc/greetd/config.toml" 0644
   render_template_to_file "$SCRIPT_DIR/templates/greetd-vt.conf.tpl" "/etc/systemd/system/greetd.service.d/10-vt.conf" 0644
   render_template_to_file "$SCRIPT_DIR/templates/labwc.desktop.tpl" "/usr/share/wayland-sessions/labwc.desktop" 0644
@@ -223,9 +236,14 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/debian-labwc-module-menu"
   remove_if_present "/usr/local/bin/debian-labwc-player-status"
   remove_if_present "/usr/share/wayland-sessions/labwc.desktop"
+  remove_if_present "/usr/local/share/polkit-1/rules.d"
+  remove_if_present "$POLKIT_TMPFILES_PATH"
   remove_if_present "/etc/greetd/config.toml"
   remove_if_present "/etc/systemd/system/greetd.service.d/10-vt.conf"
   rmdir --ignore-fail-on-non-empty "/etc/systemd/system/greetd.service.d" >/dev/null 2>&1 || true
+  rmdir --ignore-fail-on-non-empty "/usr/local/share/polkit-1" >/dev/null 2>&1 || true
+  remove_if_present "/run/polkit-1/rules.d"
+  rmdir --ignore-fail-on-non-empty "/run/polkit-1" >/dev/null 2>&1 || true
 
   log_info "removing target user systemd user unit links"
   disable_target_user_unit pipewire.service

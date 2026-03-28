@@ -71,6 +71,7 @@ phase_doctor() {
   require_command apt
   require_command install
   require_command systemctl
+  require_command systemd-tmpfiles
   require_command lspci
   require_command getent
   require_command awk

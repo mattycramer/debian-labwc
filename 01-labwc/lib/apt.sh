@@ -17,8 +17,10 @@ readonly BACKPORTS_PACKAGES=(
   swaybg
   swayidle
   swaylock
+  # Debian trixie currently lacks xfce-polkit, so keep the auth agent on lxpolkit.
   lxpolkit
   thunar
+  thunar-volman
   nnn
   pipewire
   pipewire-audio
@@ -44,7 +46,9 @@ readonly BACKPORTS_PACKAGES=(
   qtwayland5
   qt6-wayland
   gvfs
+  gvfs-fuse
   gvfs-backends
+  udisks2
   foot
   foot-terminfo
   pavucontrol
@@ -52,6 +56,7 @@ readonly BACKPORTS_PACKAGES=(
   brightnessctl
   wev
   upower
+  power-profiles-daemon
   network-manager
   fonts-font-awesome
   fonts-noto
