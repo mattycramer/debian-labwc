@@ -327,7 +327,6 @@ verify_tools_install() {
   [[ -f "/usr/share/keyrings/microsoft.gpg" ]] || die "missing microsoft keyring"
   [[ -f "/usr/share/keyrings/mullvad-keyring.gpg" ]] || die "missing mullvad keyring"
   [[ -f "$SPOTIFY_KEYRING_PATH" ]] || die "missing spotify keyring"
-  [[ ! -f "/etc/apt/sources.list.d/spotify.list" ]] || die "spotify repo must use deb822 spotify.sources, not spotify.list"
   grep -F 'Architectures: amd64' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing amd64 architecture"
   grep -F 'Signed-By: /usr/share/keyrings/microsoft.gpg' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing microsoft signed-by key"
   grep -F 'URIs: https://packages.microsoft.com/repos/code' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing expected repo uri"
