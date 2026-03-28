@@ -377,6 +377,15 @@ pkill -x "nwg-dock" >/dev/null 2>&1 || true
 if command -v gpgconf >/dev/null 2>&1; then
   gpgconf --kill gpg-agent >/dev/null 2>&1 || true
 fi
+
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl --user stop \
+    wireplumber.service \
+    pipewire-pulse.service \
+    pipewire.service \
+    pipewire-pulse.socket \
+    pipewire.socket >/dev/null 2>&1 || true
+fi
 EOF
 )"
   render_user_script "$LABWC_TARGET_HOME/.config/labwc/shutdown" "$shutdown"
@@ -390,6 +399,7 @@ render_gpg_agent_config() {
   [[ "${KWALLET_SESSION_GPG_CACHE_TTL_SEC:-}" =~ ^[1-9][0-9]*$ ]] || die "KWALLET_SESSION_GPG_CACHE_TTL_SEC must be a positive integer, found '${KWALLET_SESSION_GPG_CACHE_TTL_SEC:-}'"
   render_user_private_file "$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf" "enable-ssh-support
 pinentry-program /usr/bin/pinentry-gtk-2
+disable-scdaemon
 default-cache-ttl ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}
 max-cache-ttl ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}
 default-cache-ttl-ssh ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}

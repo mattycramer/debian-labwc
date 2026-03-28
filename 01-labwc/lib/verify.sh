@@ -121,6 +121,9 @@ verify_greetd_semantics() {
   grep -F "Conflicts=getty@tty${LABWC_GREETD_VT}.service" "$greetd_dropin" >/dev/null || die "greetd drop-in missing getty conflict"
   grep -F "Before=getty@tty${LABWC_GREETD_VT}.service" "$greetd_dropin" >/dev/null || die "greetd drop-in missing getty ordering"
   grep -F 'export LABWC_UPDATE_ACTIVATION_ENV=1' "$session_wrapper" >/dev/null || die "labwc session wrapper missing explicit activation-environment enablement"
+  grep -F 'export PASSWORD_STORE=kwallet6' "$session_wrapper" >/dev/null || die "session wrapper missing default KWallet password-store export"
+  grep -F 'export ELECTRON_OZONE_PLATFORM_HINT=wayland' "$session_wrapper" >/dev/null || die "session wrapper missing Electron Wayland hint"
+  grep -F 'export QT_QPA_PLATFORM=wayland' "$session_wrapper" >/dev/null || die "session wrapper missing Qt Wayland platform export"
 }
 
 verify_waybar_config_semantics() {
@@ -152,9 +155,12 @@ verify_gpg_agent_semantics() {
   local gpg_agent_config="$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf"
   grep -F 'pkill -x "waybar"' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing waybar stop"
   grep -F 'gpgconf --kill gpg-agent' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing gpg-agent kill"
+  grep -F 'systemctl --user stop \' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing explicit pipewire shutdown"
+  grep -F 'wireplumber.service' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing wireplumber stop"
   grep -F 'TimeoutStopSec=10s' "$override_path" >/dev/null || die "gpg-agent override missing reduced stop timeout"
   grep -F 'enable-ssh-support' "$gpg_agent_config" >/dev/null || die "gpg-agent config missing ssh agent support"
   grep -F 'pinentry-program /usr/bin/pinentry-gtk-2' "$gpg_agent_config" >/dev/null || die "gpg-agent config missing explicit pinentry"
+  grep -F 'disable-scdaemon' "$gpg_agent_config" >/dev/null || die "gpg-agent config missing scdaemon disablement"
   grep -F "default-cache-ttl ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}" "$gpg_agent_config" >/dev/null || die "gpg-agent config missing configured cache ttl"
   grep -F "max-cache-ttl ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}" "$gpg_agent_config" >/dev/null || die "gpg-agent config missing configured max cache ttl"
   grep -F "default-cache-ttl-ssh ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}" "$gpg_agent_config" >/dev/null || die "gpg-agent config missing configured ssh cache ttl"

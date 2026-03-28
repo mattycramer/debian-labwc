@@ -83,6 +83,7 @@ phase_install() {
   log_info "phase: install"
   phase_doctor
   load_env_file
+  ensure_crowdsec_console_enrollment_key
   detect_security_download_user
   install_bootstrap_packages
   phase_bootstrap_doctor

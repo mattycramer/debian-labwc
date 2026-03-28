@@ -182,7 +182,17 @@ if [[ ! -x "$app_command" ]]; then
   exit 1
 fi
 
-exec "$app_command" --password-store=kwallet6 "$@"
+unset USE_X11
+export ELECTRON_OZONE_PLATFORM_HINT=wayland
+if [[ -n "${WAYLAND_DISPLAY:-}" && "${XDG_SESSION_TYPE:-}" == "wayland" ]]; then
+  unset DISPLAY
+fi
+
+exec "$app_command" \
+  --password-store=kwallet6 \
+  --enable-features=UseOzonePlatform,WaylandWindowDecorations \
+  --ozone-platform=wayland \
+  "$@"
 EOF
   run_cmd chmod 0755 "$CODE_WRAPPER_PATH"
 
@@ -308,6 +318,7 @@ verify_tools_install() {
   [[ -f "$BITWARDEN_DESKTOP_OVERRIDE_PATH" ]] || die "missing managed Bitwarden desktop override"
   grep -F '/usr/share/code/code' "$CODE_WRAPPER_PATH" >/dev/null || die "managed Code wrapper is not launching the upstream Code binary"
   grep -F -- '--password-store=kwallet6' "$CODE_WRAPPER_PATH" >/dev/null || die "managed Code wrapper is not forcing KWallet"
+  grep -F -- '--ozone-platform=wayland' "$CODE_WRAPPER_PATH" >/dev/null || die "managed Code wrapper is not forcing Wayland"
   grep -F 'Exec=/usr/local/bin/code %F' "$CODE_DESKTOP_OVERRIDE_PATH" >/dev/null || die "managed Code desktop override is missing the wrapper Exec"
   grep -F '/opt/Bitwarden/bitwarden-app' "$BITWARDEN_WRAPPER_PATH" >/dev/null || die "managed Bitwarden wrapper is not launching the Electron binary directly"
   grep -F -- '--password-store=kwallet6' "$BITWARDEN_WRAPPER_PATH" >/dev/null || die "managed Bitwarden wrapper is not forcing KWallet"

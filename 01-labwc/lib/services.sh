@@ -89,12 +89,19 @@ install_helper_script() {
 }
 
 bootstrap_target_user_gpg_key() {
+  local gpg_passphrase="${KWALLET_SESSION_GPG_PASSWD:-}"
+  if [[ -z "$gpg_passphrase" ]]; then
+    [[ -t 0 ]] || die "KWALLET_SESSION_GPG_PASSWD is empty and no interactive terminal is available for prompting"
+    IFS= read -r -s -p "No GPG Encryption Password Set. Enter New Password: " gpg_passphrase
+    printf '\n'
+  fi
+  [[ -n "$gpg_passphrase" ]] || die "no GPG encryption password was provided"
   run_cmd env \
     HOME="$LABWC_TARGET_HOME" \
     USER="$LABWC_TARGET_USER" \
     LOGNAME="$LABWC_TARGET_USER" \
     GNUPGHOME="$LABWC_TARGET_HOME/.gnupg" \
-    KWALLET_SESSION_GPG_PASSWD="${KWALLET_SESSION_GPG_PASSWD:-}" \
+    KWALLET_SESSION_GPG_PASSWD="$gpg_passphrase" \
     LABWC_TARGET_USER="$LABWC_TARGET_USER" \
     LABWC_GPG_KEY_REALNAME="${LABWC_GPG_KEY_REALNAME:-}" \
     LABWC_GPG_KEY_EMAIL="${LABWC_GPG_KEY_EMAIL:-}" \

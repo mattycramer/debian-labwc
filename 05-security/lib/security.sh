@@ -84,6 +84,19 @@ detect_security_download_user() {
   [[ -n "${SECURITY_DOWNLOAD_HOME:-}" ]] || SECURITY_DOWNLOAD_HOME="/tmp"
 }
 
+ensure_crowdsec_console_enrollment_key() {
+  if [[ -f "$CROWDSEC_CONSOLE_MARKER" ]]; then
+    return 0
+  fi
+  if [[ -n "${CROWDSEC_CONSOLE_ENROLLMENT_KEY:-}" ]]; then
+    return 0
+  fi
+  [[ -t 0 ]] || die "CROWDSEC_CONSOLE_ENROLLMENT_KEY is empty and no interactive terminal is available for prompting"
+  IFS= read -r -s -p "No CrowdSec Enrollment Key Set. Enter Enrollment Key: " CROWDSEC_CONSOLE_ENROLLMENT_KEY
+  printf '\n'
+  [[ -n "${CROWDSEC_CONSOLE_ENROLLMENT_KEY:-}" ]] || die "no CrowdSec enrollment key was provided"
+}
+
 retry_cmd() {
   local attempts="$1"
   shift
