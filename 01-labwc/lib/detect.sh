@@ -101,7 +101,6 @@ detect_connector_hz() {
 
 write_autogen_block() {
   local env_file="$1"
-  local runtime_env_path="$LABWC_TARGET_HOME/.config/debian-labwc/runtime.env"
   local temp_file block_file
   temp_file="$(dirname "$env_file")/.env.tmp.$$"
   block_file="$(dirname "$env_file")/.env.block.$$"
@@ -155,13 +154,6 @@ EOF
 
   run_cmd mv -- "$temp_file" "$env_file"
   run_cmd rm -f -- "$block_file"
-
-  awk -v runtime_env="$runtime_env_path" -v repo_env="$env_file" '
-    /^LABWC_RUNTIME_ENV_PATH=/ {$0 = "LABWC_RUNTIME_ENV_PATH=\"" runtime_env "\""}
-    /^LABWC_REPO_ENV_PATH=/ {$0 = "LABWC_REPO_ENV_PATH=\"" repo_env "\""}
-    {print}
-  ' "$env_file" >"$temp_file"
-  run_cmd mv -- "$temp_file" "$env_file"
 }
 
 detect_hardware() {

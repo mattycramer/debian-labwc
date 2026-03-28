@@ -21,8 +21,6 @@ source "$SCRIPT_DIR/lib/detect.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/render.sh"
 # shellcheck disable=SC1091
-source "$SCRIPT_DIR/lib/session.sh"
-# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/services.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/tweaks.sh"
@@ -99,7 +97,7 @@ phase_render() {
   log_info "phase: render"
   phase_doctor
   load_env_file
-  render_all_configs "$ENV_FILE"
+  render_all_configs
 }
 
 phase_build_doctor() {
@@ -114,7 +112,12 @@ phase_build_doctor() {
 phase_enable() {
   log_info "phase: enable"
   phase_doctor
+  require_command runuser
+  require_command gpg
+  require_command gpgconf
+  require_command pinentry-gtk-2
   load_env_file
+  bootstrap_target_user_gpg_key
   enable_all_services "$ENV_FILE"
   phase_build_doctor
   install_labwc_tweaks

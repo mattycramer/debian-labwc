@@ -2,19 +2,18 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-runtime_env="@RUNTIME_ENV_PATH@"
-repo_env="@REPO_ENV_PATH@"
 state_dir="$HOME/.config/debian-labwc"
 marker_file="$state_dir/.outputs-refined"
-
-[[ -r "$runtime_env" ]] || exit 0
-
-# shellcheck disable=SC1090
-source "$runtime_env"
+internal_output="@INTERNAL_OUTPUT@"
+external_output="@EXTERNAL_OUTPUT@"
+internal_mode="@INTERNAL_MODE@"
+internal_hz="@INTERNAL_HZ@"
+external_mode_default="@EXTERNAL_MODE@"
+external_hz_default="@EXTERNAL_HZ@"
 
 mkdir -p "$state_dir"
 
-[[ -n "${LABWC_EXTERNAL_OUTPUT:-}" ]] || {
+[[ -n "$external_output" ]] || {
   touch "$marker_file"
   exit 0
 }
@@ -22,8 +21,8 @@ mkdir -p "$state_dir"
 current_output=""
 current_mode=""
 current_hz=""
-external_mode="${LABWC_EXTERNAL_MODE:-1920x1080}"
-external_hz="${LABWC_EXTERNAL_HZ:-60}"
+external_mode="${external_mode_default:-1920x1080}"
+external_hz="${external_hz_default:-60}"
 external_120="no"
 
 while IFS= read -r line; do
@@ -31,7 +30,7 @@ while IFS= read -r line; do
     current_output="${line%% *}"
     continue
   fi
-  if [[ "$current_output" != "${LABWC_EXTERNAL_OUTPUT:-}" ]]; then
+  if [[ "$current_output" != "$external_output" ]]; then
     continue
   fi
   if [[ "$line" == *"(preferred"* || "$line" == *"(current"* ]]; then
@@ -50,54 +49,26 @@ if [[ "$external_120" != "yes" && -n "$current_mode" && -n "$current_hz" ]]; the
   external_hz="$current_hz"
 fi
 
-tmp_file="$(dirname "$runtime_env")/.runtime.env.tmp.$$"
-awk \
-  -v ext_mode="$external_mode" \
-  -v ext_hz="$external_hz" \
-  -v ext120="$external_120" \
-  '
-    /^LABWC_EXTERNAL_MODE=/ {$0 = "LABWC_EXTERNAL_MODE=\"" ext_mode "\""}
-    /^LABWC_EXTERNAL_HZ=/ {$0 = "LABWC_EXTERNAL_HZ=\"" ext_hz "\""}
-    /^LABWC_EXTERNAL_120HZ_AVAILABLE=/ {$0 = "LABWC_EXTERNAL_120HZ_AVAILABLE=\"" ext120 "\""}
-    {print}
-  ' "$runtime_env" >"$tmp_file"
-mv -- "$tmp_file" "$runtime_env"
-
-if [[ -w "$repo_env" ]]; then
-  tmp_file="$(dirname "$repo_env")/.repo.env.tmp.$$"
-  awk \
-    -v ext_mode="$external_mode" \
-    -v ext_hz="$external_hz" \
-    -v ext120="$external_120" \
-    '
-      /^LABWC_EXTERNAL_MODE=/ {$0 = "LABWC_EXTERNAL_MODE=\"" ext_mode "\""}
-      /^LABWC_EXTERNAL_HZ=/ {$0 = "LABWC_EXTERNAL_HZ=\"" ext_hz "\""}
-      /^LABWC_EXTERNAL_120HZ_AVAILABLE=/ {$0 = "LABWC_EXTERNAL_120HZ_AVAILABLE=\"" ext120 "\""}
-      {print}
-    ' "$repo_env" >"$tmp_file"
-  mv -- "$tmp_file" "$repo_env"
-fi
-
-if [[ -n "${LABWC_INTERNAL_OUTPUT:-}" ]]; then
+if [[ -n "$internal_output" ]]; then
   cat >"$HOME/.config/kanshi/config" <<EOF
 profile internal {
-  output "$LABWC_INTERNAL_OUTPUT" mode ${LABWC_INTERNAL_MODE}@${LABWC_INTERNAL_HZ}Hz position 0,0 enable
+  output "$internal_output" mode ${internal_mode}@${internal_hz}Hz position 0,0 enable
 }
 
 profile external {
-  output "$LABWC_EXTERNAL_OUTPUT" mode ${external_mode}@${external_hz}Hz position 0,0 enable
-  output "$LABWC_INTERNAL_OUTPUT" disable
+  output "$external_output" mode ${external_mode}@${external_hz}Hz position 0,0 enable
+  output "$internal_output" disable
 }
 
 profile dual {
-  output "$LABWC_EXTERNAL_OUTPUT" mode ${external_mode}@${external_hz}Hz position 0,0 enable
-  output "$LABWC_INTERNAL_OUTPUT" mode ${LABWC_INTERNAL_MODE}@${LABWC_INTERNAL_HZ}Hz position 1920,0 enable
+  output "$external_output" mode ${external_mode}@${external_hz}Hz position 0,0 enable
+  output "$internal_output" mode ${internal_mode}@${internal_hz}Hz position 1920,0 enable
 }
 EOF
 else
   cat >"$HOME/.config/kanshi/config" <<EOF
 profile external {
-  output "$LABWC_EXTERNAL_OUTPUT" mode ${external_mode}@${external_hz}Hz position 0,0 enable
+  output "$external_output" mode ${external_mode}@${external_hz}Hz position 0,0 enable
 }
 EOF
 fi

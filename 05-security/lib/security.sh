@@ -270,7 +270,7 @@ install_latest_libmnl() {
   download_as_security_user "$LIBMNL_URL" "$archive_path"
   run_cmd tar -xjf "$archive_path" -C "$tmpdir"
   (
-    cd "$source_dir"
+    cd "$source_dir" || exit 1
     run_cmd ./configure --prefix=/usr/local
     run_cmd make -j"$(nproc)"
     run_cmd make DESTDIR="$stage_root" install
@@ -297,7 +297,7 @@ install_latest_libnftnl() {
   (
     export PKG_CONFIG_PATH
     PKG_CONFIG_PATH="$(netfilter_pkg_config_path)"
-    cd "$source_dir"
+    cd "$source_dir" || exit 1
     run_cmd ./configure --prefix=/usr/local
     run_cmd make -j"$(nproc)"
     run_cmd make DESTDIR="$stage_root" install
@@ -326,7 +326,7 @@ install_latest_nftables() {
   (
     export PKG_CONFIG_PATH
     PKG_CONFIG_PATH="$(netfilter_pkg_config_path)"
-    cd "$source_dir"
+    cd "$source_dir" || exit 1
     run_cmd ./configure --prefix=/usr/local
     run_cmd make -j"$(nproc)"
     run_cmd make DESTDIR="$stage_root" install
@@ -351,7 +351,7 @@ install_latest_aide() {
   download_as_security_user "$AIDE_URL" "$archive_path"
   run_cmd tar -xzf "$archive_path" -C "$tmpdir"
   (
-    cd "$source_dir"
+    cd "$source_dir" || exit 1
     run_cmd ./configure --prefix=/usr/local
     run_cmd make -j"$(nproc)"
     run_cmd make DESTDIR="$stage_root" install

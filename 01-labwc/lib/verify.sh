@@ -41,7 +41,6 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.config/xfce4/helpers.rc"
   require_file "$LABWC_TARGET_HOME/.config/xdg-desktop-portal/portals.conf"
   require_dir "/usr/local/share/polkit-1/rules.d"
-  require_file "$LABWC_TARGET_HOME/.config/debian-labwc/runtime.env"
   require_file "$LABWC_TARGET_HOME/.config/starship.toml"
   require_file "$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf"
   require_file "$LABWC_TARGET_HOME/.bashrc"
@@ -153,6 +152,7 @@ verify_gpg_agent_semantics() {
   grep -F 'gpgconf --kill gpg-agent' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing gpg-agent kill"
   grep -F 'TimeoutStopSec=10s' "$override_path" >/dev/null || die "gpg-agent override missing reduced stop timeout"
   grep -F 'enable-ssh-support' "$gpg_agent_config" >/dev/null || die "gpg-agent config missing ssh agent support"
+  grep -F 'pinentry-program /usr/bin/pinentry-gtk-2' "$gpg_agent_config" >/dev/null || die "gpg-agent config missing explicit pinentry"
   grep -F 'gpgconf --launch gpg-agent' "$session_wrapper" >/dev/null || die "session wrapper missing gpg-agent launch"
   grep -F 'export SSH_AUTH_SOCK=' "$session_wrapper" >/dev/null || die "session wrapper missing SSH_AUTH_SOCK export"
 }

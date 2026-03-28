@@ -117,7 +117,7 @@ yes_no_flag() {
 }
 
 render_nwg_dock_wrapper() {
-  local no_ws_flag resident_flag output_flag output_clause
+  local no_ws_flag resident_flag output_clause
   resident_flag="$(resident_flags)"
   no_ws_flag="$(yes_no_flag "${NWG_DOCK_NO_WORKSPACE_SWITCHER:-yes}" "-nows")"
   output_clause=""

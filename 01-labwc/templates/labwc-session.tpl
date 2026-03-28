@@ -10,13 +10,13 @@ export XCURSOR_THEME=@XCURSOR_THEME@
 export XCURSOR_SIZE=@XCURSOR_SIZE@
 export LABWC_UPDATE_ACTIVATION_ENV=1
 
-if [[ -r "@RUNTIME_ENV_PATH@" ]]; then
-  # shellcheck disable=SC1090,SC1091
-  source "@RUNTIME_ENV_PATH@"
-fi
-
 if command -v gpgconf >/dev/null 2>&1; then
   gpgconf --launch gpg-agent >/dev/null 2>&1 || true
+  current_tty="$(tty 2>/dev/null || true)"
+  if [[ -n "${current_tty:-}" && "${current_tty}" != "not a tty" ]]; then
+    export GPG_TTY="$current_tty"
+    systemctl --user import-environment GPG_TTY >/dev/null 2>&1 || true
+  fi
   gpg-connect-agent updatestartuptty /bye >/dev/null 2>&1 || true
   ssh_agent_socket="$(gpgconf --list-dirs agent-ssh-socket 2>/dev/null || true)"
   if [[ -n "${ssh_agent_socket:-}" ]]; then

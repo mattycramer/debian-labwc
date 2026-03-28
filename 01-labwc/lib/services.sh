@@ -67,7 +67,6 @@ render_template_to_file() {
     -e "s|@TARGET_HOME@|$LABWC_TARGET_HOME|g" \
     -e "s|@XCURSOR_THEME@|$LABWC_XCURSOR_THEME|g" \
     -e "s|@XCURSOR_SIZE@|$LABWC_XCURSOR_SIZE|g" \
-    -e "s|@RUNTIME_ENV_PATH@|$LABWC_TARGET_HOME/.config/debian-labwc/runtime.env|g" \
     -e "s|@SESSION_WRAPPER@|/usr/local/bin/debian-labwc-session|g" \
     "$template_path" >"$destination"
   run_cmd chmod "$mode" "$destination"
@@ -79,10 +78,28 @@ install_helper_script() {
   run_cmd install -D -m 0755 /dev/null "$destination"
   sed \
     -e "s|@TARGET_HOME@|$LABWC_TARGET_HOME|g" \
-    -e "s|@RUNTIME_ENV_PATH@|$LABWC_TARGET_HOME/.config/debian-labwc/runtime.env|g" \
-    -e "s|@REPO_ENV_PATH@|$SCRIPT_DIR/.env|g" \
+    -e "s|@INTERNAL_OUTPUT@|${LABWC_INTERNAL_OUTPUT}|g" \
+    -e "s|@EXTERNAL_OUTPUT@|${LABWC_EXTERNAL_OUTPUT}|g" \
+    -e "s|@INTERNAL_MODE@|${LABWC_INTERNAL_MODE}|g" \
+    -e "s|@EXTERNAL_MODE@|${LABWC_EXTERNAL_MODE}|g" \
+    -e "s|@INTERNAL_HZ@|${LABWC_INTERNAL_HZ}|g" \
+    -e "s|@EXTERNAL_HZ@|${LABWC_EXTERNAL_HZ}|g" \
     "$source_path" >"$destination"
   run_cmd chmod 0755 "$destination"
+}
+
+bootstrap_target_user_gpg_key() {
+  run_cmd env \
+    HOME="$LABWC_TARGET_HOME" \
+    USER="$LABWC_TARGET_USER" \
+    LOGNAME="$LABWC_TARGET_USER" \
+    GNUPGHOME="$LABWC_TARGET_HOME/.gnupg" \
+    KWALLET_SESSION_GPG_PASSWD="${KWALLET_SESSION_GPG_PASSWD:-}" \
+    LABWC_TARGET_USER="$LABWC_TARGET_USER" \
+    LABWC_GPG_KEY_REALNAME="${LABWC_GPG_KEY_REALNAME:-}" \
+    LABWC_GPG_KEY_EMAIL="${LABWC_GPG_KEY_EMAIL:-}" \
+    LABWC_GPG_KEY_EXPIRE="${LABWC_GPG_KEY_EXPIRE:-2y}" \
+    runuser -u "$LABWC_TARGET_USER" -- bash "$SCRIPT_DIR/bin/ensure-gpg-key.sh"
 }
 
 install_root_files() {

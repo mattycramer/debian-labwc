@@ -26,12 +26,6 @@ render_user_script() {
   run_cmd chmod 0755 "$destination"
 }
 
-render_runtime_env() {
-  local runtime_dir="$LABWC_TARGET_HOME/.config/debian-labwc"
-  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$runtime_dir"
-  run_cmd install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$1" "$runtime_dir/runtime.env"
-}
-
 render_labwc_environment() {
   local environment_file
   environment_file="$(cat <<EOF
@@ -386,7 +380,7 @@ render_gpg_agent_override() {
 }
 
 render_gpg_agent_config() {
-  render_user_private_file "$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf" $'enable-ssh-support\ndefault-cache-ttl 1800\nmax-cache-ttl 7200\n'
+  render_user_private_file "$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf" $'enable-ssh-support\npinentry-program /usr/bin/pinentry-gtk-2\ndefault-cache-ttl 1800\nmax-cache-ttl 7200\n'
 }
 
 render_waybar_config() {
@@ -731,7 +725,6 @@ install_wallpaper() {
 }
 
 render_all_configs() {
-  local env_file="$1"
   local config_root="$LABWC_TARGET_HOME/.config"
   ensure_user_base_dirs
   run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
@@ -751,7 +744,6 @@ render_all_configs() {
     "$config_root"
   run_cmd install -d -m 0700 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.gnupg"
 
-  render_runtime_env "$env_file"
   render_home_dirs
   render_shell_startup_files
   render_xfce_helpers
