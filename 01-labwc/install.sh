@@ -74,6 +74,8 @@ phase_doctor() {
   require_command lspci
   require_command getent
   require_command awk
+  require_command groupadd
+  require_command useradd
 }
 
 phase_detect() {
@@ -89,6 +91,7 @@ phase_packages() {
   load_env_file
   apt_update
   install_requested_packages
+  ensure_polkitd_service_account
 }
 
 phase_render() {

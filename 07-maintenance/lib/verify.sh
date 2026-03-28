@@ -29,14 +29,10 @@ verify_paths() {
 
 verify_detection() {
   [[ "$MAINTENANCE_BTRFS_PARTITION_COUNT" =~ ^[1-9][0-9]*$ ]] || die "expected one or more Btrfs partitions, found '${MAINTENANCE_BTRFS_PARTITION_COUNT}'"
-  [[ "$MAINTENANCE_BTRFS_DEVICE_COUNT" =~ ^[1-9][0-9]*$ ]] || die "expected one or more mounted Btrfs block devices, found '${MAINTENANCE_BTRFS_DEVICE_COUNT}'"
+  [[ "$MAINTENANCE_BTRFS_DEVICE_COUNT" =~ ^[1-9][0-9]*$ ]] || die "expected one or more mounted Btrfs sources, found '${MAINTENANCE_BTRFS_DEVICE_COUNT}'"
   [[ -n "$MAINTENANCE_ROOT_BTRFS_SOURCE" ]] || die "missing detected root Btrfs source"
   [[ -n "$MAINTENANCE_ROOT_BTRFS_UUID" ]] || die "missing detected root Btrfs UUID"
   [[ -n "$MAINTENANCE_ROOT_BTRFS_KERNEL_FLAGS" ]] || die "missing derived root Btrfs kernel flags"
-  printf '%s\n' "$MAINTENANCE_BTRFS_PARTITION_LIST" | grep -F "$MAINTENANCE_ROOT_BTRFS_SOURCE" >/dev/null || die "root Btrfs source is not in the detected partition list"
-  if [[ -n "$MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST" ]]; then
-    log_warn "root-UUID-matching Btrfs partition(s) are currently unmounted and will be skipped until mounted: ${MAINTENANCE_UNMOUNTED_BTRFS_PARTITION_LIST}"
-  fi
 }
 
 verify_timeshift_config() {

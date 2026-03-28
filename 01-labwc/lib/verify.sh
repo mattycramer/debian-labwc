@@ -80,6 +80,11 @@ verify_greeter_user() {
   getent passwd greeter >/dev/null 2>&1 || die "greeter user is missing"
 }
 
+verify_polkitd_user() {
+  getent group polkitd >/dev/null 2>&1 || die "polkitd group is missing"
+  getent passwd polkitd >/dev/null 2>&1 || die "polkitd user is missing"
+}
+
 verify_labwc_config_semantics() {
   local rc_path="$LABWC_TARGET_HOME/.config/labwc/rc.xml"
   grep -F '<action name="NextWindow" />' "$rc_path" >/dev/null || die "rc.xml missing explicit Alt+Tab next window action"
@@ -165,6 +170,7 @@ verify_install() {
   verify_user_unit_enabled wireplumber.service
   verify_services_enabled
   verify_greeter_user
+  verify_polkitd_user
   verify_ownership
   verify_greetd_semantics
   verify_labwc_config_semantics

@@ -12,6 +12,23 @@ ensure_greeter_user() {
     greeter
 }
 
+ensure_polkitd_service_account() {
+  if ! getent group polkitd >/dev/null 2>&1; then
+    run_cmd groupadd --system polkitd
+  fi
+  if getent passwd polkitd >/dev/null 2>&1; then
+    return 0
+  fi
+  run_cmd useradd \
+    --system \
+    --gid polkitd \
+    --home-dir / \
+    --no-create-home \
+    --shell /usr/sbin/nologin \
+    --comment "User for polkitd" \
+    polkitd
+}
+
 ensure_greeter_runtime_dirs() {
   run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter
   run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.cache
