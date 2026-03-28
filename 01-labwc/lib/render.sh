@@ -369,7 +369,7 @@ render_waybar_config() {
   "position": "top",
   "height": 42,
   "spacing": 6,
-  "modules-left": ["custom/launcher", "ext/workspaces", "wlr/taskbar"],
+  "modules-left": ["custom/launcher"],
   "modules-center": ["clock"],
   "modules-right": ["network", "pulseaudio", "battery", "backlight", "cpu", "memory", "disk", "custom/player", "tray", "custom/power"],
   "custom/launcher": {
@@ -377,16 +377,6 @@ render_waybar_config() {
     "tooltip": false,
     "on-click": "/usr/local/bin/debian-labwc-launcher-menu",
     "on-click-right": "wofi --show drun"
-  },
-  "ext/workspaces": {
-    "format": "{name}",
-    "sort-by-number": true,
-    "on-click": "activate"
-  },
-  "wlr/taskbar": {
-    "format": "{app_id}",
-    "tooltip-format": "{title}",
-    "on-click": "minimize-raise"
   },
   "clock": {
     "interval": 30,
@@ -517,36 +507,6 @@ window#waybar {
   background: rgba(10, 14, 20, 0.84);
   color: #edf2f7;
   border-bottom: 1px solid rgba(173, 181, 189, 0.16);
-}
-
-#workspaces {
-  margin: 5px 0;
-  padding: 0 4px;
-  border-radius: 14px;
-  background: rgba(25, 32, 44, 0.74);
-  border: 1px solid rgba(88, 101, 119, 0.25);
-}
-
-#workspaces button {
-  color: #d7dde6;
-  padding: 0 12px;
-  margin: 4px 2px;
-  border-radius: 10px;
-  background: transparent;
-}
-
-#workspaces button:hover {
-  background: rgba(92, 165, 219, 0.18);
-  color: #ffffff;
-}
-
-#workspaces button.active {
-  background: linear-gradient(180deg, rgba(109, 196, 237, 0.92), rgba(71, 167, 214, 0.92));
-  color: #09121b;
-}
-
-#taskbar {
-  margin: 5px 0 5px 8px;
 }
 
 #custom-launcher,

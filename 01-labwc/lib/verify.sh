@@ -114,7 +114,8 @@ verify_greetd_semantics() {
 verify_waybar_config_semantics() {
   local waybar_path="$LABWC_TARGET_HOME/.config/waybar/config.jsonc"
   grep -F '"custom/launcher"' "$waybar_path" >/dev/null || die "waybar config missing launcher module"
-  grep -F '"ext/workspaces"' "$waybar_path" >/dev/null || die "waybar config missing labwc-compatible ext/workspaces module"
+  ! grep -F '"ext/workspaces"' "$waybar_path" >/dev/null || die "waybar config still references unsupported ext/workspaces"
+  ! grep -F '"wlr/taskbar"' "$waybar_path" >/dev/null || die "waybar config still references unsupported wlr/taskbar"
   ! grep -F '"wlr/workspaces"' "$waybar_path" >/dev/null || die "waybar config still references unsupported wlr/workspaces"
   grep -F '"height": 42' "$waybar_path" >/dev/null || die "waybar config height is not set high enough for the configured modules"
   grep -F '"disk"' "$waybar_path" >/dev/null || die "waybar config missing disk module"

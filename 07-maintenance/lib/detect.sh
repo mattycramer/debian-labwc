@@ -86,11 +86,15 @@ detect_btrfs_layout() {
   fi
   [[ -n "$uuid" ]] || die "could not determine UUID for root Btrfs device '$root_source'"
 
-  while read -r device mountpoint; do
+  while read -r device; do
     [[ -n "$device" ]] || continue
     devices+=("$device")
+  done < <(findmnt -rn -t btrfs -o SOURCE --nofsroot | strip_findmnt_fsroot | sort -u)
+
+  while read -r mountpoint; do
+    [[ -n "$mountpoint" ]] || continue
     mountpoints+=("$mountpoint")
-  done < <(findmnt -rn -t btrfs -o SOURCE,TARGET --nofsroot | strip_findmnt_fsroot | sort -u)
+  done < <(findmnt -rn -t btrfs -o TARGET --nofsroot | sort -u)
 
   ((${#devices[@]} > 0)) || die "no mounted Btrfs sources were detected"
 

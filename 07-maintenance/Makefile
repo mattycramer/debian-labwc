@@ -6,7 +6,7 @@ help:
 	@printf '%s\n' \
 	  '07-maintenance targets:' \
 	  '  doctor      Validate host prerequisites for Btrfs maintenance and GRUB snapshot wiring' \
-	  '  detect      Detect the root Btrfs filesystem and all mounted Btrfs block devices into .env' \
+	  '  detect      Detect the root Btrfs filesystem, mounted Btrfs sources, and Btrfs mountpoints into .env' \
 	  '  install     Run doctor, detect, package install, render, enable, and verify' \
 	  '  packages    Install the required maintenance packages' \
 	  '  render      Render Timeshift, grub-btrfs, and btrfsmaintenance configuration' \
