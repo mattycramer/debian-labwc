@@ -5,6 +5,7 @@ readonly BACKPORTS_PACKAGES=(
   labwc
   kanshi
   waybar
+  gsimplecal
   wofi
   mako-notifier
   wlr-randr
@@ -25,6 +26,7 @@ readonly BACKPORTS_PACKAGES=(
   pipewire
   pipewire-audio
   pipewire-pulse
+  libspa-0.2-libcamera
   wireplumber
   rtkit
   dbus-user-session
@@ -62,6 +64,8 @@ readonly BACKPORTS_PACKAGES=(
   fonts-font-awesome
   fonts-noto
   fonts-noto-core
+  nwg-look
+  papirus-icon-them
   zsh
   zsh-autosuggestions
   starship

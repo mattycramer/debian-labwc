@@ -4,6 +4,15 @@ package_is_installed() {
   dpkg-query -W -f='${Status}\n' "$1" 2>/dev/null | grep -F "install ok installed" >/dev/null
 }
 
+expected_primary_wallpaper_path() {
+  local wallpaper_source_path=""
+  wallpaper_source_path="$(
+    find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f | sort | head -n 1
+  )"
+  [[ -n "$wallpaper_source_path" ]] || die "missing wallpaper asset under '$SCRIPT_DIR/wallpaper'"
+  printf '%s/.local/share/debian-labwc/%s\n' "$LABWC_TARGET_HOME" "$(basename "$wallpaper_source_path")"
+}
+
 verify_packages() {
   local pkg
   local -a package_list=()
@@ -49,7 +58,7 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.zshrc"
   require_file "$LABWC_TARGET_HOME/.zprofile"
   require_file "$LABWC_TARGET_HOME/.config/systemd/user/gpg-agent.service.d/override.conf"
-  require_file "$LABWC_TARGET_HOME/.local/share/debian-labwc/labwall2-1920x1080.png"
+  require_file "$(expected_primary_wallpaper_path)"
   require_dir "$LABWC_TARGET_HOME/Music"
   require_dir "$LABWC_TARGET_HOME/Videos"
   require_dir "$LABWC_TARGET_HOME/Documents"
@@ -71,6 +80,7 @@ verify_services_enabled() {
   systemctl is-enabled greetd.service >/dev/null 2>&1 || die "greetd.service is not enabled"
   systemctl is-enabled seatd.service >/dev/null 2>&1 || die "seatd.service is not enabled"
   systemctl is-enabled NetworkManager.service >/dev/null 2>&1 || die "NetworkManager.service is not enabled"
+  systemctl is-enabled upower.service >/dev/null 2>&1 || die "upower.service is not enabled"
 }
 
 verify_ownership() {
@@ -94,6 +104,7 @@ verify_polkit_semantics() {
   grep -F 'lxpolkit &' "$autostart_path" >/dev/null || die "labwc autostart missing lxpolkit auth agent"
   grep -F 'debian-labwc-unlock-gpg-key' "$autostart_path" >/dev/null || die "labwc autostart missing proactive GPG unlock helper"
   grep -F 'systemctl --user import-environment' "$autostart_path" >/dev/null || die "labwc autostart missing systemd user environment import"
+  grep -F 'dbus-update-activation-environment --systemd "$@"' "$autostart_path" >/dev/null || die "labwc autostart missing D-Bus activation environment updates"
   ! grep -F 'is-active dbus.service' "$autostart_path" >/dev/null || die "labwc autostart still waits on dbus.service instead of the session bus socket"
 }
 
@@ -124,6 +135,7 @@ verify_greetd_semantics() {
   grep -F 'export PASSWORD_STORE=kwallet6' "$session_wrapper" >/dev/null || die "session wrapper missing default KWallet password-store export"
   grep -F 'export ELECTRON_OZONE_PLATFORM_HINT=wayland' "$session_wrapper" >/dev/null || die "session wrapper missing Electron Wayland hint"
   grep -F 'export QT_QPA_PLATFORM=wayland' "$session_wrapper" >/dev/null || die "session wrapper missing Qt Wayland platform export"
+  grep -F 'dbus-update-activation-environment --systemd "$@"' "$session_wrapper" >/dev/null || die "session wrapper missing D-Bus activation environment updates"
 }
 
 verify_waybar_config_semantics() {
@@ -138,6 +150,9 @@ verify_waybar_config_semantics() {
   grep -F '"/usr/local/bin/debian-labwc-module-menu network menu"' "$waybar_path" >/dev/null || die "waybar config missing network right-click menu"
   grep -F '"/usr/local/bin/debian-labwc-module-menu storage menu"' "$waybar_path" >/dev/null || die "waybar config missing storage right-click menu"
   grep -F '"/usr/local/bin/debian-labwc-player-status"' "$waybar_path" >/dev/null || die "waybar config missing player status helper"
+  grep -F '"tooltip-format": "<tt><small>{calendar}</small></tt>"' "$waybar_path" >/dev/null || die "waybar clock tooltip is not configured to show the calendar"
+  grep -F '"on-click": "gsimplecal"' "$waybar_path" >/dev/null || die "waybar clock is not configured to launch gsimplecal on click"
+  grep -F '"calendar": {' "$waybar_path" >/dev/null || die "waybar clock calendar block is missing"
 }
 
 verify_thunar_terminal_semantics() {
@@ -146,6 +161,14 @@ verify_thunar_terminal_semantics() {
 
 verify_labwc_tweaks_semantics() {
   grep -F 'Exec=labwc-tweaks' /usr/share/applications/labwc_tweaks.desktop >/dev/null || die "labwc-tweaks desktop file missing expected Exec"
+}
+
+verify_swaylock_semantics() {
+  local swaylock_path="$LABWC_TARGET_HOME/.config/swaylock/config"
+  local wallpaper_path
+  wallpaper_path="$(expected_primary_wallpaper_path)"
+  grep -F "image=${wallpaper_path}" "$swaylock_path" >/dev/null || die "swaylock config is not using the installed wallpaper asset"
+  grep -F "scaling=${LABWC_WALLPAPER_MODE}" "$swaylock_path" >/dev/null || die "swaylock config is not using the configured wallpaper mode"
 }
 
 verify_gpg_agent_semantics() {
@@ -207,6 +230,7 @@ verify_install() {
   verify_waybar_config_semantics
   verify_thunar_terminal_semantics
   verify_labwc_tweaks_semantics
+  verify_swaylock_semantics
   verify_gpg_agent_semantics
   verify_shell_config_semantics
   log_info "verification completed"

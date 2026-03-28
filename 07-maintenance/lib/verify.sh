@@ -13,6 +13,8 @@ verify_packages() {
 
 verify_paths() {
   require_file "$TIMESHIFT_CONFIG_PATH"
+  require_file "$TIMESHIFT_WRAPPER_PATH"
+  require_file "$TIMESHIFT_LEGACY_LAUNCHER_PATH"
   require_file "$TIMESHIFT_DESKTOP_OVERRIDE_PATH"
   require_file "$GRUB_BTRFS_CONFIG_PATH"
   require_file "$GRUB_BTRFS_SCRIPT_PATH"
@@ -46,7 +48,9 @@ verify_timeshift_config() {
   grep -F "\"count_weekly\" : \"${TIMESHIFT_COUNT_WEEKLY}\"" "$TIMESHIFT_CONFIG_PATH" >/dev/null || die "Timeshift config missing weekly retention cap"
   grep -F "\"count_monthly\" : \"${TIMESHIFT_COUNT_MONTHLY}\"" "$TIMESHIFT_CONFIG_PATH" >/dev/null || die "Timeshift config missing monthly retention cap"
   [[ ! -f "$TIMESHIFT_DESKTOP_SOURCE_PATH" ]] || die "packaged Timeshift desktop entry should be removed in favor of the managed override"
-  grep -F 'Exec=/usr/bin/timeshift-gtk' "$TIMESHIFT_DESKTOP_OVERRIDE_PATH" >/dev/null || die "managed Timeshift desktop override is not pointing directly at timeshift-gtk"
+  grep -F 'Exec=/usr/local/bin/timeshift-gtk' "$TIMESHIFT_DESKTOP_OVERRIDE_PATH" >/dev/null || die "managed Timeshift desktop override is not pointing at the privileged launcher"
+  grep -F 'exec pkexec env "${env_args[@]}" /usr/bin/timeshift-gtk "$@"' "$TIMESHIFT_WRAPPER_PATH" >/dev/null || die "Timeshift wrapper is not launching timeshift-gtk through pkexec"
+  [[ "$(readlink -f "$TIMESHIFT_LEGACY_LAUNCHER_PATH")" == "$TIMESHIFT_WRAPPER_PATH" ]] || die "legacy Timeshift launcher does not resolve to the managed wrapper"
   desktop-file-validate "$TIMESHIFT_DESKTOP_OVERRIDE_PATH"
 }
 

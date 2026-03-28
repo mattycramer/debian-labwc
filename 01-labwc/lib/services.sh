@@ -206,6 +206,7 @@ enable_system_services_only() {
   run_cmd systemctl enable greetd.service
   run_cmd systemctl enable seatd.service
   run_cmd systemctl enable NetworkManager.service
+  run_cmd systemctl enable upower.service
 }
 
 enable_all_services() {

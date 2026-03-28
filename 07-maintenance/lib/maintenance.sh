@@ -136,7 +136,7 @@ render_timeshift_desktop_override() {
   content="$(cat <<'EOF'
 [Desktop Entry]
 Name=Timeshift
-Exec=/usr/bin/timeshift-gtk
+Exec=/usr/local/bin/timeshift-gtk
 Type=Application
 GenericName=System Restore Utility
 Terminal=false
@@ -154,6 +154,41 @@ EOF
   if command -v update-desktop-database >/dev/null 2>&1; then
     run_cmd update-desktop-database "$TIMESHIFT_DESKTOP_OVERRIDE_DIR"
   fi
+}
+
+render_timeshift_wrapper() {
+  local content
+  content="$(cat <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+if [[ "$(id -u)" -eq 0 ]]; then
+  exec /usr/bin/timeshift-gtk "$@"
+fi
+
+command -v pkexec >/dev/null 2>&1 || {
+  printf '%s\n' 'pkexec is required to launch Timeshift with administrative privileges.' >&2
+  exit 1
+}
+
+env_args=(
+  "DISPLAY=${DISPLAY:-}"
+  "WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}"
+  "XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-}"
+  "XAUTHORITY=${XAUTHORITY:-}"
+  "DBUS_SESSION_BUS_ADDRESS=${DBUS_SESSION_BUS_ADDRESS:-}"
+  "XDG_SESSION_TYPE=${XDG_SESSION_TYPE:-}"
+  "XDG_CURRENT_DESKTOP=${XDG_CURRENT_DESKTOP:-}"
+  "XDG_SESSION_DESKTOP=${XDG_SESSION_DESKTOP:-}"
+  "DESKTOP_SESSION=${DESKTOP_SESSION:-}"
+)
+
+exec pkexec env "${env_args[@]}" /usr/bin/timeshift-gtk "$@"
+EOF
+)"
+  write_root_file "$TIMESHIFT_WRAPPER_PATH" 0755 "$content"
+  run_cmd ln -sfn "$TIMESHIFT_WRAPPER_PATH" "$TIMESHIFT_LEGACY_LAUNCHER_PATH"
 }
 
 render_btrfsmaintenance_config() {
@@ -259,6 +294,7 @@ EOF
 render_all_configs() {
   run_cmd rm -f -- "$TIMESHIFT_WRAPPER_PATH" "$TIMESHIFT_LEGACY_LAUNCHER_PATH"
   render_timeshift_config
+  render_timeshift_wrapper
   render_timeshift_desktop_override
   render_btrfsmaintenance_config
   render_grub_btrfs_config

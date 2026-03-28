@@ -36,6 +36,21 @@ EOF
   render_user_file "$LABWC_TARGET_HOME/.config/labwc/environment" "$environment_file"
 }
 
+primary_wallpaper_source_path() {
+  local wallpaper_path=""
+  wallpaper_path="$(
+    find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f | sort | head -n 1
+  )"
+  [[ -n "$wallpaper_path" ]] || die "missing wallpaper asset under '$SCRIPT_DIR/wallpaper'"
+  printf '%s\n' "$wallpaper_path"
+}
+
+primary_wallpaper_target_path() {
+  local wallpaper_source_path
+  wallpaper_source_path="$(primary_wallpaper_source_path)"
+  printf '%s/.local/share/debian-labwc/%s\n' "$LABWC_TARGET_HOME" "$(basename "$wallpaper_source_path")"
+}
+
 ensure_user_base_dirs() {
   run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
     "$LABWC_TARGET_HOME/.config" \
@@ -286,8 +301,9 @@ EOF
 }
 
 render_labwc_autostart() {
-  local wallpaper_path="$LABWC_TARGET_HOME/.local/share/debian-labwc/labwall2-1920x1080.png"
+  local wallpaper_path
   local autostart
+  wallpaper_path="$(primary_wallpaper_target_path)"
   autostart="$(cat <<EOF
 #!/bin/sh
 set -eu
@@ -309,20 +325,37 @@ wait_for_session_bus() {
   return 1
 }
 
+update_activation_environment() {
+  if [ "\${LABWC_UPDATE_ACTIVATION_ENV:-0}" != "1" ]; then
+    return 0
+  fi
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl --user import-environment "\$@" >/dev/null 2>&1 || true
+  fi
+  if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+    dbus-update-activation-environment --systemd "\$@" >/dev/null 2>&1 || true
+  fi
+}
+
 pgrep -x foot >/dev/null 2>&1 || foot --server &
 pgrep -x swaybg >/dev/null 2>&1 || swaybg -i "$wallpaper_path" -m "${LABWC_WALLPAPER_MODE}" &
 
 wait_for_session_bus || true
-if command -v systemctl >/dev/null 2>&1; then
-  systemctl --user import-environment \
-    WAYLAND_DISPLAY \
-    XDG_CURRENT_DESKTOP \
-    XDG_SESSION_TYPE \
-    XDG_SESSION_DESKTOP \
-    DESKTOP_SESSION \
-    GPG_TTY \
-    SSH_AUTH_SOCK >/dev/null 2>&1 || true
-fi
+update_activation_environment \
+  DISPLAY \
+  WAYLAND_DISPLAY \
+  XDG_CURRENT_DESKTOP \
+  XDG_SESSION_TYPE \
+  XDG_SESSION_DESKTOP \
+  DESKTOP_SESSION \
+  XCURSOR_THEME \
+  XCURSOR_SIZE \
+  GPG_TTY \
+  SSH_AUTH_SOCK \
+  PASSWORD_STORE \
+  ELECTRON_OZONE_PLATFORM_HINT \
+  QT_QPA_PLATFORM \
+  QT_WAYLAND_DISABLE_WINDOWDECORATION
 
 pgrep -x lxpolkit >/dev/null 2>&1 || lxpolkit &
 pgrep -x waybar >/dev/null 2>&1 || waybar &
@@ -428,7 +461,25 @@ render_waybar_config() {
     "interval": 30,
     "format": "{:%a %b %d  %H:%M}",
     "format-alt": "{:%Y-%m-%d  %H:%M:%S}",
-    "tooltip-format": "<tt>{:%A %Y-%m-%d\nWeek %V  %Z}</tt>"
+    "tooltip": true,
+    "tooltip-format": "<tt><small>{calendar}</small></tt>",
+    "calendar": {
+      "mode": "month",
+      "weeks-pos": "right",
+      "on-scroll": 1,
+      "format": {
+        "months": "<span color='#f6bd60'><b>{}</b></span>",
+        "weekdays": "<span color='#8ecae6'><b>{}</b></span>",
+        "weeks": "<span color='#94d2bd'><b>W{}</b></span>",
+        "today": "<span color='#ffb4a2'><b><u>{}</u></b></span>"
+      }
+    },
+    "actions": {
+      "on-click-right": "mode",
+      "on-scroll-up": "shift_up",
+      "on-scroll-down": "shift_down"
+    },
+    "on-click": "gsimplecal"
   },
   "tray": {
     "spacing": 8
@@ -728,7 +779,20 @@ render_mako() {
 }
 
 render_swaylock() {
-  render_user_file "$LABWC_TARGET_HOME/.config/swaylock/config" $'daemonize\nclock\nfont=Noto Sans\nindicator\ncolor=111111\ninside-color=202020\nring-color=4a89dc\nline-color=111111\nkey-hl-color=88c0d0\n'
+  local wallpaper_path
+  wallpaper_path="$(primary_wallpaper_target_path)"
+  render_user_file "$LABWC_TARGET_HOME/.config/swaylock/config" "daemonize
+clock
+font=Noto Sans
+indicator
+image=${wallpaper_path}
+scaling=${LABWC_WALLPAPER_MODE}
+color=111111
+inside-color=202020
+ring-color=4a89dc
+line-color=111111
+key-hl-color=88c0d0
+"
 }
 
 render_foot() {
@@ -744,8 +808,14 @@ render_portals() {
 }
 
 install_wallpaper() {
+  local wallpaper_source_path wallpaper_name
   run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.local/share/debian-labwc"
-  run_cmd install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$SCRIPT_DIR/wallpaper/labwall2-1920x1080.png" "$LABWC_TARGET_HOME/.local/share/debian-labwc/labwall2-1920x1080.png"
+  while IFS= read -r wallpaper_source_path; do
+    [[ -n "$wallpaper_source_path" ]] || continue
+    wallpaper_name="$(basename "$wallpaper_source_path")"
+    run_cmd install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$wallpaper_source_path" "$LABWC_TARGET_HOME/.local/share/debian-labwc/$wallpaper_name"
+  done < <(find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f | sort)
+  require_file "$(primary_wallpaper_target_path)"
 }
 
 render_all_configs() {
