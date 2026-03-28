@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 readonly POLKIT_TMPFILES_PATH="/etc/tmpfiles.d/debian-labwc-polkit.conf"
+readonly UDISKS2_DROPIN_DIR="/etc/systemd/system/udisks2.service.d"
+readonly UDISKS2_DROPIN_PATH="${UDISKS2_DROPIN_DIR}/10-polkit.conf"
 
 ensure_greeter_user() {
   if getent passwd greeter >/dev/null 2>&1; then
@@ -39,6 +41,19 @@ d /run/polkit-1/rules.d 0755 root root -
 EOF
   run_cmd chmod 0644 "$POLKIT_TMPFILES_PATH"
   run_cmd systemd-tmpfiles --create "$POLKIT_TMPFILES_PATH"
+}
+
+install_udisks2_polkit_dropin() {
+  local content
+  content="$(cat <<'EOF'
+[Unit]
+Wants=polkit.service
+After=polkit.service dbus.service
+EOF
+)"
+  run_cmd install -d -m 0755 "$UDISKS2_DROPIN_DIR"
+  printf '%s' "$content" >"$UDISKS2_DROPIN_PATH"
+  run_cmd chmod 0644 "$UDISKS2_DROPIN_PATH"
 }
 
 ensure_greeter_runtime_dirs() {
@@ -114,6 +129,7 @@ install_root_files() {
   ensure_greeter_user
   ensure_greeter_runtime_dirs
   install_polkit_runtime_layout
+  install_udisks2_polkit_dropin
   render_template_to_file "$SCRIPT_DIR/templates/greetd-config.toml.tpl" "/etc/greetd/config.toml" 0644
   render_template_to_file "$SCRIPT_DIR/templates/greetd-vt.conf.tpl" "/etc/systemd/system/greetd.service.d/10-vt.conf" 0644
   render_template_to_file "$SCRIPT_DIR/templates/labwc.desktop.tpl" "/usr/share/wayland-sessions/labwc.desktop" 0644
@@ -206,7 +222,9 @@ enable_system_services_only() {
   run_cmd systemctl enable greetd.service
   run_cmd systemctl enable seatd.service
   run_cmd systemctl enable NetworkManager.service
+  run_cmd systemctl enable udisks2.service
   run_cmd systemctl enable upower.service
+  run_cmd systemctl start polkit.service
 }
 
 enable_all_services() {
@@ -242,6 +260,8 @@ nuke_all_state() {
   remove_if_present "$LABWC_TARGET_HOME/.config/foot"
   remove_if_present "$LABWC_TARGET_HOME/.config/gammastep"
   remove_if_present "$LABWC_TARGET_HOME/.config/xdg-desktop-portal"
+  remove_if_present "$LABWC_TARGET_HOME/.config/systemd/user/xdg-desktop-portal.service.d"
+  remove_if_present "$LABWC_TARGET_HOME/.config/systemd/user/xdg-desktop-portal-wlr.service.d"
   remove_if_present "$LABWC_TARGET_HOME/.config/debian-labwc"
   remove_if_present "$LABWC_TARGET_HOME/.config/starship.toml"
   remove_if_present "$LABWC_TARGET_HOME/.local/share/debian-labwc"
@@ -249,6 +269,7 @@ nuke_all_state() {
   remove_if_present "$LABWC_TARGET_HOME/.profile"
   remove_if_present "$LABWC_TARGET_HOME/.zshrc"
   remove_if_present "$LABWC_TARGET_HOME/.zprofile"
+  remove_if_present "$LABWC_TARGET_HOME/.nanorc"
 
   log_info "removing installed helper scripts and session files"
   remove_if_present "/usr/local/bin/debian-labwc-session"
@@ -265,9 +286,11 @@ nuke_all_state() {
   remove_if_present "/usr/share/wayland-sessions/labwc.desktop"
   remove_if_present "/usr/local/share/polkit-1/rules.d"
   remove_if_present "$POLKIT_TMPFILES_PATH"
+  remove_if_present "$UDISKS2_DROPIN_PATH"
   remove_if_present "/etc/greetd/config.toml"
   remove_if_present "/etc/systemd/system/greetd.service.d/10-vt.conf"
   rmdir --ignore-fail-on-non-empty "/etc/systemd/system/greetd.service.d" >/dev/null 2>&1 || true
+  rmdir --ignore-fail-on-non-empty "$UDISKS2_DROPIN_DIR" >/dev/null 2>&1 || true
   rmdir --ignore-fail-on-non-empty "/usr/local/share/polkit-1" >/dev/null 2>&1 || true
   remove_if_present "/run/polkit-1/rules.d"
   rmdir --ignore-fail-on-non-empty "/run/polkit-1" >/dev/null 2>&1 || true

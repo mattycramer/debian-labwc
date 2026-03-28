@@ -447,6 +447,8 @@ fi
 
 if command -v systemctl >/dev/null 2>&1; then
   systemctl --user stop \
+    xdg-desktop-portal.service \
+    xdg-desktop-portal-wlr.service \
     wireplumber.service \
     pipewire-pulse.service \
     pipewire.service \
@@ -460,6 +462,11 @@ EOF
 
 render_gpg_agent_override() {
   render_user_file "$LABWC_TARGET_HOME/.config/systemd/user/gpg-agent.service.d/override.conf" $'[Service]\nTimeoutStopSec=10s\n'
+}
+
+render_portal_unit_overrides() {
+  render_user_file "$LABWC_TARGET_HOME/.config/systemd/user/xdg-desktop-portal.service.d/override.conf" $'[Unit]\nWants=pipewire.service wireplumber.service xdg-desktop-portal-wlr.service\nAfter=pipewire.service wireplumber.service xdg-desktop-portal-wlr.service\n'
+  render_user_file "$LABWC_TARGET_HOME/.config/systemd/user/xdg-desktop-portal-wlr.service.d/override.conf" $'[Unit]\nWants=pipewire.service wireplumber.service\nAfter=pipewire.service wireplumber.service\nBindsTo=pipewire.service\n'
 }
 
 render_gpg_agent_config() {
@@ -868,6 +875,8 @@ render_all_configs() {
     "$config_root/xdg-desktop-portal" \
     "$config_root/debian-labwc" \
     "$config_root/systemd/user/gpg-agent.service.d" \
+    "$config_root/systemd/user/xdg-desktop-portal.service.d" \
+    "$config_root/systemd/user/xdg-desktop-portal-wlr.service.d" \
     "$config_root/systemd/user" \
     "$config_root"
   run_cmd install -d -m 0700 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.gnupg"
@@ -883,6 +892,7 @@ render_all_configs() {
   render_labwc_shutdown
   render_gpg_agent_override
   render_gpg_agent_config
+  render_portal_unit_overrides
   render_waybar_config
   render_waybar_style
   render_kanshi_config

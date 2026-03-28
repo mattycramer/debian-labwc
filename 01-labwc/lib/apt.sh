@@ -66,7 +66,7 @@ readonly BACKPORTS_PACKAGES=(
   fonts-noto
   fonts-noto-core
   nwg-look
-  papirus-icon-them
+  papirus-icon-theme
   zsh
   zsh-autosuggestions
   starship
