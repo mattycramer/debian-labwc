@@ -79,11 +79,18 @@ render_home_dirs() {
 }
 
 render_shell_startup_files() {
-  local bashrc profile zshrc zprofile starship
+  local bashrc profile zshrc zprofile starship nanorc
   bashrc="$(cat <<'EOF'
 # Managed by debian-labwc
 umask 022
 export PATH="/data/usr/local/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+export EDITOR=nano
+export VISUAL=nano
+export HISTSIZE=10000
+export HISTFILESIZE=20000
+
+alias ll='ls -alFh'
+alias la='ls -A'
 
 if [[ -f /etc/bash_completion ]]; then
   # shellcheck disable=SC1091
@@ -102,6 +109,10 @@ EOF
 # Managed by debian-labwc
 umask 022
 export PATH="/data/usr/local/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+export EDITOR=nano
+export VISUAL=nano
+export HISTSIZE=10000
+export HISTFILESIZE=20000
 
 if [ -n "${BASH_VERSION:-}" ] && [ -f "$HOME/.bashrc" ]; then
   # shellcheck disable=SC1090
@@ -113,6 +124,14 @@ EOF
 # Managed by debian-labwc
 umask 022
 export PATH="/data/usr/local/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+export EDITOR=nano
+export VISUAL=nano
+export HISTSIZE=10000
+export HISTFILESIZE=20000
+SAVEHIST="${HISTFILESIZE}"
+
+alias ll='ls -alFh'
+alias la='ls -A'
 
 autoload -Uz compinit
 compinit
@@ -165,11 +184,26 @@ format = "[git:$branch ](bold magenta)"
 format = "[$all_status$ahead_behind ](bold red)"
 EOF
 )"
+  nanorc="$(cat <<'EOF'
+set mouse
+set autoindent
+set tabsize 4
+set tabstospaces
+set softwrap
+set indicator
+set titlecolor bold,white,blue
+set numbercolor cyan
+set keycolor cyan
+set functioncolor green
+include "/usr/share/nano/*.nanorc"
+EOF
+)"
   render_user_file "$LABWC_TARGET_HOME/.bashrc" "$bashrc"
   render_user_file "$LABWC_TARGET_HOME/.profile" "$profile"
   render_user_file "$LABWC_TARGET_HOME/.zshrc" "$zshrc"
   render_user_file "$LABWC_TARGET_HOME/.zprofile" "$zprofile"
   render_user_file "$LABWC_TARGET_HOME/.config/starship.toml" "$starship"
+  render_user_file "$LABWC_TARGET_HOME/.nanorc" "$nanorc"
 }
 
 render_xfce_helpers() {
@@ -221,7 +255,7 @@ ${title_bind}
       <naturalScroll>${LABWC_NATURAL_SCROLL}</naturalScroll>
     </device>
     <device category="non-touch">
-      <naturalScroll>${LABWC_NATURAL_SCROLL}</naturalScroll>
+      <naturalScroll>no</naturalScroll>
     </device>
   </libinput>
   <keyboard>

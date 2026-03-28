@@ -23,6 +23,7 @@ readonly BACKPORTS_PACKAGES=(
   thunar
   thunar-volman
   nnn
+  nano
   pipewire
   pipewire-audio
   pipewire-pulse
