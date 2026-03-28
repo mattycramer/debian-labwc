@@ -27,6 +27,7 @@ verify_paths() {
   require_file "/usr/local/bin/debian-labwc-launcher-menu"
   require_file "/usr/local/bin/debian-labwc-module-menu"
   require_file "/usr/local/bin/debian-labwc-player-status"
+  require_file "/usr/local/bin/debian-labwc-unlock-gpg-key"
   require_file "/usr/bin/labwc-tweaks"
   require_file "/usr/share/applications/labwc_tweaks.desktop"
   require_file "/usr/share/metainfo/labwc_tweaks.appdata.xml"
@@ -91,6 +92,7 @@ verify_polkit_semantics() {
   local autostart_path="$LABWC_TARGET_HOME/.config/labwc/autostart"
   grep -F 'd /run/polkit-1/rules.d 0755 root root -' /etc/tmpfiles.d/debian-labwc-polkit.conf >/dev/null || die "polkit tmpfiles config missing runtime rules directory"
   grep -F 'lxpolkit &' "$autostart_path" >/dev/null || die "labwc autostart missing lxpolkit auth agent"
+  grep -F 'debian-labwc-unlock-gpg-key' "$autostart_path" >/dev/null || die "labwc autostart missing proactive GPG unlock helper"
   grep -F 'systemctl --user import-environment' "$autostart_path" >/dev/null || die "labwc autostart missing systemd user environment import"
   ! grep -F 'is-active dbus.service' "$autostart_path" >/dev/null || die "labwc autostart still waits on dbus.service instead of the session bus socket"
 }
@@ -153,6 +155,10 @@ verify_gpg_agent_semantics() {
   grep -F 'TimeoutStopSec=10s' "$override_path" >/dev/null || die "gpg-agent override missing reduced stop timeout"
   grep -F 'enable-ssh-support' "$gpg_agent_config" >/dev/null || die "gpg-agent config missing ssh agent support"
   grep -F 'pinentry-program /usr/bin/pinentry-gtk-2' "$gpg_agent_config" >/dev/null || die "gpg-agent config missing explicit pinentry"
+  grep -F "default-cache-ttl ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}" "$gpg_agent_config" >/dev/null || die "gpg-agent config missing configured cache ttl"
+  grep -F "max-cache-ttl ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}" "$gpg_agent_config" >/dev/null || die "gpg-agent config missing configured max cache ttl"
+  grep -F "default-cache-ttl-ssh ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}" "$gpg_agent_config" >/dev/null || die "gpg-agent config missing configured ssh cache ttl"
+  grep -F "max-cache-ttl-ssh ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}" "$gpg_agent_config" >/dev/null || die "gpg-agent config missing configured ssh max cache ttl"
   grep -F 'gpgconf --launch gpg-agent' "$session_wrapper" >/dev/null || die "session wrapper missing gpg-agent launch"
   grep -F 'export SSH_AUTH_SOCK=' "$session_wrapper" >/dev/null || die "session wrapper missing SSH_AUTH_SOCK export"
 }

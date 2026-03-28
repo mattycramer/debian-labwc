@@ -320,6 +320,7 @@ if command -v systemctl >/dev/null 2>&1; then
     XDG_SESSION_TYPE \
     XDG_SESSION_DESKTOP \
     DESKTOP_SESSION \
+    GPG_TTY \
     SSH_AUTH_SOCK >/dev/null 2>&1 || true
 fi
 
@@ -327,6 +328,12 @@ pgrep -x lxpolkit >/dev/null 2>&1 || lxpolkit &
 pgrep -x waybar >/dev/null 2>&1 || waybar &
 pgrep -x kanshi >/dev/null 2>&1 || kanshi &
 pgrep -x mako >/dev/null 2>&1 || mako &
+if command -v /usr/local/bin/debian-labwc-unlock-gpg-key >/dev/null 2>&1; then
+  (
+    sleep 2
+    /usr/local/bin/debian-labwc-unlock-gpg-key
+  ) >/dev/null 2>&1 &
+fi
 pgrep -x swayidle >/dev/null 2>&1 || swayidle \
   timeout "${LABWC_IDLE_LOCK_SECONDS}" 'swaylock -f' \
   timeout "${LABWC_IDLE_DPMS_SECONDS}" '/usr/local/bin/debian-labwc-dpms off' \
@@ -380,7 +387,14 @@ render_gpg_agent_override() {
 }
 
 render_gpg_agent_config() {
-  render_user_private_file "$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf" $'enable-ssh-support\npinentry-program /usr/bin/pinentry-gtk-2\ndefault-cache-ttl 1800\nmax-cache-ttl 7200\n'
+  [[ "${KWALLET_SESSION_GPG_CACHE_TTL_SEC:-}" =~ ^[1-9][0-9]*$ ]] || die "KWALLET_SESSION_GPG_CACHE_TTL_SEC must be a positive integer, found '${KWALLET_SESSION_GPG_CACHE_TTL_SEC:-}'"
+  render_user_private_file "$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf" "enable-ssh-support
+pinentry-program /usr/bin/pinentry-gtk-2
+default-cache-ttl ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}
+max-cache-ttl ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}
+default-cache-ttl-ssh ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}
+max-cache-ttl-ssh ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}
+"
 }
 
 render_waybar_config() {

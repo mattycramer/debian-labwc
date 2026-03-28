@@ -43,7 +43,7 @@ resolve_key_email() {
     printf '%s\n' "$LABWC_GPG_KEY_EMAIL"
     return 0
   fi
-  printf '%s@local.invalid\n' "${LABWC_TARGET_USER:-$USER}"
+  printf '%s\n' ""
 }
 
 main() {
@@ -58,7 +58,11 @@ main() {
     printf '%s\n' "KWALLET_SESSION_GPG_PASSWD is required to generate a new KWallet GPG key" >&2
     exit 1
   }
-  key_uid="${key_realname} <${key_email}>"
+  if [[ -n "$key_email" ]]; then
+    key_uid="${key_realname} <${key_email}>"
+  else
+    key_uid="${key_realname}"
+  fi
   printf '%s\n' "$key_passphrase" | gpg --batch --pinentry-mode loopback --passphrase-fd 0 --quick-generate-key "$key_uid" default default "$key_expire"
 }
 

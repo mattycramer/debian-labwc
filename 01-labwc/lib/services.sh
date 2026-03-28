@@ -121,6 +121,7 @@ install_root_files() {
   install_helper_script "$SCRIPT_DIR/bin/launcher-menu.sh" "/usr/local/bin/debian-labwc-launcher-menu"
   install_helper_script "$SCRIPT_DIR/bin/module-menu.sh" "/usr/local/bin/debian-labwc-module-menu"
   install_helper_script "$SCRIPT_DIR/bin/player-status.sh" "/usr/local/bin/debian-labwc-player-status"
+  install_helper_script "$SCRIPT_DIR/bin/unlock-gpg-key.sh" "/usr/local/bin/debian-labwc-unlock-gpg-key"
 }
 
 resolve_user_unit_path() {
@@ -252,6 +253,7 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/debian-labwc-launcher-menu"
   remove_if_present "/usr/local/bin/debian-labwc-module-menu"
   remove_if_present "/usr/local/bin/debian-labwc-player-status"
+  remove_if_present "/usr/local/bin/debian-labwc-unlock-gpg-key"
   remove_if_present "/usr/share/wayland-sessions/labwc.desktop"
   remove_if_present "/usr/local/share/polkit-1/rules.d"
   remove_if_present "$POLKIT_TMPFILES_PATH"
