@@ -39,6 +39,8 @@ readonly BACKPORTS_PACKAGES=(
   wf-recorder
   grim
   slurp
+  gpg-agent
+  kwallet6
   qtwayland5
   qt6-wayland
   gvfs

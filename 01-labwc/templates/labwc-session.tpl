@@ -15,4 +15,14 @@ if [[ -r "@RUNTIME_ENV_PATH@" ]]; then
   source "@RUNTIME_ENV_PATH@"
 fi
 
+if command -v gpgconf >/dev/null 2>&1; then
+  gpgconf --launch gpg-agent >/dev/null 2>&1 || true
+  gpg-connect-agent updatestartuptty /bye >/dev/null 2>&1 || true
+  ssh_agent_socket="$(gpgconf --list-dirs agent-ssh-socket 2>/dev/null || true)"
+  if [[ -n "${ssh_agent_socket:-}" ]]; then
+    export SSH_AUTH_SOCK="$ssh_agent_socket"
+    systemctl --user import-environment SSH_AUTH_SOCK >/dev/null 2>&1 || true
+  fi
+fi
+
 exec labwc

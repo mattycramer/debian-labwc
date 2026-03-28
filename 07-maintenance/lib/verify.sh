@@ -13,7 +13,6 @@ verify_packages() {
 
 verify_paths() {
   require_file "$TIMESHIFT_CONFIG_PATH"
-  require_file "$TIMESHIFT_LAUNCHER_PATH"
   require_file "$TIMESHIFT_DESKTOP_OVERRIDE_PATH"
   require_file "$GRUB_BTRFS_CONFIG_PATH"
   require_file "$GRUB_BTRFS_SCRIPT_PATH"
@@ -46,8 +45,7 @@ verify_timeshift_config() {
   grep -F "\"count_hourly\" : \"${TIMESHIFT_COUNT_HOURLY}\"" "$TIMESHIFT_CONFIG_PATH" >/dev/null || die "Timeshift config missing hourly retention cap"
   grep -F "\"count_weekly\" : \"${TIMESHIFT_COUNT_WEEKLY}\"" "$TIMESHIFT_CONFIG_PATH" >/dev/null || die "Timeshift config missing weekly retention cap"
   grep -F "\"count_monthly\" : \"${TIMESHIFT_COUNT_MONTHLY}\"" "$TIMESHIFT_CONFIG_PATH" >/dev/null || die "Timeshift config missing monthly retention cap"
-  grep -F 'pkexec env' "$TIMESHIFT_LAUNCHER_PATH" >/dev/null || die "managed Timeshift launcher is missing pkexec environment propagation"
-  grep -F 'Exec=/usr/local/bin/timeshift-gtk' "$TIMESHIFT_DESKTOP_OVERRIDE_PATH" >/dev/null || die "managed Timeshift desktop override is not pointing at the timeshift-gtk wrapper"
+  grep -F 'Exec=/usr/bin/timeshift-gtk' "$TIMESHIFT_DESKTOP_OVERRIDE_PATH" >/dev/null || die "managed Timeshift desktop override is not pointing directly at timeshift-gtk"
 }
 
 verify_grub_btrfs_config() {

@@ -8,6 +8,15 @@ render_user_file() {
   run_cmd chown "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$destination"
 }
 
+render_user_private_file() {
+  local destination="$1"
+  local content="$2"
+  run_cmd install -D -m 0600 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" /dev/null "$destination"
+  printf '%s' "$content" >"$destination"
+  run_cmd chown "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$destination"
+  run_cmd chmod 0600 "$destination"
+}
+
 render_user_script() {
   local destination="$1"
   local content="$2"
@@ -359,6 +368,10 @@ EOF
 
 render_gpg_agent_override() {
   render_user_file "$LABWC_TARGET_HOME/.config/systemd/user/gpg-agent.service.d/override.conf" $'[Service]\nTimeoutStopSec=10s\n'
+}
+
+render_gpg_agent_config() {
+  render_user_private_file "$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf" $'enable-ssh-support\ndefault-cache-ttl 1800\nmax-cache-ttl 7200\n'
 }
 
 render_waybar_config() {
@@ -721,6 +734,7 @@ render_all_configs() {
     "$config_root/systemd/user/gpg-agent.service.d" \
     "$config_root/systemd/user" \
     "$config_root"
+  run_cmd install -d -m 0700 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.gnupg"
 
   render_runtime_env "$env_file"
   render_home_dirs
@@ -733,6 +747,7 @@ render_all_configs() {
   render_labwc_autostart
   render_labwc_shutdown
   render_gpg_agent_override
+  render_gpg_agent_config
   render_waybar_config
   render_waybar_style
   render_kanshi_config

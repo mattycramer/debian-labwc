@@ -41,6 +41,7 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.config/xdg-desktop-portal/portals.conf"
   require_file "$LABWC_TARGET_HOME/.config/debian-labwc/runtime.env"
   require_file "$LABWC_TARGET_HOME/.config/starship.toml"
+  require_file "$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf"
   require_file "$LABWC_TARGET_HOME/.bashrc"
   require_file "$LABWC_TARGET_HOME/.profile"
   require_file "$LABWC_TARGET_HOME/.zshrc"
@@ -136,9 +137,14 @@ verify_labwc_tweaks_semantics() {
 verify_gpg_agent_semantics() {
   local shutdown_path="$LABWC_TARGET_HOME/.config/labwc/shutdown"
   local override_path="$LABWC_TARGET_HOME/.config/systemd/user/gpg-agent.service.d/override.conf"
+  local session_wrapper="/usr/local/bin/debian-labwc-session"
+  local gpg_agent_config="$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf"
   grep -F 'pkill -x "waybar"' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing waybar stop"
   grep -F 'gpgconf --kill gpg-agent' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing gpg-agent kill"
   grep -F 'TimeoutStopSec=10s' "$override_path" >/dev/null || die "gpg-agent override missing reduced stop timeout"
+  grep -F 'enable-ssh-support' "$gpg_agent_config" >/dev/null || die "gpg-agent config missing ssh agent support"
+  grep -F 'gpgconf --launch gpg-agent' "$session_wrapper" >/dev/null || die "session wrapper missing gpg-agent launch"
+  grep -F 'export SSH_AUTH_SOCK=' "$session_wrapper" >/dev/null || die "session wrapper missing SSH_AUTH_SOCK export"
 }
 
 verify_shell_config_semantics() {

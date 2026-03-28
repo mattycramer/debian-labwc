@@ -27,6 +27,8 @@ readonly BACKPORTS_TOOLS_PACKAGES=(
 )
 
 readonly TOOLS_KEYRING_DIR="/usr/share/keyrings"
+readonly CODE_WRAPPER_PATH="/usr/local/bin/code"
+readonly CODE_DESKTOP_OVERRIDE_PATH="/usr/local/share/applications/code.desktop"
 readonly BITWARDEN_WRAPPER_PATH="/usr/local/bin/bitwarden"
 readonly BITWARDEN_DESKTOP_OVERRIDE_PATH="/usr/local/share/applications/bitwarden.desktop"
 
@@ -160,7 +162,49 @@ install_deb_tools() {
   install_deb_url "$BITWARDEN_URL" /tmp/bitwarden_amd64.deb
   install_deb_url "$OBSIDIAN_URL" /tmp/obsidian_amd64.deb
   install_deb_url "$FILEN_URL" /tmp/filen_amd64.deb
+  render_code_kwallet_wrapper
   render_bitwarden_wayland_wrapper
+}
+
+render_code_kwallet_wrapper() {
+  run_cmd install -d -m 0755 /usr/local/bin /usr/local/share/applications
+  cat >"$CODE_WRAPPER_PATH" <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+app_command='/usr/share/code/code'
+
+if [[ ! -x "$app_command" ]]; then
+  printf 'missing Code launcher: %s\n' "$app_command" >&2
+  exit 1
+fi
+
+exec "$app_command" --password-store=kwallet6 "$@"
+EOF
+  run_cmd chmod 0755 "$CODE_WRAPPER_PATH"
+
+  cat >"$CODE_DESKTOP_OVERRIDE_PATH" <<'EOF'
+[Desktop Entry]
+Name=Visual Studio Code
+Comment=Code Editing. Redefined.
+GenericName=Text Editor
+Exec=/usr/local/bin/code %F
+Icon=vscode
+Type=Application
+StartupNotify=false
+StartupWMClass=Code
+Categories=TextEditor;Development;IDE;
+MimeType=application/x-code-workspace;
+Actions=new-empty-window;
+Keywords=vscode;
+
+[Desktop Action new-empty-window]
+Name=New Empty Window
+Exec=/usr/local/bin/code --new-window %F
+Icon=vscode
+EOF
+  run_cmd chmod 0644 "$CODE_DESKTOP_OVERRIDE_PATH"
 }
 
 render_bitwarden_wayland_wrapper() {
@@ -184,6 +228,7 @@ if [[ -n "${WAYLAND_DISPLAY:-}" && "${XDG_SESSION_TYPE:-}" == "wayland" ]]; then
 fi
 
 exec "$app_command" \
+  --password-store=kwallet6 \
   --enable-features=UseOzonePlatform,WaylandWindowDecorations \
   --ozone-platform=wayland \
   "$@"
@@ -249,9 +294,15 @@ verify_tools_install() {
   grep -F 'URIs: https://repository.mullvad.net/deb/stable' /etc/apt/sources.list.d/mullvad.sources >/dev/null || die "mullvad source missing expected repo uri"
   grep -F 'Suites: stable' /etc/apt/sources.list.d/mullvad.sources >/dev/null || die "mullvad source missing stable suite"
   grep -F 'Components: main' /etc/apt/sources.list.d/mullvad.sources >/dev/null || die "mullvad source missing main component"
+  [[ -f "$CODE_WRAPPER_PATH" ]] || die "missing managed Code wrapper"
+  [[ -f "$CODE_DESKTOP_OVERRIDE_PATH" ]] || die "missing managed Code desktop override"
   [[ -f "$BITWARDEN_WRAPPER_PATH" ]] || die "missing managed Bitwarden wrapper"
   [[ -f "$BITWARDEN_DESKTOP_OVERRIDE_PATH" ]] || die "missing managed Bitwarden desktop override"
+  grep -F '/usr/share/code/code' "$CODE_WRAPPER_PATH" >/dev/null || die "managed Code wrapper is not launching the upstream Code binary"
+  grep -F -- '--password-store=kwallet6' "$CODE_WRAPPER_PATH" >/dev/null || die "managed Code wrapper is not forcing KWallet"
+  grep -F 'Exec=/usr/local/bin/code %F' "$CODE_DESKTOP_OVERRIDE_PATH" >/dev/null || die "managed Code desktop override is missing the wrapper Exec"
   grep -F '/opt/Bitwarden/bitwarden-app' "$BITWARDEN_WRAPPER_PATH" >/dev/null || die "managed Bitwarden wrapper is not launching the Electron binary directly"
+  grep -F -- '--password-store=kwallet6' "$BITWARDEN_WRAPPER_PATH" >/dev/null || die "managed Bitwarden wrapper is not forcing KWallet"
   grep -F -- '--ozone-platform=wayland' "$BITWARDEN_WRAPPER_PATH" >/dev/null || die "managed Bitwarden wrapper is not forcing Wayland"
   grep -F 'Exec=/usr/local/bin/bitwarden %U' "$BITWARDEN_DESKTOP_OVERRIDE_PATH" >/dev/null || die "managed Bitwarden desktop override is missing the Wayland wrapper Exec"
   [[ -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf" ]] || die "missing mpv.conf"
@@ -264,6 +315,7 @@ remove_tools_install() {
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}" thorium-browser bitwarden obsidian filen || true
   run_cmd rm -f /etc/apt/sources.list.d/vscode.sources /etc/apt/sources.list.d/vscode.list /etc/apt/sources.list.d/thorium.sources /etc/apt/sources.list.d/thorium.list /etc/apt/sources.list.d/mullvad.sources /etc/apt/sources.list.d/mullvad.list
   run_cmd rm -f /usr/share/keyrings/microsoft.gpg /usr/share/keyrings/mullvad-keyring.asc /usr/share/keyrings/mullvad-keyring.gpg
+  run_cmd rm -f "$CODE_WRAPPER_PATH" "$CODE_DESKTOP_OVERRIDE_PATH"
   run_cmd rm -f "$BITWARDEN_WRAPPER_PATH" "$BITWARDEN_DESKTOP_OVERRIDE_PATH"
   run_cmd rm -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf"
 }

@@ -6,9 +6,10 @@ readonly GRUB_BTRFS_CLONE_DIR="/tmp/grub-btrfs"
 readonly GRUB_BTRFS_COMMIT_FILE="${MAINTENANCE_RUNTIME_ROOT}/grub-btrfs.commit"
 readonly TIMESHIFT_CONFIG_DIR="/etc/timeshift"
 readonly TIMESHIFT_CONFIG_PATH="/etc/timeshift/timeshift.json"
-readonly TIMESHIFT_LAUNCHER_PATH="/usr/local/bin/timeshift-gtk"
 readonly TIMESHIFT_DESKTOP_OVERRIDE_DIR="/usr/local/share/applications"
 readonly TIMESHIFT_DESKTOP_OVERRIDE_PATH="/usr/local/share/applications/timeshift-gtk.desktop"
+readonly TIMESHIFT_WRAPPER_PATH="/usr/local/bin/timeshift-gtk"
+readonly TIMESHIFT_LEGACY_LAUNCHER_PATH="/usr/local/bin/timeshift-launcher"
 readonly GRUB_BTRFS_CONFIG_DIR="/etc/default/grub-btrfs"
 readonly GRUB_BTRFS_CONFIG_PATH="/etc/default/grub-btrfs/config"
 readonly GRUB_BTRFS_SCRIPT_PATH="/etc/grub.d/41_snapshots-btrfs"
@@ -129,87 +130,12 @@ EOF
   write_root_file "$TIMESHIFT_CONFIG_PATH" 0644 "$content"
 }
 
-render_timeshift_launcher() {
-  local content
-  content="$(cat <<'EOF'
-#!/usr/bin/env bash
-set -Eeuo pipefail
-IFS=$'\n\t'
-
-app_command='/usr/bin/timeshift-gtk'
-
-load_gui_env_for_user() {
-  local user_name="$1"
-  local user_home=""
-  local user_uid=""
-  local user_runtime=""
-  local wayland_socket=""
-
-  [[ -n "$user_name" ]] || return 0
-  user_home="$(getent passwd "$user_name" | awk -F: '{print $6}')"
-  user_uid="$(id -u "$user_name" 2>/dev/null || true)"
-  [[ -n "$user_uid" ]] || return 0
-
-  user_runtime="/run/user/$user_uid"
-  if [[ -z "${XDG_RUNTIME_DIR:-}" && -d "$user_runtime" ]]; then
-    export XDG_RUNTIME_DIR="$user_runtime"
-  fi
-  if [[ -n "${XDG_RUNTIME_DIR:-}" && -z "${DBUS_SESSION_BUS_ADDRESS:-}" && -S "${XDG_RUNTIME_DIR}/bus" ]]; then
-    export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
-  fi
-  if [[ -n "${XDG_RUNTIME_DIR:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then
-    wayland_socket="$(find "${XDG_RUNTIME_DIR}" -maxdepth 1 -type s -name 'wayland-*' | sort | head -n1 || true)"
-    if [[ -n "$wayland_socket" ]]; then
-      export WAYLAND_DISPLAY
-      WAYLAND_DISPLAY="$(basename "$wayland_socket")"
-    fi
-  fi
-  if [[ -z "${XAUTHORITY:-}" && -n "$user_home" && -f "$user_home/.Xauthority" ]]; then
-    export XAUTHORITY="$user_home/.Xauthority"
-  fi
-}
-
-if [[ "$(id -u)" -eq 0 ]]; then
-  if [[ -n "${SUDO_USER:-}" && "${SUDO_USER:-}" != "root" ]]; then
-    load_gui_env_for_user "$SUDO_USER"
-  fi
-  exec "$app_command"
-fi
-
-load_gui_env_for_user "$(id -un)"
-
-if command -v pkexec >/dev/null 2>&1; then
-  exec pkexec env \
-    DISPLAY="${DISPLAY:-}" \
-    WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-}" \
-    XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-}" \
-    XDG_SESSION_TYPE="${XDG_SESSION_TYPE:-wayland}" \
-    DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-}" \
-    XAUTHORITY="${XAUTHORITY:-}" \
-    "$app_command"
-fi
-
-if command -v sudo >/dev/null 2>&1; then
-  exec x-terminal-emulator -e "sudo ${app_command}"
-fi
-
-if command -v su >/dev/null 2>&1; then
-  exec x-terminal-emulator -e "su - -c '${app_command}'"
-fi
-
-printf 'timeshift-gtk requires root privileges and no supported escalation helper was found.\n' >&2
-exit 1
-EOF
-)"
-  write_root_file "$TIMESHIFT_LAUNCHER_PATH" 0755 "$content"
-}
-
 render_timeshift_desktop_override() {
   local content
   content="$(cat <<'EOF'
 [Desktop Entry]
 Name=Timeshift
-Exec=/usr/local/bin/timeshift-gtk
+Exec=/usr/bin/timeshift-gtk
 Type=Application
 GenericName=System Restore Utility
 Terminal=false
@@ -326,8 +252,8 @@ EOF
 }
 
 render_all_configs() {
+  run_cmd rm -f -- "$TIMESHIFT_WRAPPER_PATH" "$TIMESHIFT_LEGACY_LAUNCHER_PATH"
   render_timeshift_config
-  render_timeshift_launcher
   render_timeshift_desktop_override
   render_btrfsmaintenance_config
   render_grub_btrfs_config
@@ -373,7 +299,7 @@ remove_maintenance_install() {
   restore_unit_state "btrfs-trim.timer" "STATE_BTRFS_TRIM_TIMER"
   restore_unit_state "btrfsmaintenance-refresh.path" "STATE_BTRFS_REFRESH_PATH"
 
-  run_cmd rm -f -- "$GRUB_BTRFS_SCRIPT_PATH" "$GRUB_BTRFS_DAEMON_PATH" "$GRUB_BTRFS_SERVICE_PATH" "$GRUB_BTRFS_CONFIG_PATH" "$TIMESHIFT_CONFIG_PATH" "$TIMESHIFT_LAUNCHER_PATH" "$TIMESHIFT_DESKTOP_OVERRIDE_PATH" "$BTRFSMAINT_CONFIG_PATH"
+  run_cmd rm -f -- "$GRUB_BTRFS_SCRIPT_PATH" "$GRUB_BTRFS_DAEMON_PATH" "$GRUB_BTRFS_SERVICE_PATH" "$GRUB_BTRFS_CONFIG_PATH" "$TIMESHIFT_CONFIG_PATH" "$TIMESHIFT_DESKTOP_OVERRIDE_PATH" "$TIMESHIFT_WRAPPER_PATH" "$TIMESHIFT_LEGACY_LAUNCHER_PATH" "$BTRFSMAINT_CONFIG_PATH"
   run_cmd rm -f -- "$BTRFS_SCRUB_DROPIN_PATH" "$BTRFS_BALANCE_DROPIN_PATH"
   run_cmd rmdir --ignore-fail-on-non-empty "$BTRFS_SCRUB_DROPIN_DIR" >/dev/null 2>&1 || true
   run_cmd rmdir --ignore-fail-on-non-empty "$BTRFS_BALANCE_DROPIN_DIR" >/dev/null 2>&1 || true
