@@ -14,7 +14,6 @@ readonly CRYSTAL_DOCK_SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
 readonly CRYSTAL_DOCK_BOOTSTRAP_PACKAGES=(
   ca-certificates
   curl
-  blueman
 )
 
 readonly CRYSTAL_DOCK_RUNTIME_PACKAGES=(
