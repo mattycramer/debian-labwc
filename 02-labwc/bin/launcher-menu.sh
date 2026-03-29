@@ -30,6 +30,7 @@ run_terminal() {
 entries=(
   "Applications"
   "Terminal"
+  "Kitty"
   "Files"
 )
 
@@ -42,8 +43,14 @@ fi
 if has_command code; then
   entries+=("Code")
 fi
+if has_command mousepad; then
+  entries+=("Mousepad")
+fi
 if has_command obsidian; then
   entries+=("Obsidian")
+fi
+if has_command geeqie; then
+  entries+=("Geeqie")
 fi
 if has_command mullvad-vpn; then
   entries+=("Mullvad VPN")
@@ -61,11 +68,14 @@ selection="$(choose "Launch" "${entries[@]}")"
 case "$selection" in
   "Applications") exec wofi --show drun ;;
   "Terminal") run_terminal "Terminal" 'exec "${SHELL:-/bin/bash}"' ;;
+  "Kitty") run_gui kitty ;;
   "Files") run_gui thunar ;;
   "Browser") run_gui thorium-browser ;;
   "Qutebrowser") run_gui qutebrowser ;;
   "Code") run_gui code ;;
+  "Mousepad") run_gui mousepad ;;
   "Obsidian") run_gui obsidian ;;
+  "Geeqie") run_gui geeqie ;;
   "Mullvad VPN") run_gui mullvad-vpn ;;
   "Bitwarden") run_gui bitwarden ;;
   "Network") run_terminal "Network" 'exec nmtui' ;;

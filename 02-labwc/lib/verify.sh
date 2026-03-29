@@ -71,9 +71,14 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.config/labwc/autostart"
   require_file "$LABWC_TARGET_HOME/.config/labwc/environment"
   require_file "$LABWC_TARGET_HOME/.config/labwc/shutdown"
+  require_file "$LABWC_TARGET_HOME/.config/mimeapps.list"
+  require_file "$LABWC_TARGET_HOME/.local/bin/xdg-terminal-exec"
   require_file "$LABWC_TARGET_HOME/.config/waybar/config.jsonc"
   require_file "$LABWC_TARGET_HOME/.config/waybar/style.css"
+  require_file "$LABWC_TARGET_HOME/.config/waybar/scripts/pending-updates.sh"
+  require_file "$LABWC_TARGET_HOME/.config/waybar/scripts/run-upgrades.sh"
   require_file "$LABWC_TARGET_HOME/.config/kanshi/config"
+  require_file "$LABWC_TARGET_HOME/.config/kitty/kitty.conf"
   require_file "$LABWC_TARGET_HOME/.config/xfce4/helpers.rc"
   require_file "$LABWC_TARGET_HOME/.config/kwalletrc"
   require_file "$LABWC_TARGET_HOME/.config/xdg-desktop-portal/portals.conf"
@@ -167,14 +172,40 @@ verify_labwc_config_semantics() {
   grep -F '<action name="GoToDesktop" to="4" />' "$rc_path" >/dev/null || die "rc.xml missing workspace switch action for desktop 4"
   grep -F '<keybind key="W-S-1">' "$rc_path" >/dev/null || die "rc.xml missing Super+Shift+1 send-to-desktop binding"
   grep -F '<action name="SendToDesktop" to="4" follow="no" />' "$rc_path" >/dev/null || die "rc.xml missing send-to-desktop action for desktop 4"
-  grep -F '<keybind key="W-t">' "$rc_path" >/dev/null || die "rc.xml missing Super+t terminal binding"
-  grep -F '<command>foot</command>' "$rc_path" >/dev/null || die "rc.xml missing foot command binding"
-  grep -F '<keybind key="W-b">' "$rc_path" >/dev/null || die "rc.xml missing Super+b browser binding"
+  grep -F '<keybind key="W-e">' "$rc_path" >/dev/null || die "rc.xml missing Super+e thorium binding"
   grep -F '<command>thorium-browser</command>' "$rc_path" >/dev/null || die "rc.xml missing thorium-browser command binding"
-  grep -F '<keybind key="W-f">' "$rc_path" >/dev/null || die "rc.xml missing Super+f file manager binding"
+  grep -F '<keybind key="W-t">' "$rc_path" >/dev/null || die "rc.xml missing Super+t file manager binding"
+  grep -F '<command>thunar</command>' "$rc_path" >/dev/null || die "rc.xml missing thunar command binding"
+  grep -F '<keybind key="W-b">' "$rc_path" >/dev/null || die "rc.xml missing Super+b bitwarden binding"
+  grep -F '<command>bitwarden</command>' "$rc_path" >/dev/null || die "rc.xml missing bitwarden command binding"
+  grep -F '<keybind key="W-f">' "$rc_path" >/dev/null || die "rc.xml missing Super+f foot binding"
+  grep -F '<command>footclient</command>' "$rc_path" >/dev/null || die "rc.xml missing footclient command binding"
+  grep -F '<keybind key="W-k">' "$rc_path" >/dev/null || die "rc.xml missing Super+k kitty binding"
+  grep -F '<command>kitty</command>' "$rc_path" >/dev/null || die "rc.xml missing kitty command binding"
+  grep -F '<keybind key="W-c">' "$rc_path" >/dev/null || die "rc.xml missing Super+c code binding"
+  grep -F '<command>code</command>' "$rc_path" >/dev/null || die "rc.xml missing code command binding"
+  grep -F '<keybind key="W-m">' "$rc_path" >/dev/null || die "rc.xml missing Super+m mousepad binding"
+  grep -F '<command>mousepad</command>' "$rc_path" >/dev/null || die "rc.xml missing mousepad command binding"
+  grep -F '<keybind key="W-g">' "$rc_path" >/dev/null || die "rc.xml missing Super+g geeqie binding"
+  grep -F '<command>geeqie</command>' "$rc_path" >/dev/null || die "rc.xml missing geeqie command binding"
+  grep -F '<keybind key="W-o">' "$rc_path" >/dev/null || die "rc.xml missing Super+o obsidian binding"
+  grep -F '<command>obsidian</command>' "$rc_path" >/dev/null || die "rc.xml missing obsidian command binding"
   grep -F '<command>/usr/local/bin/debian-labwc-lock</command>' "$rc_path" >/dev/null || die "rc.xml missing dedicated lock helper binding"
   grep -F "XCURSOR_THEME=${LABWC_XCURSOR_THEME}" "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing XCURSOR_THEME"
   grep -F "XCURSOR_SIZE=${LABWC_XCURSOR_SIZE}" "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing XCURSOR_SIZE"
+  grep -F 'CLUTTER_BACKEND=wayland' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing CLUTTER_BACKEND"
+  grep -F 'SDL_VIDEODRIVER=wayland' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing SDL_VIDEODRIVER"
+  grep -F '_JAVA_AWT_WM_NONREPARENTING=1' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing Java WM compatibility"
+  grep -F 'NO_AT_BRIDGE=1' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing NO_AT_BRIDGE"
+  grep -F 'MOZ_ENABLE_WAYLAND=1' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing MOZ_ENABLE_WAYLAND"
+  grep -F 'MOZ_WEBRENDER=1' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing MOZ_WEBRENDER"
+  grep -F 'LIBVA_DRIVER_NAME=iHD' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing LIBVA_DRIVER_NAME"
+  grep -F 'LIBVA_DRI_DRIVER_NAME=iHD' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing LIBVA_DRI_DRIVER_NAME"
+  grep -F 'QT_QPA_PLATFORMTHEME=qt6ct' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing QT_QPA_PLATFORMTHEME"
+  grep -F 'QT_AUTO_SCREEN_SCALE_FACTOR=1' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing QT_AUTO_SCREEN_SCALE_FACTOR"
+  grep -F 'GBM_BACKEND=nvidia-drm' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing GBM_BACKEND"
+  grep -F '__GLX_VENDOR_LIBRARY_NAME=nvidia' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing __GLX_VENDOR_LIBRARY_NAME"
+  grep -F 'WLR_NO_HARDWARE_CURSOR=1' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing WLR_NO_HARDWARE_CURSOR"
 }
 
 verify_greetd_semantics() {
@@ -198,8 +229,9 @@ verify_waybar_config_semantics() {
   grep -F '"custom/launcher"' "$waybar_path" >/dev/null || die "waybar config missing launcher module"
   grep -F '"custom/workspace-1"' "$waybar_path" >/dev/null || die "waybar config missing workspace 1 module"
   grep -F '"custom/workspace-4"' "$waybar_path" >/dev/null || die "waybar config missing workspace 4 module"
+  grep -F '"wlr/taskbar"' "$waybar_path" >/dev/null || die "waybar config missing wlr/taskbar module"
+  grep -F '"custom/updates"' "$waybar_path" >/dev/null || die "waybar config missing updates module"
   ! grep -F '"ext/workspaces"' "$waybar_path" >/dev/null || die "waybar config still references unsupported ext/workspaces"
-  ! grep -F '"wlr/taskbar"' "$waybar_path" >/dev/null || die "waybar config still references unsupported wlr/taskbar"
   ! grep -F '"wlr/workspaces"' "$waybar_path" >/dev/null || die "waybar config still references unsupported wlr/workspaces"
   grep -F '"height": 42' "$waybar_path" >/dev/null || die "waybar config height is not set high enough for the configured modules"
   grep -F '"disk"' "$waybar_path" >/dev/null || die "waybar config missing disk module"
@@ -214,10 +246,19 @@ verify_waybar_config_semantics() {
   grep -F '"tooltip-format": "<tt><small>{calendar}</small></tt>"' "$waybar_path" >/dev/null || die "waybar clock tooltip is not configured to show the calendar"
   grep -F '"on-click": "gsimplecal"' "$waybar_path" >/dev/null || die "waybar clock is not configured to launch gsimplecal on click"
   grep -F '"calendar": {' "$waybar_path" >/dev/null || die "waybar clock calendar block is missing"
+  grep -F '"on-click": "activate"' "$waybar_path" >/dev/null || die "waybar taskbar is not configured to activate on click"
+  grep -F '"on-click-middle": "close"' "$waybar_path" >/dev/null || die "waybar taskbar is not configured to close on middle click"
+  grep -F '"on-click-right": "minimize-raise"' "$waybar_path" >/dev/null || die "waybar taskbar is not configured to minimize-raise on right click"
+  grep -F '".config/waybar/scripts/pending-updates.sh"' "$waybar_path" >/dev/null || die "waybar config missing updates script path"
+  grep -F '".config/waybar/scripts/run-upgrades.sh"' "$waybar_path" >/dev/null || die "waybar config missing updates upgrade handler"
+  grep -F '"signal": 12' "$waybar_path" >/dev/null || die "waybar updates module missing manual refresh signal"
 }
 
 verify_thunar_terminal_semantics() {
   grep -F 'TerminalEmulator=foot' "$LABWC_TARGET_HOME/.config/xfce4/helpers.rc" >/dev/null || die "xfce helpers missing foot terminal mapping"
+  grep -F 'x-scheme-handler/terminal=foot.desktop' "$LABWC_TARGET_HOME/.config/mimeapps.list" >/dev/null || die "mimeapps.list missing foot terminal handler"
+  grep -F 'application/x-terminal-emulator=foot.desktop' "$LABWC_TARGET_HOME/.config/mimeapps.list" >/dev/null || die "mimeapps.list missing foot terminal MIME default"
+  grep -F 'exec foot "$@"' "$LABWC_TARGET_HOME/.local/bin/xdg-terminal-exec" >/dev/null || die "xdg-terminal-exec wrapper does not launch foot"
 }
 
 verify_labwc_tweaks_semantics() {
@@ -246,11 +287,13 @@ verify_gpg_agent_semantics() {
   local gpg_agent_config="$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf"
   grep -F 'pkill -x "waybar"' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing waybar stop"
   grep -F 'gpgconf --kill gpg-agent' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing gpg-agent kill"
-  grep -F 'pkill -x "polkit-kde-authentication-agent-1"' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing KDE polkit agent stop"
+  grep -F 'wl-copy --clear' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing clipboard clear"
+  grep -F 'kill -SIGTERM "$polkit_pid"' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing deterministic KDE polkit agent stop"
   grep -F 'xdg-desktop-portal.service' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing portal stop"
   grep -F 'xdg-desktop-portal-wlr.service' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing portal-wlr stop"
   grep -F 'systemctl --user stop \' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing explicit pipewire shutdown"
   grep -F 'wireplumber.service' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing wireplumber stop"
+  grep -F 'sync >/dev/null 2>&1 || true' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing sync call"
   grep -F 'After=pipewire.service wireplumber.service xdg-desktop-portal-wlr.service' "$portal_override_path" >/dev/null || die "portal override missing PipeWire ordering"
   grep -F 'After=pipewire.service wireplumber.service' "$portal_wlr_override_path" >/dev/null || die "portal-wlr override missing PipeWire ordering"
   grep -F 'BindsTo=pipewire.service' "$portal_wlr_override_path" >/dev/null || die "portal-wlr override missing PipeWire binding"
@@ -290,8 +333,32 @@ verify_keepsecret_semantics() {
 
 verify_foot_semantics() {
   local foot_path="$LABWC_TARGET_HOME/.config/foot/foot.ini"
-  grep -F '[colors-dark]' "$foot_path" >/dev/null || die "foot config is missing the non-deprecated [colors-dark] section"
+  grep -F '[colors-dark]' "$foot_path" >/dev/null || die "foot config is missing the colors-dark section"
   ! grep -F '[colors]' "$foot_path" >/dev/null || die "foot config still uses deprecated [colors] section"
+  grep -F 'selection-target=both' "$foot_path" >/dev/null || die "foot config missing copy-on-select clipboard behavior"
+  grep -F '\x1b[1;3A = Mod1+Up' "$foot_path" >/dev/null || die "foot config missing Alt+Up text binding"
+  grep -F '\x1b[1;3B = Mod1+Down' "$foot_path" >/dev/null || die "foot config missing Alt+Down text binding"
+}
+
+verify_kitty_semantics() {
+  local kitty_path="$LABWC_TARGET_HOME/.config/kitty/kitty.conf"
+  grep -F 'copy_on_select clipboard' "$kitty_path" >/dev/null || die "kitty config missing copy-on-select clipboard behavior"
+  grep -F 'clear_selection_on_clipboard_loss yes' "$kitty_path" >/dev/null || die "kitty config missing clipboard-loss clearing"
+  grep -F 'clipboard_control write-clipboard write-primary read-clipboard-ask read-primary-ask' "$kitty_path" >/dev/null || die "kitty config missing clipboard control policy"
+  grep -F 'shell_integration enabled' "$kitty_path" >/dev/null || die "kitty config missing shell integration"
+  grep -F 'confirm_os_window_close -1 count-background' "$kitty_path" >/dev/null || die "kitty config missing safer window close confirmation"
+  grep -F 'wayland_titlebar_color background' "$kitty_path" >/dev/null || die "kitty config missing Wayland titlebar color configuration"
+  grep -F 'map alt+up send_text all \e[1;3A' "$kitty_path" >/dev/null || die "kitty config missing Alt+Up mapping"
+  grep -F 'map alt+down send_text all \e[1;3B' "$kitty_path" >/dev/null || die "kitty config missing Alt+Down mapping"
+}
+
+verify_waybar_script_semantics() {
+  local updates_script="$LABWC_TARGET_HOME/.config/waybar/scripts/pending-updates.sh"
+  local upgrade_script="$LABWC_TARGET_HOME/.config/waybar/scripts/run-upgrades.sh"
+  grep -F 'updates=$(apt list --upgradable 2>/dev/null || true)' "$updates_script" >/dev/null || die "waybar updates script missing apt list check"
+  grep -F 'printf '\''{"text":"%s","tooltip":"%s","class":%s,"percentage":%s}\n'\''' "$updates_script" >/dev/null || die "waybar updates script missing JSON output"
+  grep -F 'foot -T "System Upgrade" -e bash -lc '\''sudo apt upgrade;' "$upgrade_script" >/dev/null || die "waybar upgrade script missing foot upgrade launcher"
+  grep -F 'pkill -RTMIN+12 -x waybar' "$upgrade_script" >/dev/null || die "waybar upgrade script missing refresh signal"
 }
 
 verify_shell_config_semantics() {
@@ -346,12 +413,17 @@ verify_shell_config_semantics() {
   grep -F 'set keycolor cyan' "$LABWC_TARGET_HOME/.nanorc" >/dev/null || die ".nanorc missing keycolor"
   grep -F 'set functioncolor green' "$LABWC_TARGET_HOME/.nanorc" >/dev/null || die ".nanorc missing functioncolor"
   grep -F 'include "/usr/share/nano/*.nanorc"' "$LABWC_TARGET_HOME/.nanorc" >/dev/null || die ".nanorc missing syntax include"
-  grep -F 'format = "$username$hostname$directory$git_branch$git_status\n$character "' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing multiline prompt format"
+  grep -F 'palette = "labwc"' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing labwc palette selection"
+  grep -F 'command_timeout = 1200' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing command timeout"
+  grep -F 'scan_timeout = 30' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing scan timeout"
   grep -F '[username]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing username config"
   grep -F '[hostname]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing hostname config"
   grep -F '[directory]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing directory config"
+  grep -F '[fill]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing fill config"
   grep -F '[git_branch]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing git_branch config"
   grep -F '[git_status]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing git_status config"
+  grep -F '[git_state]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing git_state config"
+  grep -F '[cmd_duration]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing cmd_duration config"
   grep -F -- '--layout=reverse' "$LABWC_TARGET_HOME/.config/fzf/default-opts" >/dev/null || die "fzf default opts missing layout"
   grep -F -- '--bind=ctrl-/:toggle-preview' "$LABWC_TARGET_HOME/.config/fzf/default-opts" >/dev/null || die "fzf default opts missing preview toggle"
   grep -F -- '--color=bg:#0f1720' "$LABWC_TARGET_HOME/.config/fzf/default-opts" >/dev/null || die "fzf default opts missing color theme"
@@ -402,6 +474,8 @@ verify_install() {
   verify_kwallet_semantics
   verify_keepsecret_semantics
   verify_foot_semantics
+  verify_kitty_semantics
+  verify_waybar_script_semantics
   verify_shell_config_semantics
   verify_tmux_semantics
   verify_mako_semantics

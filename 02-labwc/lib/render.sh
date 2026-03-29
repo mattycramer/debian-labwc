@@ -31,6 +31,19 @@ render_labwc_environment() {
   environment_file="$(cat <<EOF
 XCURSOR_THEME=${LABWC_XCURSOR_THEME}
 XCURSOR_SIZE=${LABWC_XCURSOR_SIZE}
+CLUTTER_BACKEND=wayland
+SDL_VIDEODRIVER=wayland
+_JAVA_AWT_WM_NONREPARENTING=1
+NO_AT_BRIDGE=1
+MOZ_ENABLE_WAYLAND=1
+MOZ_WEBRENDER=1
+LIBVA_DRIVER_NAME=iHD
+LIBVA_DRI_DRIVER_NAME=iHD
+QT_QPA_PLATFORMTHEME=qt6ct
+QT_AUTO_SCREEN_SCALE_FACTOR=1
+GBM_BACKEND=nvidia-drm
+__GLX_VENDOR_LIBRARY_NAME=nvidia
+WLR_NO_HARDWARE_CURSOR=1
 EOF
 )"
   render_user_file "$LABWC_TARGET_HOME/.config/labwc/environment" "$environment_file"
@@ -80,6 +93,7 @@ ensure_user_base_dirs() {
   run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
     "$LABWC_TARGET_HOME/.config" \
     "$LABWC_TARGET_HOME/.local" \
+    "$LABWC_TARGET_HOME/.local/bin" \
     "$LABWC_TARGET_HOME/.local/share" \
     "$LABWC_TARGET_HOME/.local/state"
   run_cmd chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.config" "$LABWC_TARGET_HOME/.local"
@@ -268,32 +282,75 @@ fi
 EOF
 )"
   starship="$(cat <<'EOF'
-add_newline = false
-format = "$username$hostname$directory$git_branch$git_status\n$character "
+add_newline = true
+command_timeout = 1200
+scan_timeout = 30
+palette = "labwc"
+format = """
+$username$hostname$directory$git_branch$git_status$fill$cmd_duration
+$character
+"""
+
+[palettes.labwc]
+text = "#e5edf5"
+muted = "#94a3b8"
+sky = "#7dd3fc"
+cyan = "#6dc4ed"
+mint = "#94d2bd"
+amber = "#f6bd60"
+rose = "#ffb4a2"
+red = "#ef4444"
+mauve = "#c4b5fd"
+panel = "#0f1720"
 
 [username]
 show_always = true
-format = "[$user@](bold yellow)"
+style_user = "bold amber"
+style_root = "bold red"
+format = "[$user](style)@"
 
 [hostname]
 ssh_only = false
-format = "[$hostname ](bold blue)"
+style = "bold cyan"
+format = "[$hostname ](style)"
+
+[fill]
+symbol = " "
+style = "muted"
 
 [character]
-success_symbol = "[>](bold green)"
+success_symbol = "[>](bold mint)"
 error_symbol = "[>](bold red)"
+vimcmd_symbol = "[<](bold amber)"
+vimcmd_replace_one_symbol = "[<](bold rose)"
+vimcmd_replace_symbol = "[<](bold rose)"
+vimcmd_visual_symbol = "[<](bold mauve)"
 
 [directory]
-format = "[$path ](bold cyan)"
+style = "bold sky"
+format = "[$path ](style)"
 home_symbol = "~"
-truncation_length = 3
+truncation_length = 4
 truncate_to_repo = false
+read_only = " ro"
 
 [git_branch]
-format = "[git:$branch ](bold magenta)"
+symbol = "git:"
+style = "bold mauve"
+format = "[${symbol}$branch ](style)"
 
 [git_status]
-format = "[$all_status$ahead_behind ](bold red)"
+style = "bold rose"
+format = "[$all_status$ahead_behind ](style)"
+
+[git_state]
+style = "bold rose"
+format = "[$state($progress_current/$progress_total) ](style)"
+
+[cmd_duration]
+min_time = 1500
+style = "bold muted"
+format = "[took $duration](style)"
 EOF
 )"
   nanorc="$(cat <<'EOF'
@@ -320,6 +377,14 @@ EOF
 
 render_xfce_helpers() {
   render_user_file "$LABWC_TARGET_HOME/.config/xfce4/helpers.rc" $'TerminalEmulator=foot\n'
+}
+
+render_mimeapps() {
+  render_user_file "$LABWC_TARGET_HOME/.config/mimeapps.list" $'[Default Applications]\nx-scheme-handler/terminal=foot.desktop\napplication/x-terminal-emulator=foot.desktop\n\n[Added Associations]\nx-scheme-handler/terminal=foot.desktop;kitty.desktop;\napplication/x-terminal-emulator=foot.desktop;kitty.desktop;\n'
+}
+
+render_xdg_terminal_exec() {
+  render_user_script "$LABWC_TARGET_HOME/.local/bin/xdg-terminal-exec" $'#!/usr/bin/env bash\nset -Eeuo pipefail\nIFS=$\'\\n\\t\'\n\nexec foot "$@"\n'
 }
 
 render_tmux_config() {
@@ -502,11 +567,11 @@ ${title_bind}
     <keybind key="W-Return">
       <action name="Execute"><command>${LABWC_TERMINAL}</command></action>
     </keybind>
-    <keybind key="W-t">
-      <action name="Execute"><command>foot</command></action>
-    </keybind>
     <keybind key="W-b">
-      <action name="Execute"><command>thorium-browser</command></action>
+      <action name="Execute"><command>bitwarden</command></action>
+    </keybind>
+    <keybind key="W-c">
+      <action name="Execute"><command>code</command></action>
     </keybind>
     <keybind key="W-d">
       <action name="Execute"><command>${LABWC_LAUNCHER_CMD}</command></action>
@@ -515,9 +580,24 @@ ${title_bind}
       <action name="Execute"><command>${LABWC_LAUNCHER_CMD}</command></action>
     </keybind>
     <keybind key="W-e">
-      <action name="Execute"><command>thunar</command></action>
+      <action name="Execute"><command>thorium-browser</command></action>
     </keybind>
     <keybind key="W-f">
+      <action name="Execute"><command>footclient</command></action>
+    </keybind>
+    <keybind key="W-g">
+      <action name="Execute"><command>geeqie</command></action>
+    </keybind>
+    <keybind key="W-k">
+      <action name="Execute"><command>kitty</command></action>
+    </keybind>
+    <keybind key="W-m">
+      <action name="Execute"><command>mousepad</command></action>
+    </keybind>
+    <keybind key="W-o">
+      <action name="Execute"><command>obsidian</command></action>
+    </keybind>
+    <keybind key="W-t">
       <action name="Execute"><command>thunar</command></action>
     </keybind>
     <keybind key="W-1">
@@ -581,6 +661,9 @@ render_labwc_menu_xml() {
   <menu id="root-menu" label="Applications">
     <item label="Terminal">
       <action name="Execute"><command>footclient</command></action>
+    </item>
+    <item label="Kitty">
+      <action name="Execute"><command>kitty</command></action>
     </item>
     <item label="Launcher">
       <action name="Execute"><command>wofi --show drun</command></action>
@@ -738,10 +821,20 @@ IFS='
 pkill -x "waybar" >/dev/null 2>&1 || true
 pkill -x "kanshi" >/dev/null 2>&1 || true
 pkill -x "mako" >/dev/null 2>&1 || true
-pkill -x "polkit-kde-authentication-agent-1" >/dev/null 2>&1 || true
 pkill -x "swayidle" >/dev/null 2>&1 || true
 pkill -x "crystal-dock" >/dev/null 2>&1 || true
 pkill -x "nwg-dock" >/dev/null 2>&1 || true
+
+if command -v wl-copy >/dev/null 2>&1; then
+  wl-copy --clear >/dev/null 2>&1 || true
+fi
+
+if command -v pgrep >/dev/null 2>&1; then
+  polkit_pid="$(pgrep -x polkit-kde-authentication-agent-1 2>/dev/null || true)"
+  if [ -n "$polkit_pid" ]; then
+    kill -SIGTERM "$polkit_pid" >/dev/null 2>&1 || true
+  fi
+fi
 
 if command -v gpgconf >/dev/null 2>&1; then
   gpgconf --kill gpg-agent >/dev/null 2>&1 || true
@@ -757,6 +850,8 @@ if command -v systemctl >/dev/null 2>&1; then
     pipewire-pulse.socket \
     pipewire.socket >/dev/null 2>&1 || true
 fi
+
+sync >/dev/null 2>&1 || true
 EOF
 )"
   render_user_script "$LABWC_TARGET_HOME/.config/labwc/shutdown" "$shutdown"
@@ -788,17 +883,94 @@ render_kwallet_config() {
   render_user_file "$LABWC_TARGET_HOME/.config/kwalletrc" $'[Wallet]\nEnabled=true\n\n[org.freedesktop.secrets]\napiEnabled=true\n'
 }
 
+render_waybar_scripts() {
+  local updates_script upgrade_script
+  updates_script="$(cat <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+json_escape() {
+  local value="${1:-}"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/}"
+  printf '%s' "$value"
+}
+
+if ! command -v apt >/dev/null 2>&1; then
+  printf '{"text":"Updates ?","tooltip":"apt is not available","class":["updates","error"],"percentage":100}\n'
+  exit 0
+fi
+
+updates=$(apt list --upgradable 2>/dev/null || true)
+if [[ -z "$updates" ]]; then
+  printf '{"text":"Updates ?","tooltip":"Unable to read apt upgrade state","class":["updates","error"],"percentage":100}\n'
+  exit 0
+fi
+
+updates_list="$(printf '%s\n' "$updates" | awk 'NR > 1 && NF { print }')"
+count="$(printf '%s\n' "$updates_list" | awk 'NF { count++ } END { print count + 0 }')"
+
+if (( count == 0 )); then
+  text="Up to date"
+  tooltip="System is up to date."
+  class='["updates","up-to-date"]'
+  percentage=0
+else
+  text="Updates ${count}"
+  tooltip="$(printf '%s\n' "$updates_list" | sed -n '1,20p')"
+  if (( count > 20 )); then
+    tooltip="${tooltip}"$'\n'"... and $((count - 20)) more"
+  fi
+  if (( count >= 25 )); then
+    class='["updates","critical"]'
+    percentage=100
+  elif (( count >= 10 )); then
+    class='["updates","warning"]'
+    percentage=60
+  else
+    class='["updates","pending"]'
+    percentage=25
+  fi
+fi
+
+printf '{"text":"%s","tooltip":"%s","class":%s,"percentage":%s}\n' \
+  "$(json_escape "$text")" \
+  "$(json_escape "$tooltip")" \
+  "$class" \
+  "$percentage"
+EOF
+)"
+  upgrade_script="$(cat <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+command -v foot >/dev/null 2>&1 || exit 1
+
+foot -T "System Upgrade" -e bash -lc 'sudo apt upgrade; rc=$?; printf "\nPress Enter to close..."; read -r _; exit $rc'
+pkill -RTMIN+12 -x waybar >/dev/null 2>&1 || true
+EOF
+)"
+  render_user_script "$LABWC_TARGET_HOME/.config/waybar/scripts/pending-updates.sh" "$updates_script"
+  render_user_script "$LABWC_TARGET_HOME/.config/waybar/scripts/run-upgrades.sh" "$upgrade_script"
+}
+
 render_waybar_config() {
-  local waybar
-  waybar="$(cat <<'EOF'
+  local waybar updates_script upgrade_script
+  updates_script="$LABWC_TARGET_HOME/.config/waybar/scripts/pending-updates.sh"
+  upgrade_script="$LABWC_TARGET_HOME/.config/waybar/scripts/run-upgrades.sh"
+  waybar="$(cat <<EOF
 {
   "layer": "top",
   "position": "top",
   "height": 42,
   "spacing": 6,
   "modules-left": ["custom/launcher", "custom/workspace-1", "custom/workspace-2", "custom/workspace-3", "custom/workspace-4"],
-  "modules-center": ["clock"],
-  "modules-right": ["network", "pulseaudio", "battery", "backlight", "cpu", "memory", "disk", "custom/player", "tray", "custom/power"],
+  "modules-center": ["wlr/taskbar"],
+  "modules-right": ["custom/updates", "network", "pulseaudio", "battery", "backlight", "cpu", "memory", "disk", "custom/player", "clock", "tray", "custom/power"],
   "custom/launcher": {
     "format": "Menu",
     "tooltip": false,
@@ -836,6 +1008,36 @@ render_waybar_config() {
     "signal": 10,
     "tooltip": false,
     "on-click": "/usr/local/bin/debian-labwc-workspace-activate 4"
+  },
+  "wlr/taskbar": {
+    "format": "{icon} {name}",
+    "icon-size": 18,
+    "tooltip-format": "{title}",
+    "on-click": "activate",
+    "on-click-middle": "close",
+    "on-click-right": "minimize-raise",
+    "ignore-list": ["waybar"],
+    "app_ids-mapping": {
+      "footclient": "foot",
+      "code-url-handler": "code"
+    },
+    "rewrite": {
+      "Foot Server": "Foot",
+      "kitty": "Kitty",
+      "foot": "Foot",
+      "mousepad": "Mousepad",
+      "geeqie": "Geeqie",
+      "obsidian": "Obsidian",
+      "bitwarden": "Bitwarden"
+    }
+  },
+  "custom/updates": {
+    "exec": "${updates_script}",
+    "return-type": "json",
+    "interval": 1800,
+    "signal": 12,
+    "format": "{text}",
+    "on-click": "${upgrade_script}"
   },
   "clock": {
     "interval": 30,
@@ -973,6 +1175,21 @@ EOF
 render_waybar_style() {
   local css
   css="$(cat <<'EOF'
+@define-color panel rgba(10, 16, 23, 0.88);
+@define-color panel_alt rgba(20, 28, 39, 0.82);
+@define-color panel_hover rgba(35, 50, 68, 0.94);
+@define-color border rgba(129, 146, 165, 0.28);
+@define-color border_strong rgba(129, 146, 165, 0.46);
+@define-color text #e5edf5;
+@define-color muted #9aa9ba;
+@define-color amber #f6bd60;
+@define-color sky #7dd3fc;
+@define-color cyan #6dc4ed;
+@define-color mint #94d2bd;
+@define-color rose #ffb4a2;
+@define-color red #ef4444;
+@define-color mauve #c4b5fd;
+
 * {
   font-family: "Noto Sans", "Font Awesome 6 Free", "Material Design Icons";
   font-size: 13px;
@@ -981,9 +1198,9 @@ render_waybar_style() {
 }
 
 window#waybar {
-  background: rgba(10, 14, 20, 0.84);
-  color: #edf2f7;
-  border-bottom: 1px solid rgba(173, 181, 189, 0.16);
+  background: @panel;
+  color: @text;
+  border-bottom: 1px solid @border;
 }
 
 #custom-launcher,
@@ -991,6 +1208,7 @@ window#waybar {
 #custom-workspace-2,
 #custom-workspace-3,
 #custom-workspace-4,
+#custom-updates,
 #clock,
 #network,
 #pulseaudio,
@@ -1006,12 +1224,12 @@ window#waybar {
   padding: 0 12px;
   min-height: 28px;
   border-radius: 14px;
-  background: rgba(25, 32, 44, 0.74);
-  border: 1px solid rgba(88, 101, 119, 0.25);
+  background: @panel_alt;
+  border: 1px solid @border;
 }
 
 #custom-launcher {
-  color: #f6bd60;
+  color: @amber;
   font-weight: 600;
 }
 
@@ -1021,7 +1239,7 @@ window#waybar {
 #custom-workspace-4 {
   min-width: 18px;
   padding: 0 11px;
-  color: #cbd5e1;
+  color: @text;
   font-weight: 600;
 }
 
@@ -1030,50 +1248,112 @@ window#waybar {
 #custom-workspace-3.active,
 #custom-workspace-4.active {
   background: rgba(246, 189, 96, 0.94);
-  border-color: rgba(246, 189, 96, 0.6);
-  color: #0f1720;
+  border-color: rgba(246, 189, 96, 0.66);
+  color: #07131d;
+}
+
+#taskbar {
+  margin: 5px 8px;
+  padding: 4px 8px;
+  border-radius: 16px;
+  background: @panel_alt;
+  border: 1px solid @border;
+}
+
+#taskbar button {
+  margin: 0 4px;
+  padding: 0 12px;
+  min-height: 30px;
+  border-radius: 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: @text;
+}
+
+#taskbar button:hover {
+  background: @panel_hover;
+  border-color: @border_strong;
+}
+
+#taskbar button.active {
+  background: rgba(109, 196, 237, 0.18);
+  border-color: rgba(109, 196, 237, 0.42);
+  color: @sky;
+}
+
+#taskbar button.minimized {
+  color: @muted;
+}
+
+#taskbar button.maximized {
+  color: @amber;
+}
+
+#taskbar button.fullscreen {
+  color: @mint;
+}
+
+#custom-updates {
+  font-weight: 600;
+}
+
+#custom-updates.pending {
+  color: @sky;
+}
+
+#custom-updates.warning {
+  color: @amber;
+}
+
+#custom-updates.critical,
+#custom-updates.error {
+  color: @rose;
+}
+
+#custom-updates.up-to-date {
+  color: @mint;
 }
 
 #clock {
-  color: #f3f4f6;
+  color: @text;
 }
 
 #network.disconnected,
 #network.disabled {
-  color: #f6ad55;
+  color: @amber;
 }
 
 #pulseaudio.muted {
-  color: #f6ad55;
+  color: @amber;
 }
 
 #battery.charging,
 #battery.full {
-  color: #9ae6b4;
+  color: @mint;
 }
 
 #battery.warning,
 #cpu.warning,
 #memory.warning,
 #disk.warning {
-  color: #f6e05e;
+  color: @amber;
 }
 
 #battery.critical,
 #cpu.critical,
 #memory.critical,
 #disk.critical {
-  color: #fc8181;
+  color: @red;
 }
 
 #custom-player {
-  color: #c4b5fd;
+  color: @mauve;
 }
 
 #custom-power {
   background: rgba(68, 25, 33, 0.78);
-  border-color: rgba(246, 173, 173, 0.28);
-  color: #fed7d7;
+  border-color: rgba(246, 173, 173, 0.34);
+  color: @rose;
   font-weight: 600;
 }
 
@@ -1082,6 +1362,7 @@ window#waybar {
 #custom-workspace-2:hover,
 #custom-workspace-3:hover,
 #custom-workspace-4:hover,
+#custom-updates:hover,
 #clock:hover,
 #network:hover,
 #pulseaudio:hover,
@@ -1093,8 +1374,8 @@ window#waybar {
 #custom-player:hover,
 #custom-power:hover,
 #tray:hover {
-  background: rgba(40, 54, 74, 0.92);
-  border-color: rgba(119, 141, 169, 0.38);
+  background: @panel_hover;
+  border-color: @border_strong;
 }
 
 #custom-workspace-1.active:hover,
@@ -1102,7 +1383,7 @@ window#waybar {
 #custom-workspace-3.active:hover,
 #custom-workspace-4.active:hover {
   background: rgba(246, 189, 96, 0.94);
-  border-color: rgba(246, 189, 96, 0.6);
+  border-color: rgba(246, 189, 96, 0.66);
 }
 EOF
 )"
@@ -1238,7 +1519,11 @@ text-wrong-color=fff1f2ff
 }
 
 render_foot() {
-  render_user_file "$LABWC_TARGET_HOME/.config/foot/foot.ini" $'[main]\nfont=Noto Sans Mono:size=11\npad=8x8\n\n[bell]\nsystem=no\n\n[colors-dark]\nbackground=111111\nforeground=f5f5f5\n'
+  render_user_file "$LABWC_TARGET_HOME/.config/foot/foot.ini" $'[main]\nterm=foot\napp-id=foot\nfont=Noto Sans Mono:size=11\ndpi-aware=yes\ninitial-window-size-chars=120x34\npad=10x8\nselection-target=both\n\n[bell]\nsystem=no\n\n[mouse]\nhide-when-typing=yes\n\n[text-bindings]\n\\x1b[1;3A = Mod1+Up\n\\x1b[1;3B = Mod1+Down\n\\x1b[1;3C = Mod1+Right\n\\x1b[1;3D = Mod1+Left\n\n[colors-dark]\nbackground=0f1720\nforeground=e5edf5\nregular0=1a2430\nregular1=ef4444\nregular2=22c55e\nregular3=f59e0b\nregular4=38bdf8\nregular5=c084fc\nregular6=2dd4bf\nregular7=e2e8f0\nbright0=475569\nbright1=f87171\nbright2=4ade80\nbright3=fbbf24\nbright4=7dd3fc\nbright5=d8b4fe\nbright6=5eead4\nbright7=f8fafc\n'
+}
+
+render_kitty() {
+  render_user_file "$LABWC_TARGET_HOME/.config/kitty/kitty.conf" $'font_family Noto Sans Mono\nfont_size 11.0\ncursor_shape beam\ncursor_beam_thickness 1.5\nenable_audio_bell no\ncopy_on_select clipboard\nclear_selection_on_clipboard_loss yes\nclipboard_control write-clipboard write-primary read-clipboard-ask read-primary-ask\nshell_integration enabled\nconfirm_os_window_close -1 count-background\nscrollback_lines 20000\nremember_window_size yes\ninitial_window_width 120c\ninitial_window_height 34c\nwindow_padding_width 10\nwayland_titlebar_color background\nforeground #e5edf5\nbackground #0f1720\nselection_foreground #07131d\nselection_background #94d2bd\ncursor #f6bd60\ncursor_text_color #07131d\ncolor0 #1a2430\ncolor1 #ef4444\ncolor2 #22c55e\ncolor3 #f59e0b\ncolor4 #38bdf8\ncolor5 #c084fc\ncolor6 #2dd4bf\ncolor7 #e2e8f0\ncolor8 #475569\ncolor9 #f87171\ncolor10 #4ade80\ncolor11 #fbbf24\ncolor12 #7dd3fc\ncolor13 #d8b4fe\ncolor14 #5eead4\ncolor15 #f8fafc\nmap alt+up send_text all \\e[1;3A\nmap alt+down send_text all \\e[1;3B\nmap alt+right send_text all \\e[1;3C\nmap alt+left send_text all \\e[1;3D\n'
 }
 
 render_gammastep() {
@@ -1267,7 +1552,9 @@ render_all_configs() {
   run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
     "$config_root/labwc" \
     "$config_root/waybar" \
+    "$config_root/waybar/scripts" \
     "$config_root/kanshi" \
+    "$config_root/kitty" \
     "$config_root/xfce4" \
     "$config_root/wofi" \
     "$config_root/mako" \
@@ -1287,6 +1574,8 @@ render_all_configs() {
   render_home_dirs
   render_shell_startup_files
   render_xfce_helpers
+  render_mimeapps
+  render_xdg_terminal_exec
   render_tmux_config
   render_fzf_config
   install_wallpaper
@@ -1299,6 +1588,7 @@ render_all_configs() {
   render_gpg_agent_config
   render_kwallet_config
   render_portal_unit_overrides
+  render_waybar_scripts
   render_waybar_config
   render_waybar_style
   render_kanshi_config
@@ -1306,6 +1596,7 @@ render_all_configs() {
   render_mako
   render_swaylock
   render_foot
+  render_kitty
   render_gammastep
   render_portals
   run_cmd chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.config" "$LABWC_TARGET_HOME/.local"

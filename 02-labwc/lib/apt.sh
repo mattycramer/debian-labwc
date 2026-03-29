@@ -65,6 +65,8 @@ readonly SID_PACKAGES=(
   udisks2
   foot
   foot-terminfo
+  kitty
+  kitty-terminfo
   pavucontrol
   playerctl
   brightnessctl
@@ -75,8 +77,11 @@ readonly SID_PACKAGES=(
   fonts-font-awesome
   fonts-noto
   fonts-noto-core
+  fonts-noto-mono
   nwg-look
   papirus-icon-theme
+  qt6ct
+  adwaita-qt6
   zsh
   zsh-autosuggestions
   starship
@@ -84,6 +89,8 @@ readonly SID_PACKAGES=(
   fonts-weather-icons
   adwaita-icon-theme
   file-roller
+  geeqie
+  mousepad
   ripgrep
   fd-find
   tmux
