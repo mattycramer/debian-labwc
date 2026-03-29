@@ -6,6 +6,9 @@ readonly BOOTSTRAP_PACKAGES=(
   curl
   gpg
   xz-utils
+  netbase
+  python3
+  pkg-config
   build-essential
   autoconf
   automake
@@ -13,8 +16,10 @@ readonly BOOTSTRAP_PACKAGES=(
   gettext
   bison
   flex
-  pkg-config
-  python3
+  nftables
+)
+
+readonly BOOTSTRAP_DEV_PACKAGES=(
   libmnl-dev
   libnftnl-dev
   libjansson-dev
@@ -31,8 +36,6 @@ readonly BOOTSTRAP_PACKAGES=(
   nettle-dev
   zlib1g-dev
   libpcre2-dev
-  nftables
-  netbase
 )
 
 readonly CROWDSEC_PACKAGES=(
@@ -125,6 +128,13 @@ apt_update() {
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
+apt_get_install_sid() {
+  local -a apt_args=()
+  mapfile -t apt_args < <(apt_yes_args)
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
+    apt-get -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "$@"
+}
+
 prepare_security_download_path() {
   local path="$1"
   run_cmd runuser -u "$SECURITY_DOWNLOAD_USER" -- mkdir -p "$(dirname "$path")"
@@ -152,9 +162,8 @@ write_text_file() {
 }
 
 install_bootstrap_packages() {
-  local -a apt_args=()
-  mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${BOOTSTRAP_PACKAGES[@]}"
+  apt_get_install_sid "${BOOTSTRAP_PACKAGES[@]}"
+  apt_get_install_sid "${BOOTSTRAP_DEV_PACKAGES[@]}"
 }
 
 install_crowdsec_repository() {
@@ -169,9 +178,7 @@ install_crowdsec_repository() {
 }
 
 install_crowdsec_packages() {
-  local -a apt_args=()
-  mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${CROWDSEC_PACKAGES[@]}"
+  apt_get_install_sid "${CROWDSEC_PACKAGES[@]}"
 }
 
 resolve_nftables_release() {

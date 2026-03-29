@@ -60,6 +60,7 @@ phase_install() {
   install_repository_files
   apt_update
   install_normal_tools
+  install_spotify_client
   install_sid_tools
   install_deb_tools
   render_mpv_config

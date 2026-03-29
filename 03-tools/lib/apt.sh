@@ -14,7 +14,6 @@ readonly NORMAL_TOOLS_PACKAGES=(
   code
   mullvad-browser-alpha
   mullvad-vpn
-  spotify-client
 )
 
 readonly SID_TOOLS_PACKAGES=(
@@ -34,6 +33,9 @@ readonly SPOTIFY_KEY_URL="https://download.spotify.com/debian/pubkey_5384CE82BA5
 readonly SPOTIFY_KEYRING_PATH="${TOOLS_KEYRING_DIR}/spotify.gpg"
 readonly SPOTIFY_LIST_PATH="/etc/apt/sources.list.d/spotify.list"
 readonly SPOTIFY_SOURCES_PATH="/etc/apt/sources.list.d/spotify.sources"
+readonly SPOTIFY_PACKAGE="spotify-client"
+readonly SPOTIFY_WRAPPER_PATH="/usr/local/bin/spotify"
+readonly SPOTIFY_DESKTOP_OVERRIDE_PATH="/usr/local/share/applications/spotify.desktop"
 readonly CODE_WRAPPER_PATH="/usr/local/bin/code"
 readonly CODE_DESKTOP_OVERRIDE_PATH="/usr/local/share/applications/code.desktop"
 readonly BITWARDEN_WRAPPER_PATH="/usr/local/bin/bitwarden"
@@ -154,6 +156,18 @@ install_normal_tools() {
   remove_spotify_legacy_source_list
 }
 
+install_spotify_client() {
+  local -a apt_args=()
+  mapfile -t apt_args < <(apt_yes_args)
+  run_cmd env \
+    DEBIAN_FRONTEND=noninteractive \
+    APT_LISTCHANGES_FRONTEND=none \
+    apt \
+    -o apt-listchanges::frontend=none \
+    -o apt-listchanges::no-network=true \
+    -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "$SPOTIFY_PACKAGE"
+}
+
 install_sid_tools() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
@@ -194,9 +208,45 @@ install_deb_tools() {
   install_deb_url "$BITWARDEN_URL" /tmp/bitwarden_amd64.deb
   install_deb_url "$OBSIDIAN_URL" /tmp/obsidian_amd64.deb
   install_deb_url "$FILEN_URL" /tmp/filen_amd64.deb
+  render_spotify_wrapper
   render_code_kwallet_wrapper
   render_bitwarden_wayland_wrapper
   refresh_managed_desktop_database
+}
+
+render_spotify_wrapper() {
+  run_cmd install -d -m 0755 /usr/local/bin /usr/local/share/applications
+  cat >"$SPOTIFY_WRAPPER_PATH" <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+app_command='/usr/bin/spotify'
+
+if [[ ! -x "$app_command" ]]; then
+  printf 'missing Spotify launcher: %s\n' "$app_command" >&2
+  exit 1
+fi
+
+exec "$app_command" "$@"
+EOF
+  run_cmd chmod 0755 "$SPOTIFY_WRAPPER_PATH"
+
+  cat >"$SPOTIFY_DESKTOP_OVERRIDE_PATH" <<'EOF'
+[Desktop Entry]
+Name=Spotify
+GenericName=Music Player
+Comment=Spotify streaming music client
+Exec=/usr/local/bin/spotify %U
+Terminal=false
+Type=Application
+Icon=spotify-client
+StartupWMClass=spotify
+MimeType=x-scheme-handler/spotify;
+Categories=Audio;Music;Player;AudioVideo;
+Keywords=Music;Player;Streaming;Spotify;
+EOF
+  run_cmd chmod 0644 "$SPOTIFY_DESKTOP_OVERRIDE_PATH"
 }
 
 render_code_kwallet_wrapper() {
@@ -325,6 +375,7 @@ verify_tools_install() {
   for pkg in "${NORMAL_TOOLS_PACKAGES[@]}" "${SID_TOOLS_PACKAGES[@]}"; do
     package_is_installed "$pkg" || die "package '$pkg' is not installed"
   done
+  package_is_installed "$SPOTIFY_PACKAGE" || die "package '$SPOTIFY_PACKAGE' is not installed"
   package_is_installed thorium-browser || die "thorium-browser package is not installed"
   package_is_installed bitwarden || die "bitwarden package is not installed"
   package_pattern_installed '^obsidian($|[-])' || die "obsidian package is not installed"
@@ -336,6 +387,8 @@ verify_tools_install() {
   [[ -f "/usr/share/keyrings/microsoft.gpg" ]] || die "missing microsoft keyring"
   [[ -f "/usr/share/keyrings/mullvad-keyring.gpg" ]] || die "missing mullvad keyring"
   [[ -f "$SPOTIFY_KEYRING_PATH" ]] || die "missing spotify keyring"
+  [[ -f "$SPOTIFY_WRAPPER_PATH" ]] || die "missing managed Spotify wrapper"
+  [[ -f "$SPOTIFY_DESKTOP_OVERRIDE_PATH" ]] || die "missing managed Spotify desktop override"
   grep -F 'Architectures: amd64' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing amd64 architecture"
   grep -F 'Signed-By: /usr/share/keyrings/microsoft.gpg' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing microsoft signed-by key"
   grep -F 'URIs: https://packages.microsoft.com/repos/code' /etc/apt/sources.list.d/vscode.sources >/dev/null || die "vscode source missing expected repo uri"
@@ -351,6 +404,8 @@ verify_tools_install() {
   grep -F 'URIs: https://repository.spotify.com' "$SPOTIFY_SOURCES_PATH" >/dev/null || die "spotify source missing expected repo uri"
   grep -F 'Suites: stable' "$SPOTIFY_SOURCES_PATH" >/dev/null || die "spotify source missing stable suite"
   grep -F 'Components: non-free' "$SPOTIFY_SOURCES_PATH" >/dev/null || die "spotify source missing non-free component"
+  grep -F '/usr/bin/spotify' "$SPOTIFY_WRAPPER_PATH" >/dev/null || die "managed Spotify wrapper is not launching the upstream Spotify binary"
+  grep -F 'Exec=/usr/local/bin/spotify %U' "$SPOTIFY_DESKTOP_OVERRIDE_PATH" >/dev/null || die "managed Spotify desktop override is missing the wrapper Exec"
   [[ -f "$CODE_WRAPPER_PATH" ]] || die "missing managed Code wrapper"
   [[ -f "$CODE_DESKTOP_OVERRIDE_PATH" ]] || die "missing managed Code desktop override"
   [[ -f "$BITWARDEN_WRAPPER_PATH" ]] || die "missing managed Bitwarden wrapper"
@@ -363,6 +418,7 @@ verify_tools_install() {
   grep -F -- '--password-store=kwallet6' "$BITWARDEN_WRAPPER_PATH" >/dev/null || die "managed Bitwarden wrapper is not forcing KWallet"
   grep -F -- '--ozone-platform=wayland' "$BITWARDEN_WRAPPER_PATH" >/dev/null || die "managed Bitwarden wrapper is not forcing Wayland"
   grep -F 'Exec=/usr/local/bin/bitwarden %U' "$BITWARDEN_DESKTOP_OVERRIDE_PATH" >/dev/null || die "managed Bitwarden desktop override is missing the Wayland wrapper Exec"
+  desktop-file-validate "$SPOTIFY_DESKTOP_OVERRIDE_PATH"
   desktop-file-validate "$CODE_DESKTOP_OVERRIDE_PATH"
   desktop-file-validate "$BITWARDEN_DESKTOP_OVERRIDE_PATH"
   [[ -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf" ]] || die "missing mpv.conf"
@@ -372,10 +428,11 @@ verify_tools_install() {
 remove_tools_install() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${SID_TOOLS_PACKAGES[@]}" thorium-browser bitwarden obsidian filen || true
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${SID_TOOLS_PACKAGES[@]}" "$SPOTIFY_PACKAGE" thorium-browser bitwarden obsidian filen || true
   run_cmd rm -f /etc/apt/sources.list.d/vscode.sources /etc/apt/sources.list.d/vscode.list /etc/apt/sources.list.d/thorium.sources /etc/apt/sources.list.d/thorium.list /etc/apt/sources.list.d/mullvad.sources /etc/apt/sources.list.d/mullvad.list "$SPOTIFY_SOURCES_PATH"
   remove_spotify_legacy_source_list
   run_cmd rm -f /usr/share/keyrings/microsoft.gpg /usr/share/keyrings/mullvad-keyring.asc /usr/share/keyrings/mullvad-keyring.gpg "$SPOTIFY_KEYRING_PATH"
+  run_cmd rm -f "$SPOTIFY_WRAPPER_PATH" "$SPOTIFY_DESKTOP_OVERRIDE_PATH"
   run_cmd rm -f "$CODE_WRAPPER_PATH" "$CODE_DESKTOP_OVERRIDE_PATH"
   run_cmd rm -f "$BITWARDEN_WRAPPER_PATH" "$BITWARDEN_DESKTOP_OVERRIDE_PATH"
   run_cmd rm -f "$TOOLS_TARGET_HOME/.config/mpv/mpv.conf"

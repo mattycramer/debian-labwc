@@ -629,6 +629,35 @@ wait_for_session_bus() {
   return 1
 }
 
+wait_for_system_bus() {
+  bus_socket="/run/dbus/system_bus_socket"
+  attempt=1
+  while [ "\$attempt" -le 10 ]; do
+    if [ -S "\$bus_socket" ]; then
+      return 0
+    fi
+    sleep 1
+    attempt=\$((attempt + 1))
+  done
+  return 1
+}
+
+warm_polkit_service() {
+  if ! command -v systemctl >/dev/null 2>&1; then
+    return 0
+  fi
+  attempt=1
+  while [ "\$attempt" -le 10 ]; do
+    systemctl start polkit.service >/dev/null 2>&1 || true
+    if systemctl is-active --quiet polkit.service >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+    attempt=\$((attempt + 1))
+  done
+  return 1
+}
+
 update_activation_environment() {
   if [ "\${LABWC_UPDATE_ACTIVATION_ENV:-0}" != "1" ]; then
     return 0
@@ -645,6 +674,7 @@ pgrep -x foot >/dev/null 2>&1 || foot --server &
 pgrep -x swaybg >/dev/null 2>&1 || swaybg -i "$wallpaper_path" -m "${LABWC_WALLPAPER_MODE}" &
 
 wait_for_session_bus || true
+wait_for_system_bus || true
 update_activation_environment \
   DISPLAY \
   WAYLAND_DISPLAY \
@@ -661,6 +691,7 @@ update_activation_environment \
   QT_QPA_PLATFORM \
   QT_WAYLAND_DISABLE_WINDOWDECORATION
 
+warm_polkit_service || true
 pgrep -x polkit-kde-authentication-agent-1 >/dev/null 2>&1 || /usr/lib/x86_64-linux-gnu/libexec/polkit-kde-authentication-agent-1 &
 /usr/local/bin/debian-labwc-workspace-state 1 >/dev/null 2>&1 || true
 pgrep -x waybar >/dev/null 2>&1 || waybar &
