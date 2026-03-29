@@ -14,4 +14,4 @@ esac
 mkdir -p "$state_root"
 printf '%s\n' "$workspace" >"$state_file"
 
-pkill -RTMIN+10 -x waybar >/dev/null 2>&1 || true
+( sleep 0.15; pkill -RTMIN+10 -x waybar >/dev/null 2>&1 || true ) &

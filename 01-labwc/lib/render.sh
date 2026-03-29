@@ -750,8 +750,7 @@ render_waybar_config() {
     "interval": "once",
     "signal": 10,
     "tooltip": false,
-    "on-click": "/usr/local/bin/debian-labwc-workspace-activate 1",
-    "on-click-right": "/usr/local/bin/debian-labwc-workspace-send 1"
+    "on-click": "/usr/local/bin/debian-labwc-workspace-activate 1"
   },
   "custom/workspace-2": {
     "exec": "/usr/local/bin/debian-labwc-workspace-status 2",
@@ -759,8 +758,7 @@ render_waybar_config() {
     "interval": "once",
     "signal": 10,
     "tooltip": false,
-    "on-click": "/usr/local/bin/debian-labwc-workspace-activate 2",
-    "on-click-right": "/usr/local/bin/debian-labwc-workspace-send 2"
+    "on-click": "/usr/local/bin/debian-labwc-workspace-activate 2"
   },
   "custom/workspace-3": {
     "exec": "/usr/local/bin/debian-labwc-workspace-status 3",
@@ -768,8 +766,7 @@ render_waybar_config() {
     "interval": "once",
     "signal": 10,
     "tooltip": false,
-    "on-click": "/usr/local/bin/debian-labwc-workspace-activate 3",
-    "on-click-right": "/usr/local/bin/debian-labwc-workspace-send 3"
+    "on-click": "/usr/local/bin/debian-labwc-workspace-activate 3"
   },
   "custom/workspace-4": {
     "exec": "/usr/local/bin/debian-labwc-workspace-status 4",
@@ -777,8 +774,7 @@ render_waybar_config() {
     "interval": "once",
     "signal": 10,
     "tooltip": false,
-    "on-click": "/usr/local/bin/debian-labwc-workspace-activate 4",
-    "on-click-right": "/usr/local/bin/debian-labwc-workspace-send 4"
+    "on-click": "/usr/local/bin/debian-labwc-workspace-activate 4"
   },
   "clock": {
     "interval": 30,

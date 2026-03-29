@@ -145,6 +145,7 @@ install_root_files() {
   install_helper_script "$SCRIPT_DIR/bin/module-menu.sh" "/usr/local/bin/debian-labwc-module-menu"
   install_helper_script "$SCRIPT_DIR/bin/player-status.sh" "/usr/local/bin/debian-labwc-player-status"
   install_helper_script "$SCRIPT_DIR/bin/unlock-gpg-key.sh" "/usr/local/bin/debian-labwc-unlock-gpg-key"
+  install_helper_script "$SCRIPT_DIR/bin/workspacectl.py" "/usr/local/bin/debian-labwc-workspacectl"
   install_helper_script "$SCRIPT_DIR/bin/workspace-activate.sh" "/usr/local/bin/debian-labwc-workspace-activate"
   install_helper_script "$SCRIPT_DIR/bin/workspace-send.sh" "/usr/local/bin/debian-labwc-workspace-send"
   install_helper_script "$SCRIPT_DIR/bin/workspace-state.sh" "/usr/local/bin/debian-labwc-workspace-state"

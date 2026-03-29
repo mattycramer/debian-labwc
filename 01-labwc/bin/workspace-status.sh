@@ -12,6 +12,13 @@ case "$workspace" in
   *) exit 1 ;;
 esac
 
+if command -v /usr/local/bin/debian-labwc-workspacectl >/dev/null 2>&1; then
+  if status_json="$(/usr/local/bin/debian-labwc-workspacectl status "$workspace" 2>/dev/null)"; then
+    printf '%s\n' "$status_json"
+    exit 0
+  fi
+fi
+
 if [[ -r "$state_file" ]]; then
   active_workspace="$(head -n 1 "$state_file" | tr -dc '0-9')"
 fi
