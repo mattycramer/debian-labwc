@@ -76,6 +76,7 @@ readonly BACKPORTS_PACKAGES=(
   file-roller
   ripgrep
   fd-find
+  tmux
   btop
   ncdu
   fzf

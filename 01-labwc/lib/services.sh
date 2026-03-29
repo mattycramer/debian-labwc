@@ -145,6 +145,10 @@ install_root_files() {
   install_helper_script "$SCRIPT_DIR/bin/module-menu.sh" "/usr/local/bin/debian-labwc-module-menu"
   install_helper_script "$SCRIPT_DIR/bin/player-status.sh" "/usr/local/bin/debian-labwc-player-status"
   install_helper_script "$SCRIPT_DIR/bin/unlock-gpg-key.sh" "/usr/local/bin/debian-labwc-unlock-gpg-key"
+  install_helper_script "$SCRIPT_DIR/bin/workspace-activate.sh" "/usr/local/bin/debian-labwc-workspace-activate"
+  install_helper_script "$SCRIPT_DIR/bin/workspace-send.sh" "/usr/local/bin/debian-labwc-workspace-send"
+  install_helper_script "$SCRIPT_DIR/bin/workspace-state.sh" "/usr/local/bin/debian-labwc-workspace-state"
+  install_helper_script "$SCRIPT_DIR/bin/workspace-status.sh" "/usr/local/bin/debian-labwc-workspace-status"
 }
 
 resolve_user_unit_path() {
@@ -256,6 +260,7 @@ nuke_all_state() {
   remove_if_present "$LABWC_TARGET_HOME/.config/kanshi"
   remove_if_present "$LABWC_TARGET_HOME/.config/wofi"
   remove_if_present "$LABWC_TARGET_HOME/.config/mako"
+  remove_if_present "$LABWC_TARGET_HOME/.config/fzf"
   remove_if_present "$LABWC_TARGET_HOME/.config/swaylock"
   remove_if_present "$LABWC_TARGET_HOME/.config/foot"
   remove_if_present "$LABWC_TARGET_HOME/.config/gammastep"
@@ -263,6 +268,7 @@ nuke_all_state() {
   remove_if_present "$LABWC_TARGET_HOME/.config/systemd/user/xdg-desktop-portal.service.d"
   remove_if_present "$LABWC_TARGET_HOME/.config/systemd/user/xdg-desktop-portal-wlr.service.d"
   remove_if_present "$LABWC_TARGET_HOME/.config/debian-labwc"
+  remove_if_present "$LABWC_TARGET_HOME/.local/state/debian-labwc"
   remove_if_present "$LABWC_TARGET_HOME/.config/starship.toml"
   remove_if_present "$LABWC_TARGET_HOME/.local/share/debian-labwc"
   remove_if_present "$LABWC_TARGET_HOME/.bashrc"
@@ -270,6 +276,7 @@ nuke_all_state() {
   remove_if_present "$LABWC_TARGET_HOME/.zshrc"
   remove_if_present "$LABWC_TARGET_HOME/.zprofile"
   remove_if_present "$LABWC_TARGET_HOME/.nanorc"
+  remove_if_present "$LABWC_TARGET_HOME/.tmux.conf"
 
   log_info "removing installed helper scripts and session files"
   remove_if_present "/usr/local/bin/debian-labwc-session"
@@ -283,6 +290,10 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/debian-labwc-module-menu"
   remove_if_present "/usr/local/bin/debian-labwc-player-status"
   remove_if_present "/usr/local/bin/debian-labwc-unlock-gpg-key"
+  remove_if_present "/usr/local/bin/debian-labwc-workspace-activate"
+  remove_if_present "/usr/local/bin/debian-labwc-workspace-send"
+  remove_if_present "/usr/local/bin/debian-labwc-workspace-state"
+  remove_if_present "/usr/local/bin/debian-labwc-workspace-status"
   remove_if_present "/usr/share/wayland-sessions/labwc.desktop"
   remove_if_present "/usr/local/share/polkit-1/rules.d"
   remove_if_present "$POLKIT_TMPFILES_PATH"

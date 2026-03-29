@@ -31,6 +31,7 @@ readonly BACKPORTS_TOOLS_PACKAGES=(
 readonly TOOLS_KEYRING_DIR="/usr/share/keyrings"
 readonly SPOTIFY_KEY_URL="https://download.spotify.com/debian/pubkey_5384CE82BA52C83A.asc"
 readonly SPOTIFY_KEYRING_PATH="${TOOLS_KEYRING_DIR}/spotify.gpg"
+readonly SPOTIFY_LIST_PATH="/etc/apt/sources.list.d/spotify.list"
 readonly SPOTIFY_SOURCES_PATH="/etc/apt/sources.list.d/spotify.sources"
 readonly CODE_WRAPPER_PATH="/usr/local/bin/code"
 readonly CODE_DESKTOP_OVERRIDE_PATH="/usr/local/share/applications/code.desktop"
@@ -88,6 +89,10 @@ fetch_as_tools_user() {
   runuser -u "$TOOLS_TARGET_USER" -- env HOME="$TOOLS_TARGET_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error "$url"
 }
 
+remove_spotify_legacy_source_list() {
+  run_cmd rm -f "$SPOTIFY_LIST_PATH"
+}
+
 install_spotify_repository_files() {
   local spotify_key_asc="/tmp/spotify-key.asc"
   run_cmd install -d -m 0755 "$TOOLS_KEYRING_DIR"
@@ -95,6 +100,7 @@ install_spotify_repository_files() {
   run_cmd gpg --dearmor --yes --output "$SPOTIFY_KEYRING_PATH" "$spotify_key_asc"
   run_cmd chmod 0644 "$SPOTIFY_KEYRING_PATH"
   run_cmd rm -f -- "$spotify_key_asc"
+  remove_spotify_legacy_source_list
   printf '%s' 'Types: deb
 URIs: https://repository.spotify.com
 Suites: stable
@@ -144,6 +150,7 @@ install_normal_tools() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}"
+  remove_spotify_legacy_source_list
 }
 
 install_backports_tools() {
@@ -324,6 +331,7 @@ verify_tools_install() {
   [[ -f "/etc/apt/sources.list.d/vscode.sources" ]] || die "missing vscode.sources"
   [[ -f "/etc/apt/sources.list.d/mullvad.sources" ]] || die "missing mullvad.sources"
   [[ -f "$SPOTIFY_SOURCES_PATH" ]] || die "missing spotify.sources"
+  [[ ! -e "$SPOTIFY_LIST_PATH" ]] || die "legacy spotify.list exists; spotify must use a deb822 .sources file"
   [[ -f "/usr/share/keyrings/microsoft.gpg" ]] || die "missing microsoft keyring"
   [[ -f "/usr/share/keyrings/mullvad-keyring.gpg" ]] || die "missing mullvad keyring"
   [[ -f "$SPOTIFY_KEYRING_PATH" ]] || die "missing spotify keyring"
@@ -365,6 +373,7 @@ remove_tools_install() {
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}" thorium-browser bitwarden obsidian filen || true
   run_cmd rm -f /etc/apt/sources.list.d/vscode.sources /etc/apt/sources.list.d/vscode.list /etc/apt/sources.list.d/thorium.sources /etc/apt/sources.list.d/thorium.list /etc/apt/sources.list.d/mullvad.sources /etc/apt/sources.list.d/mullvad.list "$SPOTIFY_SOURCES_PATH"
+  remove_spotify_legacy_source_list
   run_cmd rm -f /usr/share/keyrings/microsoft.gpg /usr/share/keyrings/mullvad-keyring.asc /usr/share/keyrings/mullvad-keyring.gpg "$SPOTIFY_KEYRING_PATH"
   run_cmd rm -f "$CODE_WRAPPER_PATH" "$CODE_DESKTOP_OVERRIDE_PATH"
   run_cmd rm -f "$BITWARDEN_WRAPPER_PATH" "$BITWARDEN_DESKTOP_OVERRIDE_PATH"

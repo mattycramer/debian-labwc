@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+workspace="${1:-}"
+state_file="${XDG_STATE_HOME:-$HOME/.local/state}/debian-labwc/current-workspace"
+active_workspace="1"
+css_class='["inactive"]'
+
+case "$workspace" in
+  1|2|3|4) ;;
+  *) exit 1 ;;
+esac
+
+if [[ -r "$state_file" ]]; then
+  active_workspace="$(head -n 1 "$state_file" | tr -dc '0-9')"
+fi
+
+case "$active_workspace" in
+  1|2|3|4) ;;
+  *) active_workspace="1" ;;
+esac
+
+if [[ "$active_workspace" == "$workspace" ]]; then
+  css_class='["active"]'
+fi
+
+printf '{"text":"%s","class":%s}\n' "$workspace" "$css_class"

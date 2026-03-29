@@ -4,6 +4,7 @@ readonly BOOTSTRAP_PACKAGES=(
   ca-certificates
   curl
   xz-utils
+  systemd-coredump
 )
 
 readonly DEV_PACKAGES=(

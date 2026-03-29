@@ -55,7 +55,8 @@ ensure_user_base_dirs() {
   run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
     "$LABWC_TARGET_HOME/.config" \
     "$LABWC_TARGET_HOME/.local" \
-    "$LABWC_TARGET_HOME/.local/share"
+    "$LABWC_TARGET_HOME/.local/share" \
+    "$LABWC_TARGET_HOME/.local/state"
   run_cmd chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.config" "$LABWC_TARGET_HOME/.local"
 }
 
@@ -100,6 +101,50 @@ elif [[ -f /usr/share/bash-completion/bash_completion ]]; then
   source /usr/share/bash-completion/bash_completion
 fi
 
+if command -v fzf >/dev/null 2>&1; then
+  export FZF_DEFAULT_OPTS_FILE="$HOME/.config/fzf/default-opts"
+  export FZF_CTRL_R_OPTS="--prompt 'History> ' --border-label='Command History'"
+fi
+
+if command -v fdfind >/dev/null 2>&1; then
+  alias fd='fdfind'
+  export FZF_DEFAULT_COMMAND='fdfind --hidden --follow --exclude .git .'
+  export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+  export FZF_ALT_C_COMMAND='fdfind --type d --hidden --follow --exclude .git .'
+  export FZF_CTRL_T_OPTS="--prompt 'Files> ' --preview '$HOME/.config/fzf/preview.sh {}' --preview-window=right,60%,border-left,wrap"
+  export FZF_ALT_C_OPTS="--prompt 'Directories> ' --preview 'ls -la --color=always -- {}' --preview-window=right,50%,border-left"
+  export FZF_COMPLETION_OPTS='--border --info=inline-right'
+  export FZF_COMPLETION_PATH_OPTS="--preview '$HOME/.config/fzf/preview.sh {}' --preview-window=right,60%,border-left,wrap"
+  export FZF_COMPLETION_DIR_OPTS="--preview 'ls -la --color=always -- {}' --preview-window=right,50%,border-left"
+fi
+
+if [[ -r /usr/share/doc/fzf/examples/key-bindings.bash ]]; then
+  # shellcheck disable=SC1091
+  source /usr/share/doc/fzf/examples/key-bindings.bash
+fi
+if [[ -r /usr/share/doc/fzf/examples/completion.bash ]]; then
+  # shellcheck disable=SC1091
+  source /usr/share/doc/fzf/examples/completion.bash
+fi
+
+if command -v fdfind >/dev/null 2>&1; then
+  _fzf_compgen_path() {
+    local base_dir="${1:-.}"
+    (
+      builtin cd -- "$base_dir" 2>/dev/null &&
+        command fdfind --hidden --follow --exclude .git .
+    )
+  }
+
+  _fzf_compgen_dir() {
+    local base_dir="${1:-.}"
+    (
+      builtin cd -- "$base_dir" 2>/dev/null &&
+        command fdfind --type d --hidden --follow --exclude .git .
+    )
+  }
+fi
+
 if command -v starship >/dev/null 2>&1; then
   eval "$(starship init bash)"
 fi
@@ -138,6 +183,48 @@ compinit
 
 if [[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then
   source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+fi
+
+if command -v fzf >/dev/null 2>&1; then
+  export FZF_DEFAULT_OPTS_FILE="$HOME/.config/fzf/default-opts"
+  export FZF_CTRL_R_OPTS="--prompt 'History> ' --border-label='Command History'"
+fi
+
+if command -v fdfind >/dev/null 2>&1; then
+  alias fd='fdfind'
+  export FZF_DEFAULT_COMMAND='fdfind --hidden --follow --exclude .git .'
+  export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+  export FZF_ALT_C_COMMAND='fdfind --type d --hidden --follow --exclude .git .'
+  export FZF_CTRL_T_OPTS="--prompt 'Files> ' --preview '$HOME/.config/fzf/preview.sh {}' --preview-window=right,60%,border-left,wrap"
+  export FZF_ALT_C_OPTS="--prompt 'Directories> ' --preview 'ls -la --color=always -- {}' --preview-window=right,50%,border-left"
+  export FZF_COMPLETION_OPTS='--border --info=inline-right'
+  export FZF_COMPLETION_PATH_OPTS="--preview '$HOME/.config/fzf/preview.sh {}' --preview-window=right,60%,border-left,wrap"
+  export FZF_COMPLETION_DIR_OPTS="--preview 'ls -la --color=always -- {}' --preview-window=right,50%,border-left"
+fi
+
+if [[ -r /usr/share/doc/fzf/examples/key-bindings.zsh ]]; then
+  source /usr/share/doc/fzf/examples/key-bindings.zsh
+fi
+if [[ -r /usr/share/doc/fzf/examples/completion.zsh ]]; then
+  source /usr/share/doc/fzf/examples/completion.zsh
+fi
+
+if command -v fdfind >/dev/null 2>&1; then
+  _fzf_compgen_path() {
+    local base_dir="${1:-.}"
+    (
+      builtin cd -- "$base_dir" 2>/dev/null &&
+        command fdfind --hidden --follow --exclude .git .
+    )
+  }
+
+  _fzf_compgen_dir() {
+    local base_dir="${1:-.}"
+    (
+      builtin cd -- "$base_dir" 2>/dev/null &&
+        command fdfind --type d --hidden --follow --exclude .git .
+    )
+  }
 fi
 
 if command -v starship >/dev/null 2>&1; then
@@ -210,6 +297,118 @@ render_xfce_helpers() {
   render_user_file "$LABWC_TARGET_HOME/.config/xfce4/helpers.rc" $'TerminalEmulator=foot\n'
 }
 
+render_tmux_config() {
+  local tmux_conf
+  tmux_conf="$(cat <<'EOF'
+# Managed by debian-labwc
+set -g default-terminal "tmux-256color"
+set -as terminal-features ",foot*:RGB,ccolour,cstyle,extkeys,focus,title,clipboard"
+set -as terminal-features ",foot-direct*:RGB,ccolour,cstyle,extkeys,focus,title,clipboard"
+set -as terminal-features ",xterm-256color:RGB"
+set -g focus-events on
+set -g mouse on
+set -g history-limit 100000
+set -g renumber-windows on
+set -g base-index 1
+setw -g pane-base-index 1
+setw -g mode-keys vi
+set -g status-keys vi
+set -s escape-time 10
+set -g set-clipboard external
+set -g detach-on-destroy off
+set -g allow-rename off
+set -g bell-action none
+
+set -g status-position bottom
+set -g status-interval 5
+set -g status-left-length 40
+set -g status-right-length 80
+set -g status-style "fg=#d8dee9,bg=#111827"
+set -g status-left "#S "
+set -g status-right "%Y-%m-%d %H:%M "
+set -g window-status-format " #I:#W "
+set -g window-status-current-format " #I:#W* "
+set -g window-status-current-style "fg=#111827,bg=#f6bd60,bold"
+set -g pane-border-style "fg=#4b5563"
+set -g pane-active-border-style "fg=#6dc4ed"
+set -g message-style "fg=#111827,bg=#f6bd60,bold"
+set -g message-command-style "fg=#111827,bg=#8ecae6"
+
+bind r source-file ~/.tmux.conf \; display-message "tmux.conf reloaded"
+bind c new-window -c "#{pane_current_path}"
+bind '"' split-window -v -c "#{pane_current_path}"
+bind % split-window -h -c "#{pane_current_path}"
+bind - split-window -v -c "#{pane_current_path}"
+bind | split-window -h -c "#{pane_current_path}"
+bind h select-pane -L
+bind j select-pane -D
+bind k select-pane -U
+bind l select-pane -R
+bind -r H resize-pane -L 5
+bind -r J resize-pane -D 5
+bind -r K resize-pane -U 5
+bind -r L resize-pane -R 5
+
+bind-key -T copy-mode-vi v send -X begin-selection
+bind-key -T copy-mode-vi y send -X copy-pipe-and-cancel "wl-copy"
+bind-key -T copy-mode-vi MouseDragEnd1Pane send -X copy-pipe-and-cancel "wl-copy"
+EOF
+)"
+  render_user_file "$LABWC_TARGET_HOME/.tmux.conf" "$tmux_conf"
+}
+
+render_fzf_config() {
+  local fzf_default_opts fzf_preview
+  fzf_default_opts="$(cat <<'EOF'
+--layout=reverse
+--height=60%
+--min-height=20
+--border=rounded
+--info=inline-right
+--prompt=> 
+--pointer=>
+--marker=*
+--scrollbar=|
+--cycle
+--ansi
+--bind=ctrl-z:ignore
+--bind=ctrl-/:toggle-preview
+--bind=ctrl-space:toggle
+--bind=ctrl-a:select-all
+--bind=ctrl-d:deselect-all
+--bind=ctrl-u:preview-half-page-up
+--bind=ctrl-f:preview-half-page-down
+--preview-window=right,60%,border-left,wrap
+--color=bg:#0f1720,bg+:#1f2937,fg:#e5e7eb,fg+:#f8fafc,border:#475569,preview-border:#475569,spinner:#f6bd60,hl:#8ecae6,hl+:#6dc4ed,marker:#f6bd60,pointer:#f6bd60,prompt:#f6bd60,info:#94d2bd,header:#c4b5fd
+EOF
+)"
+  fzf_preview="$(cat <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+target="${1:-}"
+[[ -n "$target" ]] || exit 0
+
+if [[ -d "$target" ]]; then
+  exec ls -la --color=always --group-directories-first -- "$target"
+fi
+
+mime_type="$(file --dereference --brief --mime-type -- "$target" 2>/dev/null || true)"
+case "$mime_type" in
+  text/*|*/json|*/xml|application/x-shellscript|application/javascript)
+    nl -ba -- "$target" | sed -n '1,200p'
+    ;;
+  *)
+    file --dereference --brief -- "$target"
+    ;;
+esac
+EOF
+)"
+  render_user_file "$LABWC_TARGET_HOME/.config/fzf/default-opts" "$fzf_default_opts"
+  render_user_script "$LABWC_TARGET_HOME/.config/fzf/preview.sh" "$fzf_preview"
+}
+
 render_labwc_rc_xml() {
   case "${LABWC_NATURAL_SCROLL:-}" in
     yes|no) ;;
@@ -258,6 +457,15 @@ ${title_bind}
       <naturalScroll>no</naturalScroll>
     </device>
   </libinput>
+  <desktops>
+    <popupTime>1000</popupTime>
+    <names>
+      <name>1</name>
+      <name>2</name>
+      <name>3</name>
+      <name>4</name>
+    </names>
+  </desktops>
   <keyboard>
     <default />
     <keybind key="A-Tab">
@@ -269,6 +477,12 @@ ${title_bind}
     <keybind key="W-Return">
       <action name="Execute"><command>${LABWC_TERMINAL}</command></action>
     </keybind>
+    <keybind key="W-t">
+      <action name="Execute"><command>foot</command></action>
+    </keybind>
+    <keybind key="W-b">
+      <action name="Execute"><command>thorium-browser</command></action>
+    </keybind>
     <keybind key="W-d">
       <action name="Execute"><command>${LABWC_LAUNCHER_CMD}</command></action>
     </keybind>
@@ -277,6 +491,37 @@ ${title_bind}
     </keybind>
     <keybind key="W-e">
       <action name="Execute"><command>thunar</command></action>
+    </keybind>
+    <keybind key="W-f">
+      <action name="Execute"><command>thunar</command></action>
+    </keybind>
+    <keybind key="W-1">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-workspace-state 1</command></action>
+      <action name="GoToDesktop" to="1" />
+    </keybind>
+    <keybind key="W-2">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-workspace-state 2</command></action>
+      <action name="GoToDesktop" to="2" />
+    </keybind>
+    <keybind key="W-3">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-workspace-state 3</command></action>
+      <action name="GoToDesktop" to="3" />
+    </keybind>
+    <keybind key="W-4">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-workspace-state 4</command></action>
+      <action name="GoToDesktop" to="4" />
+    </keybind>
+    <keybind key="W-S-1">
+      <action name="SendToDesktop" to="1" follow="no" />
+    </keybind>
+    <keybind key="W-S-2">
+      <action name="SendToDesktop" to="2" follow="no" />
+    </keybind>
+    <keybind key="W-S-3">
+      <action name="SendToDesktop" to="3" follow="no" />
+    </keybind>
+    <keybind key="W-S-4">
+      <action name="SendToDesktop" to="4" follow="no" />
     </keybind>
     <keybind key="W-q">
       <action name="Close" />
@@ -392,6 +637,7 @@ update_activation_environment \
   QT_WAYLAND_DISABLE_WINDOWDECORATION
 
 pgrep -x lxpolkit >/dev/null 2>&1 || lxpolkit &
+/usr/local/bin/debian-labwc-workspace-state 1 >/dev/null 2>&1 || true
 pgrep -x waybar >/dev/null 2>&1 || waybar &
 pgrep -x kanshi >/dev/null 2>&1 || kanshi &
 pgrep -x mako >/dev/null 2>&1 || mako &
@@ -489,7 +735,7 @@ render_waybar_config() {
   "position": "top",
   "height": 42,
   "spacing": 6,
-  "modules-left": ["custom/launcher"],
+  "modules-left": ["custom/launcher", "custom/workspace-1", "custom/workspace-2", "custom/workspace-3", "custom/workspace-4"],
   "modules-center": ["clock"],
   "modules-right": ["network", "pulseaudio", "battery", "backlight", "cpu", "memory", "disk", "custom/player", "tray", "custom/power"],
   "custom/launcher": {
@@ -497,6 +743,42 @@ render_waybar_config() {
     "tooltip": false,
     "on-click": "/usr/local/bin/debian-labwc-launcher-menu",
     "on-click-right": "wofi --show drun"
+  },
+  "custom/workspace-1": {
+    "exec": "/usr/local/bin/debian-labwc-workspace-status 1",
+    "return-type": "json",
+    "interval": "once",
+    "signal": 10,
+    "tooltip": false,
+    "on-click": "/usr/local/bin/debian-labwc-workspace-activate 1",
+    "on-click-right": "/usr/local/bin/debian-labwc-workspace-send 1"
+  },
+  "custom/workspace-2": {
+    "exec": "/usr/local/bin/debian-labwc-workspace-status 2",
+    "return-type": "json",
+    "interval": "once",
+    "signal": 10,
+    "tooltip": false,
+    "on-click": "/usr/local/bin/debian-labwc-workspace-activate 2",
+    "on-click-right": "/usr/local/bin/debian-labwc-workspace-send 2"
+  },
+  "custom/workspace-3": {
+    "exec": "/usr/local/bin/debian-labwc-workspace-status 3",
+    "return-type": "json",
+    "interval": "once",
+    "signal": 10,
+    "tooltip": false,
+    "on-click": "/usr/local/bin/debian-labwc-workspace-activate 3",
+    "on-click-right": "/usr/local/bin/debian-labwc-workspace-send 3"
+  },
+  "custom/workspace-4": {
+    "exec": "/usr/local/bin/debian-labwc-workspace-status 4",
+    "return-type": "json",
+    "interval": "once",
+    "signal": 10,
+    "tooltip": false,
+    "on-click": "/usr/local/bin/debian-labwc-workspace-activate 4",
+    "on-click-right": "/usr/local/bin/debian-labwc-workspace-send 4"
   },
   "clock": {
     "interval": 30,
@@ -648,6 +930,10 @@ window#waybar {
 }
 
 #custom-launcher,
+#custom-workspace-1,
+#custom-workspace-2,
+#custom-workspace-3,
+#custom-workspace-4,
 #clock,
 #network,
 #pulseaudio,
@@ -670,6 +956,25 @@ window#waybar {
 #custom-launcher {
   color: #f6bd60;
   font-weight: 600;
+}
+
+#custom-workspace-1,
+#custom-workspace-2,
+#custom-workspace-3,
+#custom-workspace-4 {
+  min-width: 18px;
+  padding: 0 11px;
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+#custom-workspace-1.active,
+#custom-workspace-2.active,
+#custom-workspace-3.active,
+#custom-workspace-4.active {
+  background: rgba(246, 189, 96, 0.94);
+  border-color: rgba(246, 189, 96, 0.6);
+  color: #0f1720;
 }
 
 #clock {
@@ -716,6 +1021,10 @@ window#waybar {
 }
 
 #custom-launcher:hover,
+#custom-workspace-1:hover,
+#custom-workspace-2:hover,
+#custom-workspace-3:hover,
+#custom-workspace-4:hover,
 #clock:hover,
 #network:hover,
 #pulseaudio:hover,
@@ -729,6 +1038,14 @@ window#waybar {
 #tray:hover {
   background: rgba(40, 54, 74, 0.92);
   border-color: rgba(119, 141, 169, 0.38);
+}
+
+#custom-workspace-1.active:hover,
+#custom-workspace-2.active:hover,
+#custom-workspace-3.active:hover,
+#custom-workspace-4.active:hover {
+  background: rgba(246, 189, 96, 0.94);
+  border-color: rgba(246, 189, 96, 0.6);
 }
 EOF
 )"
@@ -816,7 +1133,7 @@ render_wofi() {
 }
 
 render_mako() {
-  render_user_file "$LABWC_TARGET_HOME/.config/mako/config" $'font=Noto Sans 11\nborder-size=2\npadding=12\ndefault-timeout=5000\nbackground-color=#1b1b1bff\ntext-color=#f5f5f5ff\nborder-color=#4a89dcff\n'
+  render_user_file "$LABWC_TARGET_HOME/.config/mako/config" $'font=Noto Sans 11\nbackground-color=#111827f2\ntext-color=#e5e7ebff\nwidth=420\nheight=220\nouter-margin=14,14,0,14\nmargin=8\npadding=12,14\nborder-size=2\nborder-color=#6dc4edff\nborder-radius=14\nprogress-color=over #f6bd60ff\nicons=1\nmax-icon-size=48\nicon-path=/usr/share/icons/Papirus-Dark:/usr/share/icons/Papirus:/usr/share/icons/Adwaita:/usr/share/icons/hicolor\nicon-border-radius=8\nmarkup=1\nactions=1\nhistory=1\nmax-history=100\nsort=-time\ngroup-by=summary,app-name,urgency\nformat=<b>%s</b>\\n%b\nhidden-format=<b>%h hidden</b> (%t total)\ndefault-timeout=8000\nignore-timeout=0\nmax-visible=6\nlayer=overlay\nanchor=top-right\non-button-left=invoke-default-action\non-button-middle=dismiss --no-history\non-button-right=dismiss\non-touch=dismiss\n\n[grouped]\nformat=<b>%s</b>\\n%b\\n<small>%g notifications</small>\n\n[hidden]\nborder-color=#94a3b8ff\nprogress-color=over #94a3b8ff\n\n[actionable]\nborder-color=#94d2bdff\n\n[urgency=low]\nbackground-color=#0f1720f2\nborder-color=#64748bff\ndefault-timeout=5000\n\n[urgency=normal]\nbackground-color=#111827f2\nborder-color=#6dc4edff\ndefault-timeout=8000\n\n[urgency=critical]\nbackground-color=#2b1116f2\ntext-color=#fff1f2ff\nborder-color=#ef4444ff\nprogress-color=over #ef4444ff\ndefault-timeout=0\n\n[mode=do-not-disturb]\ninvisible=1\n'
 }
 
 render_swaylock() {
@@ -869,6 +1186,7 @@ render_all_configs() {
     "$config_root/xfce4" \
     "$config_root/wofi" \
     "$config_root/mako" \
+    "$config_root/fzf" \
     "$config_root/swaylock" \
     "$config_root/foot" \
     "$config_root/gammastep" \
@@ -884,6 +1202,8 @@ render_all_configs() {
   render_home_dirs
   render_shell_startup_files
   render_xfce_helpers
+  render_tmux_config
+  render_fzf_config
   install_wallpaper
   render_labwc_environment
   render_labwc_rc_xml
