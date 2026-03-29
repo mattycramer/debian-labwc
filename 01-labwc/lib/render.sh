@@ -39,7 +39,7 @@ EOF
 primary_wallpaper_source_path() {
   local wallpaper_path=""
   wallpaper_path="$(
-    find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f | sort | head -n 1
+    find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f | LC_ALL=C sort | head -n 1
   )"
   [[ -n "$wallpaper_path" ]] || die "missing wallpaper asset under '$SCRIPT_DIR/wallpaper'"
   printf '%s\n' "$wallpaper_path"
@@ -527,7 +527,7 @@ ${title_bind}
       <action name="Close" />
     </keybind>
     <keybind key="W-l">
-      <action name="Execute"><command>swaylock -f</command></action>
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-lock</command></action>
     </keybind>
     <keybind key="Print">
       <action name="Execute"><command>/usr/local/bin/debian-labwc-screenshot-full</command></action>
@@ -648,10 +648,10 @@ if command -v /usr/local/bin/debian-labwc-unlock-gpg-key >/dev/null 2>&1; then
   ) >/dev/null 2>&1 &
 fi
 pgrep -x swayidle >/dev/null 2>&1 || swayidle \
-  timeout "${LABWC_IDLE_LOCK_SECONDS}" 'swaylock -f' \
+  timeout "${LABWC_IDLE_LOCK_SECONDS}" '/usr/local/bin/debian-labwc-lock' \
   timeout "${LABWC_IDLE_DPMS_SECONDS}" '/usr/local/bin/debian-labwc-dpms off' \
   resume '/usr/local/bin/debian-labwc-dpms on' \
-  before-sleep 'swaylock -f' &
+  before-sleep '/usr/local/bin/debian-labwc-lock' &
 
 if [ ! -f "$LABWC_TARGET_HOME/.config/debian-labwc/.outputs-refined" ]; then
   /usr/local/bin/debian-labwc-refresh-outputs >/dev/null 2>&1 &
@@ -1135,17 +1135,34 @@ render_mako() {
 render_swaylock() {
   local wallpaper_path
   wallpaper_path="$(primary_wallpaper_target_path)"
-  render_user_file "$LABWC_TARGET_HOME/.config/swaylock/config" "daemonize
-clock
+  render_user_file "$LABWC_TARGET_HOME/.config/swaylock/config" "clock
+show-failed-attempts
 font=Noto Sans
+font-size=24
 indicator
+indicator-caps-lock
 image=${wallpaper_path}
 scaling=${LABWC_WALLPAPER_MODE}
-color=111111
-inside-color=202020
-ring-color=4a89dc
-line-color=111111
-key-hl-color=88c0d0
+color=111111ff
+inside-color=202020cc
+inside-clear-color=334155cc
+inside-ver-color=1f2937cc
+inside-wrong-color=7f1d1dcc
+ring-color=4a89dcff
+ring-clear-color=88c0d0ff
+ring-ver-color=6dc4edff
+ring-wrong-color=ef4444ff
+line-color=11111100
+line-clear-color=11111100
+line-ver-color=11111100
+line-wrong-color=11111100
+separator-color=00000000
+key-hl-color=88c0d0ff
+bs-hl-color=f6bd60ff
+text-color=e5e7ebff
+text-clear-color=e5e7ebff
+text-ver-color=e5e7ebff
+text-wrong-color=fff1f2ff
 "
 }
 
@@ -1168,7 +1185,7 @@ install_wallpaper() {
     [[ -n "$wallpaper_source_path" ]] || continue
     wallpaper_name="$(basename "$wallpaper_source_path")"
     run_cmd install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$wallpaper_source_path" "$LABWC_TARGET_HOME/.local/share/debian-labwc/$wallpaper_name"
-  done < <(find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f | sort)
+  done < <(find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f | LC_ALL=C sort)
   require_file "$(primary_wallpaper_target_path)"
 }
 

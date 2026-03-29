@@ -20,7 +20,7 @@ run_shutdown_hook() {
 }
 
 case "$selection" in
-  lock) exec swaylock -f ;;
+  lock) exec /usr/local/bin/debian-labwc-lock ;;
   logout)
     run_shutdown_hook
     labwc --exit >/dev/null 2>&1 || pkill -x labwc || true

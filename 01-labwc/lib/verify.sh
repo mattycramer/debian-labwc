@@ -7,7 +7,7 @@ package_is_installed() {
 expected_primary_wallpaper_path() {
   local wallpaper_source_path=""
   wallpaper_source_path="$(
-    find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f | sort | head -n 1
+    find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f | LC_ALL=C sort | head -n 1
   )"
   [[ -n "$wallpaper_source_path" ]] || die "missing wallpaper asset under '$SCRIPT_DIR/wallpaper'"
   printf '%s/.local/share/debian-labwc/%s\n' "$LABWC_TARGET_HOME" "$(basename "$wallpaper_source_path")"
@@ -34,6 +34,7 @@ verify_paths() {
   require_file "/usr/local/bin/debian-labwc-screenshot-region"
   require_file "/usr/local/bin/debian-labwc-record-toggle"
   require_file "/usr/local/bin/debian-labwc-refresh-outputs"
+  require_file "/usr/local/bin/debian-labwc-lock"
   require_file "/usr/local/bin/debian-labwc-launcher-menu"
   require_file "/usr/local/bin/debian-labwc-module-menu"
   require_file "/usr/local/bin/debian-labwc-player-status"
@@ -149,6 +150,7 @@ verify_labwc_config_semantics() {
   grep -F '<keybind key="W-b">' "$rc_path" >/dev/null || die "rc.xml missing Super+b browser binding"
   grep -F '<command>thorium-browser</command>' "$rc_path" >/dev/null || die "rc.xml missing thorium-browser command binding"
   grep -F '<keybind key="W-f">' "$rc_path" >/dev/null || die "rc.xml missing Super+f file manager binding"
+  grep -F '<command>/usr/local/bin/debian-labwc-lock</command>' "$rc_path" >/dev/null || die "rc.xml missing dedicated lock helper binding"
   grep -F "XCURSOR_THEME=${LABWC_XCURSOR_THEME}" "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing XCURSOR_THEME"
   grep -F "XCURSOR_SIZE=${LABWC_XCURSOR_SIZE}" "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing XCURSOR_SIZE"
 }
@@ -202,10 +204,15 @@ verify_labwc_tweaks_semantics() {
 
 verify_swaylock_semantics() {
   local swaylock_path="$LABWC_TARGET_HOME/.config/swaylock/config"
+  local lock_helper="/usr/local/bin/debian-labwc-lock"
   local wallpaper_path
   wallpaper_path="$(expected_primary_wallpaper_path)"
   grep -F "image=${wallpaper_path}" "$swaylock_path" >/dev/null || die "swaylock config is not using the installed wallpaper asset"
   grep -F "scaling=${LABWC_WALLPAPER_MODE}" "$swaylock_path" >/dev/null || die "swaylock config is not using the configured wallpaper mode"
+  grep -F 'show-failed-attempts' "$swaylock_path" >/dev/null || die "swaylock config is missing failed-attempt feedback"
+  grep -F -- '--image "$wallpaper_path"' "$lock_helper" >/dev/null || die "lock helper is not passing the wallpaper explicitly"
+  grep -F -- '--config "$config_path"' "$lock_helper" >/dev/null || die "lock helper is not using the generated swaylock config"
+  grep -F 'exec /usr/local/bin/debian-labwc-lock' "$SCRIPT_DIR/bin/power-menu.sh" >/dev/null || die "power menu is not using the dedicated lock helper"
 }
 
 verify_gpg_agent_semantics() {
