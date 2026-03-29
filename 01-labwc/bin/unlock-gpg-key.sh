@@ -5,11 +5,13 @@ IFS=$'\n\t'
 command -v gpg >/dev/null 2>&1 || exit 0
 command -v gpgconf >/dev/null 2>&1 || exit 0
 pinentry_bin="$(command -v pinentry-gtk-2 || true)"
-[[ -n "$pinentry_bin" ]] || exit 0
+secret_tool_bin="$(command -v secret-tool || true)"
+[[ -n "$pinentry_bin" || -n "$secret_tool_bin" ]] || exit 0
 
 export GNUPGHOME="${GNUPGHOME:-$HOME/.gnupg}"
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/debian-labwc"
 fingerprint_path="${state_dir}/kwallet-session-gpg.fpr"
+seed_path="${state_dir}/kwallet-session-gpg-passphrase.seed"
 key_fpr="$(tr -d '\n' <"$fingerprint_path" 2>/dev/null || true)"
 if [[ -z "$key_fpr" ]]; then
   key_fpr="$(
@@ -20,6 +22,28 @@ if [[ -z "$key_fpr" ]]; then
   )"
 fi
 [[ -n "$key_fpr" ]] || exit 0
+
+lookup_secret_service_passphrase() {
+  [[ -n "$secret_tool_bin" ]] || return 1
+  local stored_passphrase=""
+  stored_passphrase="$("$secret_tool_bin" lookup service debian-labwc kind kwallet-session-gpg-passphrase user "$USER" gpg_fingerprint "$key_fpr" 2>/dev/null || true)"
+  [[ -n "$stored_passphrase" ]] || stored_passphrase="$("$secret_tool_bin" lookup service debian-labwc kind kwallet-session-gpg-passphrase user "$USER" 2>/dev/null || true)"
+  [[ -n "$stored_passphrase" ]] || return 1
+  printf '%s' "$stored_passphrase"
+}
+
+store_secret_service_passphrase() {
+  local passphrase_to_store="$1"
+  [[ -n "$secret_tool_bin" ]] || return 1
+  [[ -n "$passphrase_to_store" ]] || return 1
+  "$secret_tool_bin" clear service debian-labwc kind kwallet-session-gpg-passphrase user "$USER" >/dev/null 2>&1 || true
+  printf '%s' "$passphrase_to_store" | "$secret_tool_bin" store \
+    --label="Debian Labwc KWallet Session GPG Passphrase" \
+    service debian-labwc \
+    kind kwallet-session-gpg-passphrase \
+    user "$USER" \
+    gpg_fingerprint "$key_fpr" >/dev/null
+}
 
 current_tty="$(tty 2>/dev/null || true)"
 if [[ -n "${current_tty:-}" && "${current_tty}" != "not a tty" ]]; then
@@ -35,16 +59,30 @@ cleanup() {
 }
 trap cleanup EXIT
 
-pinentry_output="$(
-  "$pinentry_bin" <<'EOF'
+passphrase="$(lookup_secret_service_passphrase || true)"
+
+if [[ -z "$passphrase" && -r "$seed_path" ]]; then
+  passphrase="$(<"$seed_path")"
+fi
+
+if [[ -z "$passphrase" ]]; then
+  [[ -n "$pinentry_bin" ]] || exit 0
+  pinentry_output="$(
+    "$pinentry_bin" <<'EOF'
 SETTITLE Debian Labwc GPG Unlock
 SETDESC Enter the GPG password to unlock the KWallet encryption key for this session.
 SETPROMPT GPG Password:
 GETPIN
 EOF
-)"
-passphrase="$(printf '%s\n' "$pinentry_output" | awk '/^D / {sub(/^D /, "", $0); print; exit}')"
+  )"
+  passphrase="$(printf '%s\n' "$pinentry_output" | awk '/^D / {sub(/^D /, "", $0); print; exit}')"
+fi
+
 [[ -n "$passphrase" ]] || exit 0
 
 printf '%s\n' "debian-labwc-gpg-unlock" >"$tmpfile"
 printf '%s\n' "$passphrase" | gpg --batch --quiet --local-user "$key_fpr" --pinentry-mode loopback --passphrase-fd 0 --detach-sign --output /dev/null "$tmpfile"
+
+if store_secret_service_passphrase "$passphrase"; then
+  rm -f -- "$seed_path"
+fi

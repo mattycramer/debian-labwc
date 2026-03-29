@@ -672,14 +672,8 @@ fi
 pgrep -x mako >/dev/null 2>&1 || mako &
 if command -v /usr/local/bin/debian-labwc-unlock-gpg-key >/dev/null 2>&1; then
   (
-    sleep 2
+    sleep 1
     /usr/local/bin/debian-labwc-unlock-gpg-key
-  ) >/dev/null 2>&1 &
-fi
-if command -v /usr/local/bin/debian-labwc-store-gpg-secret >/dev/null 2>&1; then
-  (
-    sleep 4
-    /usr/local/bin/debian-labwc-store-gpg-secret
   ) >/dev/null 2>&1 &
 fi
 pgrep -x swayidle >/dev/null 2>&1 || swayidle \
