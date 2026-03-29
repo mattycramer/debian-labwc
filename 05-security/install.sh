@@ -85,6 +85,7 @@ phase_install() {
   load_env_file
   ensure_crowdsec_console_enrollment_key
   detect_security_download_user
+  apt_update
   install_bootstrap_packages
   phase_bootstrap_doctor
   install_crowdsec_repository
