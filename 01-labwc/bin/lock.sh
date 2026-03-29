@@ -3,7 +3,7 @@ set -Eeuo pipefail
 IFS=$'\n\t'
 
 config_path="${XDG_CONFIG_HOME:-$HOME/.config}/swaylock/config"
-wallpaper_name="@PRIMARY_WALLPAPER_NAME@"
+wallpaper_name="@LOCK_WALLPAPER_NAME@"
 runtime_wallpaper="${XDG_DATA_HOME:-$HOME/.local/share}/debian-labwc/${wallpaper_name}"
 fallback_wallpaper="@TARGET_HOME@/.local/share/debian-labwc/${wallpaper_name}"
 wallpaper_path="$runtime_wallpaper"

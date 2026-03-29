@@ -4,13 +4,27 @@ package_is_installed() {
   dpkg-query -W -f='${Status}\n' "$1" 2>/dev/null | grep -F "install ok installed" >/dev/null
 }
 
-expected_primary_wallpaper_path() {
+expected_wallpaper_path_for_prefix() {
+  local prefix="$1"
   local wallpaper_source_path=""
   wallpaper_source_path="$(
-    find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f | LC_ALL=C sort | head -n 1
+    find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f -name "${prefix}-*" | LC_ALL=C sort | head -n 1
   )"
+  if [[ -z "$wallpaper_source_path" ]]; then
+    wallpaper_source_path="$(
+      find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f | LC_ALL=C sort | head -n 1
+    )"
+  fi
   [[ -n "$wallpaper_source_path" ]] || die "missing wallpaper asset under '$SCRIPT_DIR/wallpaper'"
   printf '%s/.local/share/debian-labwc/%s\n' "$LABWC_TARGET_HOME" "$(basename "$wallpaper_source_path")"
+}
+
+expected_background_wallpaper_path() {
+  expected_wallpaper_path_for_prefix "wall"
+}
+
+expected_lock_wallpaper_path() {
+  expected_wallpaper_path_for_prefix "lock"
 }
 
 verify_packages() {
@@ -72,7 +86,8 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.config/systemd/user/gpg-agent.service.d/override.conf"
   require_file "$LABWC_TARGET_HOME/.config/systemd/user/xdg-desktop-portal.service.d/override.conf"
   require_file "$LABWC_TARGET_HOME/.config/systemd/user/xdg-desktop-portal-wlr.service.d/override.conf"
-  require_file "$(expected_primary_wallpaper_path)"
+  require_file "$(expected_background_wallpaper_path)"
+  require_file "$(expected_lock_wallpaper_path)"
   require_dir "$LABWC_TARGET_HOME/.local/state"
   require_dir "$LABWC_TARGET_HOME/Music"
   require_dir "$LABWC_TARGET_HOME/Videos"
@@ -206,7 +221,7 @@ verify_swaylock_semantics() {
   local swaylock_path="$LABWC_TARGET_HOME/.config/swaylock/config"
   local lock_helper="/usr/local/bin/debian-labwc-lock"
   local wallpaper_path
-  wallpaper_path="$(expected_primary_wallpaper_path)"
+  wallpaper_path="$(expected_lock_wallpaper_path)"
   grep -F "image=${wallpaper_path}" "$swaylock_path" >/dev/null || die "swaylock config is not using the installed wallpaper asset"
   grep -F "scaling=${LABWC_WALLPAPER_MODE}" "$swaylock_path" >/dev/null || die "swaylock config is not using the configured wallpaper mode"
   grep -F 'show-failed-attempts' "$swaylock_path" >/dev/null || die "swaylock config is missing failed-attempt feedback"

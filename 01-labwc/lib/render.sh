@@ -36,19 +36,44 @@ EOF
   render_user_file "$LABWC_TARGET_HOME/.config/labwc/environment" "$environment_file"
 }
 
-primary_wallpaper_source_path() {
+wallpaper_source_path_for_prefix() {
+  local prefix="$1"
   local wallpaper_path=""
   wallpaper_path="$(
-    find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f | LC_ALL=C sort | head -n 1
+    find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f -name "${prefix}-*" | LC_ALL=C sort | head -n 1
   )"
+  if [[ -z "$wallpaper_path" ]]; then
+    wallpaper_path="$(
+      find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f | LC_ALL=C sort | head -n 1
+    )"
+  fi
   [[ -n "$wallpaper_path" ]] || die "missing wallpaper asset under '$SCRIPT_DIR/wallpaper'"
   printf '%s\n' "$wallpaper_path"
 }
 
-primary_wallpaper_target_path() {
-  local wallpaper_source_path
-  wallpaper_source_path="$(primary_wallpaper_source_path)"
+background_wallpaper_source_path() {
+  wallpaper_source_path_for_prefix "wall"
+}
+
+lock_wallpaper_source_path() {
+  wallpaper_source_path_for_prefix "lock"
+}
+
+wallpaper_target_path() {
+  local wallpaper_source_path="$1"
   printf '%s/.local/share/debian-labwc/%s\n' "$LABWC_TARGET_HOME" "$(basename "$wallpaper_source_path")"
+}
+
+background_wallpaper_target_path() {
+  local wallpaper_source_path
+  wallpaper_source_path="$(background_wallpaper_source_path)"
+  wallpaper_target_path "$wallpaper_source_path"
+}
+
+lock_wallpaper_target_path() {
+  local wallpaper_source_path
+  wallpaper_source_path="$(lock_wallpaper_source_path)"
+  wallpaper_target_path "$wallpaper_source_path"
 }
 
 ensure_user_base_dirs() {
@@ -582,7 +607,7 @@ EOF
 render_labwc_autostart() {
   local wallpaper_path
   local autostart
-  wallpaper_path="$(primary_wallpaper_target_path)"
+  wallpaper_path="$(background_wallpaper_target_path)"
   autostart="$(cat <<EOF
 #!/bin/sh
 set -eu
@@ -1134,7 +1159,7 @@ render_mako() {
 
 render_swaylock() {
   local wallpaper_path
-  wallpaper_path="$(primary_wallpaper_target_path)"
+  wallpaper_path="$(lock_wallpaper_target_path)"
   render_user_file "$LABWC_TARGET_HOME/.config/swaylock/config" "clock
 show-failed-attempts
 font=Noto Sans
@@ -1186,7 +1211,8 @@ install_wallpaper() {
     wallpaper_name="$(basename "$wallpaper_source_path")"
     run_cmd install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$wallpaper_source_path" "$LABWC_TARGET_HOME/.local/share/debian-labwc/$wallpaper_name"
   done < <(find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f | LC_ALL=C sort)
-  require_file "$(primary_wallpaper_target_path)"
+  require_file "$(background_wallpaper_target_path)"
+  require_file "$(lock_wallpaper_target_path)"
 }
 
 render_all_configs() {

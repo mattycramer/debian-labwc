@@ -90,12 +90,12 @@ render_template_to_file() {
 install_helper_script() {
   local source_path="$1"
   local destination="$2"
-  local primary_wallpaper_name
-  primary_wallpaper_name="$(basename "$(primary_wallpaper_source_path)")"
+  local lock_wallpaper_name
+  lock_wallpaper_name="$(basename "$(lock_wallpaper_source_path)")"
   run_cmd install -D -m 0755 /dev/null "$destination"
   sed \
     -e "s|@TARGET_HOME@|$LABWC_TARGET_HOME|g" \
-    -e "s|@PRIMARY_WALLPAPER_NAME@|$primary_wallpaper_name|g" \
+    -e "s|@LOCK_WALLPAPER_NAME@|$lock_wallpaper_name|g" \
     -e "s|@INTERNAL_OUTPUT@|${LABWC_INTERNAL_OUTPUT}|g" \
     -e "s|@EXTERNAL_OUTPUT@|${LABWC_EXTERNAL_OUTPUT}|g" \
     -e "s|@INTERNAL_MODE@|${LABWC_INTERNAL_MODE}|g" \
