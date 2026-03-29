@@ -231,6 +231,9 @@ verify_greetd_semantics() {
 
 verify_waybar_config_semantics() {
   local waybar_path="$LABWC_TARGET_HOME/.config/waybar/config.jsonc"
+  local updates_script="$LABWC_TARGET_HOME/.config/waybar/scripts/pending-updates.sh"
+  local upgrade_script="$LABWC_TARGET_HOME/.config/waybar/scripts/run-upgrades.sh"
+  local gpu_launch_script="$LABWC_TARGET_HOME/.config/waybar/scripts/gpu-launch.sh"
   grep -F '"custom/launcher"' "$waybar_path" >/dev/null || die "waybar config missing launcher module"
   grep -F '"custom/gpulaunch"' "$waybar_path" >/dev/null || die "waybar config missing Nvidia GPU launcher module"
   grep -F '"custom/workspace-1"' "$waybar_path" >/dev/null || die "waybar config missing workspace 1 module"
@@ -249,7 +252,7 @@ verify_waybar_config_semantics() {
   grep -F '"/usr/local/bin/debian-labwc-module-menu network menu"' "$waybar_path" >/dev/null || die "waybar config missing network right-click menu"
   grep -F '"/usr/local/bin/debian-labwc-module-menu storage menu"' "$waybar_path" >/dev/null || die "waybar config missing storage right-click menu"
   grep -F '"/usr/local/bin/debian-labwc-player-status"' "$waybar_path" >/dev/null || die "waybar config missing player status helper"
-  grep -F '".config/waybar/scripts/gpu-launch.sh"' "$waybar_path" >/dev/null || die "waybar config missing Nvidia GPU launcher click handler"
+  grep -F "\"${gpu_launch_script}\"" "$waybar_path" >/dev/null || die "waybar config missing Nvidia GPU launcher click handler"
   grep -F '"format": "Nvidia GPU"' "$waybar_path" >/dev/null || die "waybar config missing Nvidia GPU launcher label"
   grep -F '"tooltip-format": "Launch app on Nvidia GPU"' "$waybar_path" >/dev/null || die "waybar config missing Nvidia GPU launcher tooltip"
   grep -F '"tooltip-format": "<tt><small>{calendar}</small></tt>"' "$waybar_path" >/dev/null || die "waybar clock tooltip is not configured to show the calendar"
@@ -258,8 +261,8 @@ verify_waybar_config_semantics() {
   grep -F '"on-click": "activate"' "$waybar_path" >/dev/null || die "waybar taskbar is not configured to activate on click"
   grep -F '"on-click-middle": "close"' "$waybar_path" >/dev/null || die "waybar taskbar is not configured to close on middle click"
   grep -F '"on-click-right": "minimize-raise"' "$waybar_path" >/dev/null || die "waybar taskbar is not configured to minimize-raise on right click"
-  grep -F '".config/waybar/scripts/pending-updates.sh"' "$waybar_path" >/dev/null || die "waybar config missing updates script path"
-  grep -F '".config/waybar/scripts/run-upgrades.sh"' "$waybar_path" >/dev/null || die "waybar config missing updates upgrade handler"
+  grep -F "\"${updates_script}\"" "$waybar_path" >/dev/null || die "waybar config missing updates script path"
+  grep -F "\"${upgrade_script}\"" "$waybar_path" >/dev/null || die "waybar config missing updates upgrade handler"
   grep -F '"signal": 12' "$waybar_path" >/dev/null || die "waybar updates module missing manual refresh signal"
 }
 
