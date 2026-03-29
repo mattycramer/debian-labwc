@@ -24,6 +24,7 @@ readonly BACKPORTS_PACKAGES=(
   thunar-volman
   nnn
   nano
+  librsvg2-common
   pipewire
   pipewire-audio
   pipewire-pulse
