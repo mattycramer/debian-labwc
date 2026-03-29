@@ -90,6 +90,7 @@ phase_packages() {
   log_info "phase: packages"
   phase_doctor
   load_env_file
+  install_sid_repository
   apt_update
   install_requested_packages
   ensure_polkitd_service_account

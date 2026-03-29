@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+readonly SID_SUITE="sid"
 readonly NORMAL_BOOTSTRAP_PACKAGES=(
   apt-transport-https
   ca-certificates
@@ -16,7 +17,7 @@ readonly NORMAL_TOOLS_PACKAGES=(
   spotify-client
 )
 
-readonly BACKPORTS_TOOLS_PACKAGES=(
+readonly SID_TOOLS_PACKAGES=(
   qutebrowser
   mpv
   qbittorrent
@@ -61,10 +62,15 @@ apt_update() {
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
+sid_archive_available() {
+  apt-cache policy 2>/dev/null | grep -F ' n=sid' >/dev/null
+}
+
 install_repo_bootstrap() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${NORMAL_BOOTSTRAP_PACKAGES[@]}"
+  sid_archive_available || die "sid archive is not configured on the system"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${NORMAL_BOOTSTRAP_PACKAGES[@]}"
 }
 
 prepare_tools_download_path() {
@@ -149,14 +155,16 @@ Signed-By: /usr/share/keyrings/mullvad-keyring.gpg
 install_normal_tools() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}"
+  sid_archive_available || die "sid archive is not configured on the system"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}"
   remove_spotify_legacy_source_list
 }
 
-install_backports_tools() {
+install_sid_tools() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t trixie-backports install --no-install-recommends "${apt_args[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}"
+  sid_archive_available || die "sid archive is not configured on the system"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${SID_TOOLS_PACKAGES[@]}"
 }
 
 install_deb_url() {
@@ -166,9 +174,10 @@ install_deb_url() {
   [[ -n "$url" ]] || die "missing deb download url"
   [[ "$output_path" == *.deb ]] || die "deb output path must end in .deb: $output_path"
   mapfile -t apt_args < <(apt_yes_args)
+  sid_archive_available || die "sid archive is not configured on the system"
   download_as_tools_user "$url" "$output_path"
   dpkg-deb -f "$output_path" Package >/dev/null 2>&1 || die "downloaded file is not a valid Debian package: $output_path"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install "${apt_args[@]}" "$output_path"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install "${apt_args[@]}" "$output_path"
   run_cmd rm -f "$output_path"
 }
 
@@ -321,7 +330,7 @@ package_pattern_installed() {
 
 verify_tools_install() {
   local pkg
-  for pkg in "${NORMAL_TOOLS_PACKAGES[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}"; do
+  for pkg in "${NORMAL_TOOLS_PACKAGES[@]}" "${SID_TOOLS_PACKAGES[@]}"; do
     package_is_installed "$pkg" || die "package '$pkg' is not installed"
   done
   package_is_installed thorium-browser || die "thorium-browser package is not installed"
@@ -371,7 +380,7 @@ verify_tools_install() {
 remove_tools_install() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${BACKPORTS_TOOLS_PACKAGES[@]}" thorium-browser bitwarden obsidian filen || true
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${SID_TOOLS_PACKAGES[@]}" thorium-browser bitwarden obsidian filen || true
   run_cmd rm -f /etc/apt/sources.list.d/vscode.sources /etc/apt/sources.list.d/vscode.list /etc/apt/sources.list.d/thorium.sources /etc/apt/sources.list.d/thorium.list /etc/apt/sources.list.d/mullvad.sources /etc/apt/sources.list.d/mullvad.list "$SPOTIFY_SOURCES_PATH"
   remove_spotify_legacy_source_list
   run_cmd rm -f /usr/share/keyrings/microsoft.gpg /usr/share/keyrings/mullvad-keyring.asc /usr/share/keyrings/mullvad-keyring.gpg "$SPOTIFY_KEYRING_PATH"

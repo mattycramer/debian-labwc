@@ -60,7 +60,7 @@ phase_install() {
   install_repository_files
   apt_update
   install_normal_tools
-  install_backports_tools
+  install_sid_tools
   install_deb_tools
   render_mpv_config
 }

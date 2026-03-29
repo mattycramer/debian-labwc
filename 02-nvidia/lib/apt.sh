@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+readonly SID_SUITE="sid"
 readonly NVIDIA_PACKAGES=(
   build-essential
   "linux-headers-$(uname -r)"
@@ -21,12 +22,17 @@ apt_update() {
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
+sid_archive_available() {
+  apt-cache policy 2>/dev/null | grep -F ' n=sid' >/dev/null
+}
+
 install_nvidia_packages() {
   [[ "${NVIDIA_INSTALL:-1}" == "1" ]] || die "set NVIDIA_INSTALL=1 to install NVIDIA packages"
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
   log_info "installing NVIDIA packages"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${NVIDIA_PACKAGES[@]}"
+  sid_archive_available || die "sid archive is not configured on the system"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${NVIDIA_PACKAGES[@]}"
 }
 
 verify_nvidia_install() {

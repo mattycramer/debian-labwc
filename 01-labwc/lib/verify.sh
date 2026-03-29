@@ -39,6 +39,8 @@ verify_packages() {
 verify_paths() {
   require_file "/etc/greetd/config.toml"
   require_file "/etc/systemd/system/greetd.service.d/10-vt.conf"
+  require_file "$SID_SOURCE_PATH"
+  require_file "$SID_PREFERENCES_PATH"
   require_file "/etc/tmpfiles.d/debian-labwc-polkit.conf"
   require_file "/etc/systemd/system/udisks2.service.d/10-polkit.conf"
   require_file "/usr/share/wayland-sessions/labwc.desktop"
@@ -146,6 +148,13 @@ verify_polkit_semantics() {
   grep -F 'systemctl --user import-environment' "$autostart_path" >/dev/null || die "labwc autostart missing systemd user environment import"
   grep -F 'dbus-update-activation-environment --systemd "$@"' "$autostart_path" >/dev/null || die "labwc autostart missing D-Bus activation environment updates"
   ! grep -F 'is-active dbus.service' "$autostart_path" >/dev/null || die "labwc autostart still waits on dbus.service instead of the session bus socket"
+}
+
+verify_sid_repository_semantics() {
+  grep -F "URIs: ${SID_REPO_URI}" "$SID_SOURCE_PATH" >/dev/null || die "sid source file missing ${SID_REPO_URI}"
+  grep -F 'Suites: sid' "$SID_SOURCE_PATH" >/dev/null || die "sid source file missing sid suite"
+  grep -F 'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg' "$SID_SOURCE_PATH" >/dev/null || die "sid source file missing Signed-By"
+  grep -F 'Pin-Priority: 100' "$SID_PREFERENCES_PATH" >/dev/null || die "sid preferences missing pin priority 100"
 }
 
 verify_labwc_config_semantics() {
@@ -384,6 +393,7 @@ verify_install() {
   verify_greeter_user
   verify_polkitd_user
   verify_polkit_semantics
+  verify_sid_repository_semantics
   verify_ownership
   verify_greetd_semantics
   verify_labwc_config_semantics

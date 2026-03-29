@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 
-readonly BACKPORTS_SUITE="trixie-backports"
-readonly BACKPORTS_PACKAGES=(
+readonly SID_SUITE="sid"
+readonly SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
+readonly SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
+readonly DEBIAN_ARCHIVE_KEYRING_PATH="/usr/share/keyrings/debian-archive-keyring.gpg"
+readonly SID_REPO_URI="https://deb.debian.org/debian"
+readonly SID_PACKAGES=(
   labwc
   kanshi
   waybar
@@ -110,7 +114,7 @@ readonly TWEAKS_BUILD_PACKAGES=(
   pkg-config
 )
 
-readonly TWEAKS_BACKPORTS_PACKAGES=(
+readonly TWEAKS_SID_PACKAGES=(
   qt6-base-dev
   qt6-base-dev-tools
   qt6-declarative-dev
@@ -165,11 +169,28 @@ apt_update() {
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
+install_sid_repository() {
+  [[ -f "$DEBIAN_ARCHIVE_KEYRING_PATH" ]] || die "missing Debian archive keyring: $DEBIAN_ARCHIVE_KEYRING_PATH"
+  run_cmd install -D -m 0644 /dev/null "$SID_SOURCE_PATH"
+  printf '%s' 'Types: deb
+URIs: https://deb.debian.org/debian
+Suites: sid
+Components: main
+Architectures: amd64
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+' >"$SID_SOURCE_PATH"
+  run_cmd install -D -m 0644 /dev/null "$SID_PREFERENCES_PATH"
+  printf '%s' 'Package: *
+Pin: release n=sid
+Pin-Priority: 100
+' >"$SID_PREFERENCES_PATH"
+}
+
 resolved_requested_packages() {
-  printf '%s\n' "${BACKPORTS_PACKAGES[@]}"
+  printf '%s\n' "${SID_PACKAGES[@]}"
   printf '%s\n' "${GRAPHICS_PACKAGES[@]}"
   printf '%s\n' "${TWEAKS_BUILD_PACKAGES[@]}"
-  printf '%s\n' "${TWEAKS_BACKPORTS_PACKAGES[@]}"
+  printf '%s\n' "${TWEAKS_SID_PACKAGES[@]}"
   printf '%s\n' "${KEEPSECRET_BUILD_PACKAGES[@]}"
   if [[ "${LABWC_HAS_INTEL_GPU:-no}" == "yes" ]]; then
     printf '%s\n' "${INTEL_PACKAGES[@]}"
@@ -177,29 +198,29 @@ resolved_requested_packages() {
 }
 
 install_requested_packages() {
-  log_info "installing backports package set"
-  local -a backports_package_list=()
+  log_info "installing sid package set"
+  local -a sid_package_list=()
   local -a graphics_package_list=()
   local -a tweaks_build_package_list=()
-  local -a tweaks_backports_package_list=()
+  local -a tweaks_sid_package_list=()
   local -a keepsecret_build_package_list=()
   local -a apt_args=()
-  mapfile -t backports_package_list < <(printf '%s\n' "${BACKPORTS_PACKAGES[@]}")
+  mapfile -t sid_package_list < <(printf '%s\n' "${SID_PACKAGES[@]}")
   mapfile -t graphics_package_list < <(printf '%s\n' "${GRAPHICS_PACKAGES[@]}")
   mapfile -t tweaks_build_package_list < <(printf '%s\n' "${TWEAKS_BUILD_PACKAGES[@]}")
-  mapfile -t tweaks_backports_package_list < <(printf '%s\n' "${TWEAKS_BACKPORTS_PACKAGES[@]}")
+  mapfile -t tweaks_sid_package_list < <(printf '%s\n' "${TWEAKS_SID_PACKAGES[@]}")
   mapfile -t keepsecret_build_package_list < <(printf '%s\n' "${KEEPSECRET_BUILD_PACKAGES[@]}")
   if [[ "${LABWC_HAS_INTEL_GPU:-no}" == "yes" ]]; then
     mapfile -O "${#graphics_package_list[@]}" -t graphics_package_list < <(printf '%s\n' "${INTEL_PACKAGES[@]}")
   fi
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${backports_package_list[@]}"
-  log_info "installing graphics package set from backports"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${graphics_package_list[@]}"
-  log_info "installing generic build dependencies for labwc-tweaks source build from backports"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${tweaks_build_package_list[@]}"
-  log_info "installing Qt build dependencies for labwc-tweaks source build from backports"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${tweaks_backports_package_list[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${sid_package_list[@]}"
+  log_info "installing graphics package set from sid"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${graphics_package_list[@]}"
+  log_info "installing generic build dependencies for labwc-tweaks source build from sid"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${tweaks_build_package_list[@]}"
+  log_info "installing Qt build dependencies for labwc-tweaks source build from sid"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${tweaks_sid_package_list[@]}"
   log_info "installing keepsecret source build dependencies"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${keepsecret_build_package_list[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${keepsecret_build_package_list[@]}"
 }

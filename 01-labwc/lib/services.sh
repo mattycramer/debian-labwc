@@ -310,6 +310,8 @@ nuke_all_state() {
   remove_if_present "$UDISKS2_DROPIN_PATH"
   remove_if_present "/etc/greetd/config.toml"
   remove_if_present "/etc/systemd/system/greetd.service.d/10-vt.conf"
+  remove_if_present "$SID_SOURCE_PATH"
+  remove_if_present "$SID_PREFERENCES_PATH"
   remove_labwc_tweaks_install
   remove_keepsecret_install
   rmdir --ignore-fail-on-non-empty "/etc/systemd/system/greetd.service.d" >/dev/null 2>&1 || true

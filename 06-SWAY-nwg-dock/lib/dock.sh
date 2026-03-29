@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+readonly SID_SUITE="sid"
 readonly NWG_DOCK_AUTOSTART_MARKER_BEGIN="# >>> MANAGED BY debian-labwc nwg-dock >>>"
 readonly NWG_DOCK_AUTOSTART_MARKER_END="# <<< MANAGED BY debian-labwc nwg-dock <<<"
 readonly NWG_DOCK_BUILD_ROOT="/usr/local/src/nwg-dock"
@@ -45,10 +46,15 @@ apt_update() {
   run_cmd env DEBIAN_FRONTEND=noninteractive apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
+sid_archive_available() {
+  apt-cache policy 2>/dev/null | grep -F ' n=sid' >/dev/null
+}
+
 install_nwg_dock_dependencies() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends "${apt_args[@]}" "${NWG_DOCK_BUILD_PACKAGES[@]}"
+  sid_archive_available || die "sid archive is not configured on the system"
+  run_cmd env DEBIAN_FRONTEND=noninteractive apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${NWG_DOCK_BUILD_PACKAGES[@]}"
 }
 
 write_root_file() {

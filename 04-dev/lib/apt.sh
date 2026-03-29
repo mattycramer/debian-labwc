@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+readonly SID_SUITE="sid"
 readonly BOOTSTRAP_PACKAGES=(
   ca-certificates
   curl
@@ -21,11 +22,6 @@ readonly DEV_PACKAGES=(
   pkg-config
   htop
 )
-
-readonly SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
-readonly SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
-readonly DEBIAN_ARCHIVE_KEYRING_PATH="/usr/share/keyrings/debian-archive-keyring.gpg"
-readonly SID_REPO_URI="https://deb.debian.org/debian"
 
 detect_dev_download_user() {
   if [[ -n "${DEV_DOWNLOAD_USER:-}" ]] && id "$DEV_DOWNLOAD_USER" >/dev/null 2>&1; then
@@ -71,6 +67,10 @@ apt_update() {
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
+sid_archive_available() {
+  apt-cache policy 2>/dev/null | grep -F ' n=sid' >/dev/null
+}
+
 write_text_file() {
   local destination="$1"
   local content="$2"
@@ -95,19 +95,15 @@ download_as_dev_user() {
 install_bootstrap_packages() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${BOOTSTRAP_PACKAGES[@]}"
-}
-
-install_sid_repository() {
-  [[ -f "$DEBIAN_ARCHIVE_KEYRING_PATH" ]] || die "missing Debian archive keyring: $DEBIAN_ARCHIVE_KEYRING_PATH"
-  write_text_file "$SID_SOURCE_PATH" $'Types: deb\nURIs: https://deb.debian.org/debian\nSuites: sid\nComponents: main\nArchitectures: amd64\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg\n'
-  write_text_file "$SID_PREFERENCES_PATH" $'Package: *\nPin: release n=sid\nPin-Priority: 100\n'
+  sid_archive_available || die "sid archive is not configured on the system"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${BOOTSTRAP_PACKAGES[@]}"
 }
 
 install_dev_packages() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${DEV_PACKAGES[@]}"
+  sid_archive_available || die "sid archive is not configured on the system"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${DEV_PACKAGES[@]}"
 }
 
 resolve_node_release() {
@@ -193,12 +189,6 @@ verify_dev_install() {
   for cmd in node npm npx pnpm pnpx nmap strace lsof netstat ss jq yamllint valgrind perf pipx pkg-config htop; do
     command_is_available "$cmd" || die "command '$cmd' is not available"
   done
-  [[ -f "$SID_SOURCE_PATH" ]] || die "missing sid sources file"
-  [[ -f "$SID_PREFERENCES_PATH" ]] || die "missing sid preferences file"
-  grep -F "URIs: ${SID_REPO_URI}" "$SID_SOURCE_PATH" >/dev/null || die "sid source file missing ${SID_REPO_URI}"
-  grep -F 'Suites: sid' "$SID_SOURCE_PATH" >/dev/null || die "sid source file missing sid suite"
-  grep -F 'Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg' "$SID_SOURCE_PATH" >/dev/null || die "sid source file missing Signed-By"
-  grep -F 'Pin-Priority: 100' "$SID_PREFERENCES_PATH" >/dev/null || die "sid preferences missing pin priority 100"
   verify_node_runtime
 }
 
@@ -213,7 +203,6 @@ remove_dev_install() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" "${DEV_PACKAGES[@]}" || true
-  run_cmd rm -f -- "$SID_SOURCE_PATH" "$SID_PREFERENCES_PATH"
   remove_managed_link /usr/local/bin/node
   remove_managed_link /usr/local/bin/npm
   remove_managed_link /usr/local/bin/npx
