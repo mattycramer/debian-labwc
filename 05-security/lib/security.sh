@@ -6,6 +6,7 @@ readonly BOOTSTRAP_PACKAGES=(
   curl
   gpg
   xz-utils
+  autotools-dev
   netbase
   python3
   pkg-config
@@ -17,6 +18,22 @@ readonly BOOTSTRAP_PACKAGES=(
   bison
   flex
   nftables
+)
+
+readonly BOOTSTRAP_RUNTIME_PACKAGES=(
+  libmnl0
+  libnftnl11
+  libjansson4
+  libgmp10
+  libreadline8t64
+  libedit2
+  libsystemd0
+  libxtables12
+  libacl1
+  libattr1
+  libselinux1
+  libaudit1
+  libcap2
 )
 
 readonly BOOTSTRAP_DEV_PACKAGES=(
@@ -31,6 +48,7 @@ readonly BOOTSTRAP_DEV_PACKAGES=(
   libacl1-dev
   libattr1-dev
   libselinux1-dev
+  libsepol-dev
   libaudit-dev
   libcap-dev
   nettle-dev
@@ -163,6 +181,7 @@ write_text_file() {
 
 install_bootstrap_packages() {
   apt_get_install_sid "${BOOTSTRAP_PACKAGES[@]}"
+  apt_get_install_sid "${BOOTSTRAP_RUNTIME_PACKAGES[@]}"
   apt_get_install_sid "${BOOTSTRAP_DEV_PACKAGES[@]}"
 }
 
