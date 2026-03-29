@@ -198,6 +198,7 @@ enable_system_services_only() {
   run_cmd systemctl enable greetd.service
   run_cmd systemctl enable seatd.service
   run_cmd systemctl enable NetworkManager.service
+  run_cmd systemctl enable switcheroo-control.service
   run_cmd systemctl enable udisks2.service
   run_cmd systemctl enable upower.service
   run_cmd systemctl restart polkit.service >/dev/null 2>&1 || true

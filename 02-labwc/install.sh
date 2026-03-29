@@ -74,6 +74,7 @@ phase_doctor() {
   require_command lspci
   require_command getent
   require_command awk
+  require_command python3
   require_command useradd
 }
 

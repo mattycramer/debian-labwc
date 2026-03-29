@@ -41,6 +41,8 @@ verify_paths() {
   require_file "/etc/systemd/system/greetd.service.d/10-vt.conf"
   require_file "$SID_SOURCE_PATH"
   require_file "$SID_PREFERENCES_PATH"
+  require_file "/usr/bin/python3"
+  require_file "/usr/bin/switcherooctl"
   require_file "/usr/share/wayland-sessions/labwc.desktop"
   require_file "/usr/local/bin/debian-labwc-session"
   require_file "/usr/local/bin/debian-labwc-power-menu"
@@ -77,6 +79,7 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.config/waybar/style.css"
   require_file "$LABWC_TARGET_HOME/.config/waybar/scripts/pending-updates.sh"
   require_file "$LABWC_TARGET_HOME/.config/waybar/scripts/run-upgrades.sh"
+  require_file "$LABWC_TARGET_HOME/.config/waybar/scripts/gpu-launch.sh"
   require_file "$LABWC_TARGET_HOME/.config/kanshi/config"
   require_file "$LABWC_TARGET_HOME/.config/kitty/kitty.conf"
   require_file "$LABWC_TARGET_HOME/.config/xfce4/helpers.rc"
@@ -119,6 +122,7 @@ verify_services_enabled() {
   systemctl is-enabled greetd.service >/dev/null 2>&1 || die "greetd.service is not enabled"
   systemctl is-enabled seatd.service >/dev/null 2>&1 || die "seatd.service is not enabled"
   systemctl is-enabled NetworkManager.service >/dev/null 2>&1 || die "NetworkManager.service is not enabled"
+  systemctl is-enabled switcheroo-control.service >/dev/null 2>&1 || die "switcheroo-control.service is not enabled"
   systemctl is-enabled udisks2.service >/dev/null 2>&1 || die "udisks2.service is not enabled"
   systemctl is-enabled upower.service >/dev/null 2>&1 || die "upower.service is not enabled"
 }
@@ -203,8 +207,9 @@ verify_labwc_config_semantics() {
   grep -F 'LIBVA_DRI_DRIVER_NAME=iHD' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing LIBVA_DRI_DRIVER_NAME"
   grep -F 'QT_QPA_PLATFORMTHEME=qt6ct' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing QT_QPA_PLATFORMTHEME"
   grep -F 'QT_AUTO_SCREEN_SCALE_FACTOR=1' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing QT_AUTO_SCREEN_SCALE_FACTOR"
-  grep -F 'GBM_BACKEND=nvidia-drm' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing GBM_BACKEND"
-  grep -F '__GLX_VENDOR_LIBRARY_NAME=nvidia' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing __GLX_VENDOR_LIBRARY_NAME"
+  ! grep -F 'GBM_BACKEND=nvidia-drm' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment must not globally force GBM_BACKEND=nvidia-drm"
+  ! grep -F '__GLX_VENDOR_LIBRARY_NAME=nvidia' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment must not globally force __GLX_VENDOR_LIBRARY_NAME=nvidia"
+  ! grep -F '__NV_PRIME_RENDER_OFFLOAD=1' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment must not globally force __NV_PRIME_RENDER_OFFLOAD=1"
   grep -F 'WLR_NO_HARDWARE_CURSOR=1' "$LABWC_TARGET_HOME/.config/labwc/environment" >/dev/null || die "labwc environment missing WLR_NO_HARDWARE_CURSOR"
 }
 
@@ -227,6 +232,7 @@ verify_greetd_semantics() {
 verify_waybar_config_semantics() {
   local waybar_path="$LABWC_TARGET_HOME/.config/waybar/config.jsonc"
   grep -F '"custom/launcher"' "$waybar_path" >/dev/null || die "waybar config missing launcher module"
+  grep -F '"custom/gpulaunch"' "$waybar_path" >/dev/null || die "waybar config missing Nvidia GPU launcher module"
   grep -F '"custom/workspace-1"' "$waybar_path" >/dev/null || die "waybar config missing workspace 1 module"
   grep -F '"custom/workspace-4"' "$waybar_path" >/dev/null || die "waybar config missing workspace 4 module"
   grep -F '"wlr/taskbar"' "$waybar_path" >/dev/null || die "waybar config missing wlr/taskbar module"
@@ -243,6 +249,9 @@ verify_waybar_config_semantics() {
   grep -F '"/usr/local/bin/debian-labwc-module-menu network menu"' "$waybar_path" >/dev/null || die "waybar config missing network right-click menu"
   grep -F '"/usr/local/bin/debian-labwc-module-menu storage menu"' "$waybar_path" >/dev/null || die "waybar config missing storage right-click menu"
   grep -F '"/usr/local/bin/debian-labwc-player-status"' "$waybar_path" >/dev/null || die "waybar config missing player status helper"
+  grep -F '".config/waybar/scripts/gpu-launch.sh"' "$waybar_path" >/dev/null || die "waybar config missing Nvidia GPU launcher click handler"
+  grep -F '"format": "Nvidia GPU"' "$waybar_path" >/dev/null || die "waybar config missing Nvidia GPU launcher label"
+  grep -F '"tooltip-format": "Launch app on Nvidia GPU"' "$waybar_path" >/dev/null || die "waybar config missing Nvidia GPU launcher tooltip"
   grep -F '"tooltip-format": "<tt><small>{calendar}</small></tt>"' "$waybar_path" >/dev/null || die "waybar clock tooltip is not configured to show the calendar"
   grep -F '"on-click": "gsimplecal"' "$waybar_path" >/dev/null || die "waybar clock is not configured to launch gsimplecal on click"
   grep -F '"calendar": {' "$waybar_path" >/dev/null || die "waybar clock calendar block is missing"
@@ -355,10 +364,19 @@ verify_kitty_semantics() {
 verify_waybar_script_semantics() {
   local updates_script="$LABWC_TARGET_HOME/.config/waybar/scripts/pending-updates.sh"
   local upgrade_script="$LABWC_TARGET_HOME/.config/waybar/scripts/run-upgrades.sh"
+  local gpu_launch_script="$LABWC_TARGET_HOME/.config/waybar/scripts/gpu-launch.sh"
   grep -F 'updates=$(apt list --upgradable 2>/dev/null || true)' "$updates_script" >/dev/null || die "waybar updates script missing apt list check"
   grep -F 'printf '\''{"text":"%s","tooltip":"%s","class":%s,"percentage":%s}\n'\''' "$updates_script" >/dev/null || die "waybar updates script missing JSON output"
   grep -F 'foot -T "System Upgrade" -e bash -lc '\''sudo apt upgrade;' "$upgrade_script" >/dev/null || die "waybar upgrade script missing foot upgrade launcher"
   grep -F 'pkill -RTMIN+12 -x waybar' "$upgrade_script" >/dev/null || die "waybar upgrade script missing refresh signal"
+  grep -F "readonly WOFI_PROMPT='Launch on Nvidia GPU'" "$gpu_launch_script" >/dev/null || die "waybar GPU launcher script missing Nvidia prompt"
+  grep -F -- '--define=drun-print_desktop_file=true' "$gpu_launch_script" >/dev/null || die "waybar GPU launcher script missing desktop file selection mode"
+  grep -F -- '--define=drun-disable_prime=true' "$gpu_launch_script" >/dev/null || die "waybar GPU launcher script is not disabling wofi PRIME handling"
+  grep -F 'python3 - "$desktop_file" "$gpu_id"' "$gpu_launch_script" >/dev/null || die "waybar GPU launcher script missing Python desktop entry launcher"
+  grep -F 'launch_command = ["switcherooctl", "launch", f"--gpu={gpu_id}", *command]' "$gpu_launch_script" >/dev/null || die "waybar GPU launcher script missing direct switcherooctl command handoff"
+  grep -F 'def expand_exec_tokens(tokens, *, desktop_file: str, app_name: str, app_icon: str):' "$gpu_launch_script" >/dev/null || die "waybar GPU launcher script missing desktop Exec expansion helper"
+  grep -F 'require_command python3' "$gpu_launch_script" >/dev/null || die "waybar GPU launcher script missing python3 dependency check"
+  grep -F 'find_nvidia_gpu_id()' "$gpu_launch_script" >/dev/null || die "waybar GPU launcher script missing Nvidia GPU detection helper"
 }
 
 verify_shell_config_semantics() {

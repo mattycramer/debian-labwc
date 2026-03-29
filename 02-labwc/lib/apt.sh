@@ -11,6 +11,7 @@ readonly SID_PACKAGES=(
   waybar
   gsimplecal
   wofi
+  switcheroo-control
   mako-notifier
   wlr-randr
   wlrctl
