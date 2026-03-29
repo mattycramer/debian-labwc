@@ -19,7 +19,6 @@ readonly NORMAL_TOOLS_PACKAGES=(
 readonly SID_TOOLS_PACKAGES=(
   qutebrowser
   mpv
-  qbittorrent
   remmina
   mousepad
   bc
