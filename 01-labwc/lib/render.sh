@@ -664,7 +664,11 @@ update_activation_environment \
 pgrep -x polkit-kde-authentication-agent-1 >/dev/null 2>&1 || /usr/lib/x86_64-linux-gnu/libexec/polkit-kde-authentication-agent-1 &
 /usr/local/bin/debian-labwc-workspace-state 1 >/dev/null 2>&1 || true
 pgrep -x waybar >/dev/null 2>&1 || waybar &
-pgrep -x kanshi >/dev/null 2>&1 || kanshi &
+if [ ! -f "$LABWC_TARGET_HOME/.config/debian-labwc/.outputs-refined" ]; then
+  /usr/local/bin/debian-labwc-refresh-outputs >/dev/null 2>&1 || true
+else
+  pgrep -x kanshi >/dev/null 2>&1 || kanshi &
+fi
 pgrep -x mako >/dev/null 2>&1 || mako &
 if command -v /usr/local/bin/debian-labwc-unlock-gpg-key >/dev/null 2>&1; then
   (
@@ -677,10 +681,6 @@ pgrep -x swayidle >/dev/null 2>&1 || swayidle \
   timeout "${LABWC_IDLE_DPMS_SECONDS}" '/usr/local/bin/debian-labwc-dpms off' \
   resume '/usr/local/bin/debian-labwc-dpms on' \
   before-sleep '/usr/local/bin/debian-labwc-lock' &
-
-if [ ! -f "$LABWC_TARGET_HOME/.config/debian-labwc/.outputs-refined" ]; then
-  /usr/local/bin/debian-labwc-refresh-outputs >/dev/null 2>&1 &
-fi
 
 autostart_dir="$LABWC_TARGET_HOME/.config/labwc/autostart.d"
 if [ -d "\$autostart_dir" ]; then

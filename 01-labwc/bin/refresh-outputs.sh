@@ -21,9 +21,13 @@ mkdir -p "$state_dir"
 current_output=""
 current_mode=""
 current_hz=""
+preferred_mode=""
+preferred_hz=""
 external_mode="${external_mode_default:-1920x1080}"
 external_hz="${external_hz_default:-60}"
-external_120="no"
+preferred_external_mode="${LABWC_EXTERNAL_PREFERRED_MODE:-1920x1080}"
+preferred_external_hz="${LABWC_EXTERNAL_PREFERRED_HZ:-120}"
+external_preferred_match="no"
 
 mode_width() {
   local mode_name="$1"
@@ -42,20 +46,34 @@ while IFS= read -r line; do
   if [[ "$current_output" != "$external_output" ]]; then
     continue
   fi
-  if [[ "$line" == *"(preferred"* || "$line" == *"(current"* ]]; then
-    current_mode="$(printf '%s\n' "$line" | awk '{print $1}')"
-    current_hz="$(printf '%s\n' "$line" | awk '{print $3}' | cut -d. -f1)"
+  mode_candidate="$(printf '%s\n' "$line" | sed -n 's/^[[:space:]]*\([0-9][0-9]*x[0-9][0-9]*\) px, .*$/\1/p')"
+  hz_candidate="$(printf '%s\n' "$line" | sed -n 's/^[[:space:]]*[0-9][0-9]*x[0-9][0-9]* px, \([0-9.][0-9.]*\) Hz.*$/\1/p')"
+  [[ -n "$mode_candidate" && -n "$hz_candidate" ]] || continue
+  hz_rounded="$(awk -v hz="$hz_candidate" 'BEGIN { printf "%d", hz + 0.5 }')"
+  if [[ "$mode_candidate" == "$preferred_external_mode" && "$hz_rounded" == "$preferred_external_hz" ]]; then
+    external_mode="$mode_candidate"
+    external_hz="$preferred_external_hz"
+    external_preferred_match="yes"
+    continue
   fi
-  if [[ "$line" == *"1920x1080"* && "$line" == *"120."* ]]; then
-    external_mode="1920x1080"
-    external_hz="120"
-    external_120="yes"
+  if [[ "$line" == *"(preferred"* && -z "$preferred_mode" ]]; then
+    preferred_mode="$mode_candidate"
+    preferred_hz="$hz_rounded"
+  fi
+  if [[ "$line" == *"(current"* ]]; then
+    current_mode="$mode_candidate"
+    current_hz="$hz_rounded"
   fi
 done < <(wlr-randr 2>/dev/null || true)
 
-if [[ "$external_120" != "yes" && -n "$current_mode" && -n "$current_hz" ]]; then
-  external_mode="$current_mode"
-  external_hz="$current_hz"
+if [[ "$external_preferred_match" != "yes" ]]; then
+  if [[ -n "$preferred_mode" && -n "$preferred_hz" ]]; then
+    external_mode="$preferred_mode"
+    external_hz="$preferred_hz"
+  elif [[ -n "$current_mode" && -n "$current_hz" ]]; then
+    external_mode="$current_mode"
+    external_hz="$current_hz"
+  fi
 fi
 
 if [[ -n "$internal_output" ]]; then
