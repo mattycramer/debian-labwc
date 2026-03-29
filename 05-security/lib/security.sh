@@ -31,7 +31,6 @@ readonly BOOTSTRAP_RUNTIME_PACKAGES=(
   libxtables12
   libacl1
   libattr1
-  libselinux1
   libaudit1
   libcap2
 )
@@ -47,8 +46,6 @@ readonly BOOTSTRAP_DEV_PACKAGES=(
   libxtables-dev
   libacl1-dev
   libattr1-dev
-  libselinux1-dev
-  libsepol-dev
   libaudit-dev
   libcap-dev
   nettle-dev
@@ -393,7 +390,7 @@ install_latest_aide() {
   run_cmd tar -xzf "$archive_path" -C "$tmpdir"
   (
     cd "$source_dir" || exit 1
-    run_cmd ./configure --prefix=/usr/local
+    run_cmd ./configure --prefix=/usr/local --without-selinux
     run_cmd make -j"$(nproc)"
     run_cmd make DESTDIR="$stage_root" install
   )
