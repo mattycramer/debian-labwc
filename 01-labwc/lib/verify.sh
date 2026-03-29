@@ -293,9 +293,9 @@ verify_shell_config_semantics() {
   grep -F '[directory]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing directory config"
   grep -F '[git_branch]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing git_branch config"
   grep -F '[git_status]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing git_status config"
-  grep -F '--layout=reverse' "$LABWC_TARGET_HOME/.config/fzf/default-opts" >/dev/null || die "fzf default opts missing layout"
-  grep -F '--bind=ctrl-/:toggle-preview' "$LABWC_TARGET_HOME/.config/fzf/default-opts" >/dev/null || die "fzf default opts missing preview toggle"
-  grep -F '--color=bg:#0f1720' "$LABWC_TARGET_HOME/.config/fzf/default-opts" >/dev/null || die "fzf default opts missing color theme"
+  grep -F -- '--layout=reverse' "$LABWC_TARGET_HOME/.config/fzf/default-opts" >/dev/null || die "fzf default opts missing layout"
+  grep -F -- '--bind=ctrl-/:toggle-preview' "$LABWC_TARGET_HOME/.config/fzf/default-opts" >/dev/null || die "fzf default opts missing preview toggle"
+  grep -F -- '--color=bg:#0f1720' "$LABWC_TARGET_HOME/.config/fzf/default-opts" >/dev/null || die "fzf default opts missing color theme"
   grep -F 'ls -la --color=always --group-directories-first -- "$target"' "$LABWC_TARGET_HOME/.config/fzf/preview.sh" >/dev/null || die "fzf preview helper missing directory listing"
   grep -F 'nl -ba -- "$target" | sed -n' "$LABWC_TARGET_HOME/.config/fzf/preview.sh" >/dev/null || die "fzf preview helper missing text preview"
 }
