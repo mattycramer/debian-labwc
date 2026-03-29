@@ -125,10 +125,6 @@ apt_update() {
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
-sid_archive_available() {
-  apt-cache policy 2>/dev/null | grep -F ' n=sid' >/dev/null
-}
-
 prepare_security_download_path() {
   local path="$1"
   run_cmd runuser -u "$SECURITY_DOWNLOAD_USER" -- mkdir -p "$(dirname "$path")"
@@ -158,7 +154,6 @@ write_text_file() {
 install_bootstrap_packages() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  sid_archive_available || die "sid archive is not configured on the system"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${BOOTSTRAP_PACKAGES[@]}"
 }
 
@@ -176,7 +171,6 @@ install_crowdsec_repository() {
 install_crowdsec_packages() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  sid_archive_available || die "sid archive is not configured on the system"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${CROWDSEC_PACKAGES[@]}"
 }
 

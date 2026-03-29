@@ -47,14 +47,9 @@ apt_update() {
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
-sid_archive_available() {
-  apt-cache policy 2>/dev/null | grep -F ' n=sid' >/dev/null
-}
-
 install_crystal_dock_dependencies() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  sid_archive_available || die "sid archive is not configured on the system"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$CRYSTAL_DOCK_SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_BOOTSTRAP_PACKAGES[@]}"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$CRYSTAL_DOCK_SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_RUNTIME_PACKAGES[@]}"
 }
@@ -240,7 +235,6 @@ verify_crystal_dock_install() {
   require_file "$panel_path"
   require_file "$autostart_fragment_path"
   require_file "$autostart_path"
-  sid_archive_available || die "sid archive is not configured on the system"
 
   grep -F 'XDG_CURRENT_DESKTOP="labwc:wlroots"' "$CRYSTAL_DOCK_WRAPPER_PATH" >/dev/null || die "wrapper missing labwc/wlroots desktop override"
   grep -F 'export XDG_SESSION_TYPE="wayland"' "$CRYSTAL_DOCK_WRAPPER_PATH" >/dev/null || die "wrapper missing explicit wayland session type"

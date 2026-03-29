@@ -46,14 +46,9 @@ apt_update() {
   run_cmd env DEBIAN_FRONTEND=noninteractive apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
-sid_archive_available() {
-  apt-cache policy 2>/dev/null | grep -F ' n=sid' >/dev/null
-}
-
 install_nwg_dock_dependencies() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  sid_archive_available || die "sid archive is not configured on the system"
   run_cmd env DEBIAN_FRONTEND=noninteractive apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${NWG_DOCK_BUILD_PACKAGES[@]}"
 }
 

@@ -71,11 +71,9 @@ phase_doctor() {
   require_command apt
   require_command install
   require_command systemctl
-  require_command systemd-tmpfiles
   require_command lspci
   require_command getent
   require_command awk
-  require_command groupadd
   require_command useradd
 }
 
@@ -93,7 +91,6 @@ phase_packages() {
   install_sid_repository
   apt_update
   install_requested_packages
-  ensure_polkitd_service_account
 }
 
 phase_render() {

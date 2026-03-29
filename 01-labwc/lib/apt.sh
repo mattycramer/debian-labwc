@@ -50,6 +50,7 @@ readonly SID_PACKAGES=(
   slurp
   gpg
   gpg-agent
+  libsecret-tools
   kwallet6
   qtwayland5
   qt6-wayland

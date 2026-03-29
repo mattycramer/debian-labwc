@@ -8,12 +8,17 @@ pinentry_bin="$(command -v pinentry-gtk-2 || true)"
 [[ -n "$pinentry_bin" ]] || exit 0
 
 export GNUPGHOME="${GNUPGHOME:-$HOME/.gnupg}"
-key_fpr="$(
-  gpg --batch --list-secret-keys --with-colons 2>/dev/null | awk -F: '
-    $1 == "sec" {want_fpr = 1; next}
-    want_fpr && $1 == "fpr" {print $10; exit}
-  '
-)"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/debian-labwc"
+fingerprint_path="${state_dir}/kwallet-session-gpg.fpr"
+key_fpr="$(tr -d '\n' <"$fingerprint_path" 2>/dev/null || true)"
+if [[ -z "$key_fpr" ]]; then
+  key_fpr="$(
+    gpg --batch --list-secret-keys --with-colons 2>/dev/null | awk -F: '
+      $1 == "sec" {want_fpr = 1; next}
+      want_fpr && $1 == "fpr" {print $10; exit}
+    '
+  )"
+fi
 [[ -n "$key_fpr" ]] || exit 0
 
 current_tty="$(tty 2>/dev/null || true)"

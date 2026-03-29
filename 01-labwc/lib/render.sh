@@ -676,6 +676,12 @@ if command -v /usr/local/bin/debian-labwc-unlock-gpg-key >/dev/null 2>&1; then
     /usr/local/bin/debian-labwc-unlock-gpg-key
   ) >/dev/null 2>&1 &
 fi
+if command -v /usr/local/bin/debian-labwc-store-gpg-secret >/dev/null 2>&1; then
+  (
+    sleep 4
+    /usr/local/bin/debian-labwc-store-gpg-secret
+  ) >/dev/null 2>&1 &
+fi
 pgrep -x swayidle >/dev/null 2>&1 || swayidle \
   timeout "${LABWC_IDLE_LOCK_SECONDS}" '/usr/local/bin/debian-labwc-lock' \
   timeout "${LABWC_IDLE_DPMS_SECONDS}" '/usr/local/bin/debian-labwc-dpms off' \
@@ -1207,7 +1213,7 @@ text-wrong-color=fff1f2ff
 }
 
 render_foot() {
-  render_user_file "$LABWC_TARGET_HOME/.config/foot/foot.ini" $'[main]\nfont=Noto Sans Mono:size=11\npad=8x8\n\n[bell]\nsystem=no\n\n[colors]\nbackground=111111\nforeground=f5f5f5\n'
+  render_user_file "$LABWC_TARGET_HOME/.config/foot/foot.ini" $'[main]\nfont=Noto Sans Mono:size=11\npad=8x8\n\n[bell]\nsystem=no\n\n[colors-dark]\nbackground=111111\nforeground=f5f5f5\n'
 }
 
 render_gammastep() {

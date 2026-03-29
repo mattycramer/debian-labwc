@@ -62,14 +62,9 @@ apt_update() {
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
-sid_archive_available() {
-  apt-cache policy 2>/dev/null | grep -F ' n=sid' >/dev/null
-}
-
 install_repo_bootstrap() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  sid_archive_available || die "sid archive is not configured on the system"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${NORMAL_BOOTSTRAP_PACKAGES[@]}"
 }
 
@@ -155,7 +150,6 @@ Signed-By: /usr/share/keyrings/mullvad-keyring.gpg
 install_normal_tools() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  sid_archive_available || die "sid archive is not configured on the system"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}"
   remove_spotify_legacy_source_list
 }
@@ -163,7 +157,6 @@ install_normal_tools() {
 install_sid_tools() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  sid_archive_available || die "sid archive is not configured on the system"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${SID_TOOLS_PACKAGES[@]}"
 }
 
@@ -174,7 +167,6 @@ install_deb_url() {
   [[ -n "$url" ]] || die "missing deb download url"
   [[ "$output_path" == *.deb ]] || die "deb output path must end in .deb: $output_path"
   mapfile -t apt_args < <(apt_yes_args)
-  sid_archive_available || die "sid archive is not configured on the system"
   download_as_tools_user "$url" "$output_path"
   dpkg-deb -f "$output_path" Package >/dev/null 2>&1 || die "downloaded file is not a valid Debian package: $output_path"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install "${apt_args[@]}" "$output_path"

@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-readonly POLKIT_TMPFILES_PATH="/etc/tmpfiles.d/debian-labwc-polkit.conf"
-readonly UDISKS2_DROPIN_DIR="/etc/systemd/system/udisks2.service.d"
-readonly UDISKS2_DROPIN_PATH="${UDISKS2_DROPIN_DIR}/10-polkit.conf"
-
 ensure_greeter_user() {
   if getent passwd greeter >/dev/null 2>&1; then
     return 0
@@ -14,46 +10,6 @@ ensure_greeter_user() {
     --no-create-home \
     --shell /usr/sbin/nologin \
     greeter
-}
-
-ensure_polkitd_service_account() {
-  if ! getent group polkitd >/dev/null 2>&1; then
-    run_cmd groupadd --system polkitd
-  fi
-  if getent passwd polkitd >/dev/null 2>&1; then
-    return 0
-  fi
-  run_cmd useradd \
-    --system \
-    --gid polkitd \
-    --home-dir / \
-    --no-create-home \
-    --shell /usr/sbin/nologin \
-    --comment "User for polkitd" \
-    polkitd
-}
-
-install_polkit_runtime_layout() {
-  run_cmd install -d -m 0755 /usr/local/share/polkit-1/rules.d
-  cat >"$POLKIT_TMPFILES_PATH" <<'EOF'
-d /run/polkit-1 0755 root root -
-d /run/polkit-1/rules.d 0755 root root -
-EOF
-  run_cmd chmod 0644 "$POLKIT_TMPFILES_PATH"
-  run_cmd systemd-tmpfiles --create "$POLKIT_TMPFILES_PATH"
-}
-
-install_udisks2_polkit_dropin() {
-  local content
-  content="$(cat <<'EOF'
-[Unit]
-Wants=polkit.service
-After=polkit.service dbus.service
-EOF
-)"
-  run_cmd install -d -m 0755 "$UDISKS2_DROPIN_DIR"
-  printf '%s' "$content" >"$UDISKS2_DROPIN_PATH"
-  run_cmd chmod 0644 "$UDISKS2_DROPIN_PATH"
 }
 
 ensure_greeter_runtime_dirs() {
@@ -125,14 +81,25 @@ bootstrap_target_user_gpg_key() {
     LABWC_GPG_KEY_EMAIL="${LABWC_GPG_KEY_EMAIL:-}" \
     LABWC_GPG_KEY_EXPIRE="${LABWC_GPG_KEY_EXPIRE:-2y}" \
     runuser -u "$LABWC_TARGET_USER" -- bash "$SCRIPT_DIR/bin/ensure-gpg-key.sh"
+  stage_target_user_gpg_secret_seed "$gpg_passphrase"
+}
+
+stage_target_user_gpg_secret_seed() {
+  local gpg_passphrase="$1"
+  local state_dir="$LABWC_TARGET_HOME/.local/state/debian-labwc"
+  local seed_path="$state_dir/kwallet-session-gpg-passphrase.seed"
+  [[ -n "$gpg_passphrase" ]] || return 0
+  run_cmd install -d -m 0700 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$state_dir"
+  run_cmd install -D -m 0600 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" /dev/null "$seed_path"
+  printf '%s' "$gpg_passphrase" >"$seed_path"
+  run_cmd chown "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$seed_path"
+  run_cmd chmod 0600 "$seed_path"
 }
 
 install_root_files() {
   validate_greetd_settings
   ensure_greeter_user
   ensure_greeter_runtime_dirs
-  install_polkit_runtime_layout
-  install_udisks2_polkit_dropin
   render_template_to_file "$SCRIPT_DIR/templates/greetd-config.toml.tpl" "/etc/greetd/config.toml" 0644
   render_template_to_file "$SCRIPT_DIR/templates/greetd-vt.conf.tpl" "/etc/systemd/system/greetd.service.d/10-vt.conf" 0644
   render_template_to_file "$SCRIPT_DIR/templates/labwc.desktop.tpl" "/usr/share/wayland-sessions/labwc.desktop" 0644
@@ -149,6 +116,7 @@ install_root_files() {
   install_helper_script "$SCRIPT_DIR/bin/module-menu.sh" "/usr/local/bin/debian-labwc-module-menu"
   install_helper_script "$SCRIPT_DIR/bin/player-status.sh" "/usr/local/bin/debian-labwc-player-status"
   install_helper_script "$SCRIPT_DIR/bin/unlock-gpg-key.sh" "/usr/local/bin/debian-labwc-unlock-gpg-key"
+  install_helper_script "$SCRIPT_DIR/bin/store-gpg-secret.sh" "/usr/local/bin/debian-labwc-store-gpg-secret"
   install_helper_script "$SCRIPT_DIR/bin/workspacectl.py" "/usr/local/bin/debian-labwc-workspacectl"
   install_helper_script "$SCRIPT_DIR/bin/workspace-activate.sh" "/usr/local/bin/debian-labwc-workspace-activate"
   install_helper_script "$SCRIPT_DIR/bin/workspace-send.sh" "/usr/local/bin/debian-labwc-workspace-send"
@@ -233,7 +201,7 @@ enable_system_services_only() {
   run_cmd systemctl enable NetworkManager.service
   run_cmd systemctl enable udisks2.service
   run_cmd systemctl enable upower.service
-  run_cmd systemctl start polkit.service
+  run_cmd systemctl restart polkit.service >/dev/null 2>&1 || true
 }
 
 enable_all_services() {
@@ -299,15 +267,13 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/debian-labwc-module-menu"
   remove_if_present "/usr/local/bin/debian-labwc-player-status"
   remove_if_present "/usr/local/bin/debian-labwc-unlock-gpg-key"
+  remove_if_present "/usr/local/bin/debian-labwc-store-gpg-secret"
   remove_if_present "/usr/local/bin/debian-labwc-workspacectl"
   remove_if_present "/usr/local/bin/debian-labwc-workspace-activate"
   remove_if_present "/usr/local/bin/debian-labwc-workspace-send"
   remove_if_present "/usr/local/bin/debian-labwc-workspace-state"
   remove_if_present "/usr/local/bin/debian-labwc-workspace-status"
   remove_if_present "/usr/share/wayland-sessions/labwc.desktop"
-  remove_if_present "/usr/local/share/polkit-1/rules.d"
-  remove_if_present "$POLKIT_TMPFILES_PATH"
-  remove_if_present "$UDISKS2_DROPIN_PATH"
   remove_if_present "/etc/greetd/config.toml"
   remove_if_present "/etc/systemd/system/greetd.service.d/10-vt.conf"
   remove_if_present "$SID_SOURCE_PATH"
@@ -315,10 +281,6 @@ nuke_all_state() {
   remove_labwc_tweaks_install
   remove_keepsecret_install
   rmdir --ignore-fail-on-non-empty "/etc/systemd/system/greetd.service.d" >/dev/null 2>&1 || true
-  rmdir --ignore-fail-on-non-empty "$UDISKS2_DROPIN_DIR" >/dev/null 2>&1 || true
-  rmdir --ignore-fail-on-non-empty "/usr/local/share/polkit-1" >/dev/null 2>&1 || true
-  remove_if_present "/run/polkit-1/rules.d"
-  rmdir --ignore-fail-on-non-empty "/run/polkit-1" >/dev/null 2>&1 || true
 
   log_info "removing target user systemd user unit links"
   disable_target_user_unit pipewire.service

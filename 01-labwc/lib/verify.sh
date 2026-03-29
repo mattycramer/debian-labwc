@@ -41,8 +41,6 @@ verify_paths() {
   require_file "/etc/systemd/system/greetd.service.d/10-vt.conf"
   require_file "$SID_SOURCE_PATH"
   require_file "$SID_PREFERENCES_PATH"
-  require_file "/etc/tmpfiles.d/debian-labwc-polkit.conf"
-  require_file "/etc/systemd/system/udisks2.service.d/10-polkit.conf"
   require_file "/usr/share/wayland-sessions/labwc.desktop"
   require_file "/usr/local/bin/debian-labwc-session"
   require_file "/usr/local/bin/debian-labwc-power-menu"
@@ -55,6 +53,7 @@ verify_paths() {
   require_file "/usr/local/bin/debian-labwc-module-menu"
   require_file "/usr/local/bin/debian-labwc-player-status"
   require_file "/usr/local/bin/debian-labwc-unlock-gpg-key"
+  require_file "/usr/local/bin/debian-labwc-store-gpg-secret"
   require_file "/usr/local/bin/debian-labwc-workspacectl"
   require_file "/usr/local/bin/debian-labwc-workspace-activate"
   require_file "/usr/local/bin/debian-labwc-workspace-send"
@@ -79,7 +78,6 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.config/xfce4/helpers.rc"
   require_file "$LABWC_TARGET_HOME/.config/kwalletrc"
   require_file "$LABWC_TARGET_HOME/.config/xdg-desktop-portal/portals.conf"
-  require_dir "/usr/local/share/polkit-1/rules.d"
   require_file "$LABWC_TARGET_HOME/.config/starship.toml"
   require_file "$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf"
   require_file "$LABWC_TARGET_HOME/.bashrc"
@@ -131,20 +129,13 @@ verify_greeter_user() {
   getent passwd greeter >/dev/null 2>&1 || die "greeter user is missing"
 }
 
-verify_polkitd_user() {
-  getent group polkitd >/dev/null 2>&1 || die "polkitd group is missing"
-  getent passwd polkitd >/dev/null 2>&1 || die "polkitd user is missing"
-}
-
 verify_polkit_semantics() {
   local autostart_path="$LABWC_TARGET_HOME/.config/labwc/autostart"
-  grep -F 'd /run/polkit-1/rules.d 0755 root root -' /etc/tmpfiles.d/debian-labwc-polkit.conf >/dev/null || die "polkit tmpfiles config missing runtime rules directory"
-  grep -F 'Wants=polkit.service' /etc/systemd/system/udisks2.service.d/10-polkit.conf >/dev/null || die "udisks2 drop-in missing polkit dependency"
-  grep -F 'After=polkit.service dbus.service' /etc/systemd/system/udisks2.service.d/10-polkit.conf >/dev/null || die "udisks2 drop-in missing polkit ordering"
   grep -F '/usr/lib/x86_64-linux-gnu/libexec/polkit-kde-authentication-agent-1 &' "$autostart_path" >/dev/null || die "labwc autostart missing KDE polkit auth agent"
   ! grep -F 'lxpolkit' "$autostart_path" >/dev/null || die "labwc autostart still references lxpolkit"
   grep -F '/usr/local/bin/debian-labwc-workspace-state 1' "$autostart_path" >/dev/null || die "labwc autostart missing initial workspace state sync"
   grep -F 'debian-labwc-unlock-gpg-key' "$autostart_path" >/dev/null || die "labwc autostart missing proactive GPG unlock helper"
+  grep -F 'debian-labwc-store-gpg-secret' "$autostart_path" >/dev/null || die "labwc autostart missing KeepSecret import helper"
   grep -F 'systemctl --user import-environment' "$autostart_path" >/dev/null || die "labwc autostart missing systemd user environment import"
   grep -F 'dbus-update-activation-environment --systemd "$@"' "$autostart_path" >/dev/null || die "labwc autostart missing D-Bus activation environment updates"
   ! grep -F 'is-active dbus.service' "$autostart_path" >/dev/null || die "labwc autostart still waits on dbus.service instead of the session bus socket"
@@ -296,6 +287,12 @@ verify_keepsecret_semantics() {
   grep -F 'Exec=keepsecret' "$KEEPSECRET_DESKTOP_PATH" >/dev/null || die "keepsecret desktop file missing keepsecret Exec"
 }
 
+verify_foot_semantics() {
+  local foot_path="$LABWC_TARGET_HOME/.config/foot/foot.ini"
+  grep -F '[colors-dark]' "$foot_path" >/dev/null || die "foot config is missing the non-deprecated [colors-dark] section"
+  ! grep -F '[colors]' "$foot_path" >/dev/null || die "foot config still uses deprecated [colors] section"
+}
+
 verify_shell_config_semantics() {
   grep -F 'umask 022' "$LABWC_TARGET_HOME/.bashrc" >/dev/null || die ".bashrc missing umask"
   grep -F "/data/usr/local/bin:/usr/local/bin:\$HOME/.local/bin:\$PATH" "$LABWC_TARGET_HOME/.bashrc" >/dev/null || die ".bashrc missing PATH additions"
@@ -391,7 +388,6 @@ verify_install() {
   verify_user_unit_enabled wireplumber.service
   verify_services_enabled
   verify_greeter_user
-  verify_polkitd_user
   verify_polkit_semantics
   verify_sid_repository_semantics
   verify_ownership
@@ -404,6 +400,7 @@ verify_install() {
   verify_gpg_agent_semantics
   verify_kwallet_semantics
   verify_keepsecret_semantics
+  verify_foot_semantics
   verify_shell_config_semantics
   verify_tmux_semantics
   verify_mako_semantics
