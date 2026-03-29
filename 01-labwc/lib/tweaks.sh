@@ -85,3 +85,11 @@ install_labwc_tweaks() {
   run_cmd runuser -u "$LABWC_TARGET_USER" -- env HOME="$LABWC_TARGET_HOME" ctest --verbose --force-new-ctest-process --test-dir "$build_dir"
   run_cmd cmake --install "$build_dir"
 }
+
+remove_labwc_tweaks_install() {
+  remove_if_present "$LABWC_TWEAKS_BIN_PATH"
+  remove_if_present "$LABWC_TWEAKS_DESKTOP_PATH"
+  remove_if_present "$LABWC_TWEAKS_APPDATA_PATH"
+  remove_if_present "$LABWC_TWEAKS_ICON_PATH"
+  remove_if_present "$(labwc_tweaks_cache_root)"
+}

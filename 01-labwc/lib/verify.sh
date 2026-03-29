@@ -62,6 +62,10 @@ verify_paths() {
   require_file "/usr/share/applications/labwc_tweaks.desktop"
   require_file "/usr/share/metainfo/labwc_tweaks.appdata.xml"
   require_file "/usr/share/icons/hicolor/scalable/apps/labwc_tweaks.svg"
+  require_file "$KEEPSECRET_BIN_PATH"
+  require_file "$KEEPSECRET_DESKTOP_PATH"
+  require_file "$KEEPSECRET_APPDATA_PATH"
+  require_file "$KEEPSECRET_MANIFEST_PATH"
   require_file "$LABWC_TARGET_HOME/.config/labwc/rc.xml"
   require_file "$LABWC_TARGET_HOME/.config/labwc/menu.xml"
   require_file "$LABWC_TARGET_HOME/.config/labwc/autostart"
@@ -71,6 +75,7 @@ verify_paths() {
   require_file "$LABWC_TARGET_HOME/.config/waybar/style.css"
   require_file "$LABWC_TARGET_HOME/.config/kanshi/config"
   require_file "$LABWC_TARGET_HOME/.config/xfce4/helpers.rc"
+  require_file "$LABWC_TARGET_HOME/.config/kwalletrc"
   require_file "$LABWC_TARGET_HOME/.config/xdg-desktop-portal/portals.conf"
   require_dir "/usr/local/share/polkit-1/rules.d"
   require_file "$LABWC_TARGET_HOME/.config/starship.toml"
@@ -134,7 +139,8 @@ verify_polkit_semantics() {
   grep -F 'd /run/polkit-1/rules.d 0755 root root -' /etc/tmpfiles.d/debian-labwc-polkit.conf >/dev/null || die "polkit tmpfiles config missing runtime rules directory"
   grep -F 'Wants=polkit.service' /etc/systemd/system/udisks2.service.d/10-polkit.conf >/dev/null || die "udisks2 drop-in missing polkit dependency"
   grep -F 'After=polkit.service dbus.service' /etc/systemd/system/udisks2.service.d/10-polkit.conf >/dev/null || die "udisks2 drop-in missing polkit ordering"
-  grep -F 'lxpolkit &' "$autostart_path" >/dev/null || die "labwc autostart missing lxpolkit auth agent"
+  grep -F '/usr/lib/x86_64-linux-gnu/libexec/polkit-kde-authentication-agent-1 &' "$autostart_path" >/dev/null || die "labwc autostart missing KDE polkit auth agent"
+  ! grep -F 'lxpolkit' "$autostart_path" >/dev/null || die "labwc autostart still references lxpolkit"
   grep -F '/usr/local/bin/debian-labwc-workspace-state 1' "$autostart_path" >/dev/null || die "labwc autostart missing initial workspace state sync"
   grep -F 'debian-labwc-unlock-gpg-key' "$autostart_path" >/dev/null || die "labwc autostart missing proactive GPG unlock helper"
   grep -F 'systemctl --user import-environment' "$autostart_path" >/dev/null || die "labwc autostart missing systemd user environment import"
@@ -239,6 +245,7 @@ verify_gpg_agent_semantics() {
   local gpg_agent_config="$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf"
   grep -F 'pkill -x "waybar"' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing waybar stop"
   grep -F 'gpgconf --kill gpg-agent' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing gpg-agent kill"
+  grep -F 'pkill -x "polkit-kde-authentication-agent-1"' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing KDE polkit agent stop"
   grep -F 'xdg-desktop-portal.service' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing portal stop"
   grep -F 'xdg-desktop-portal-wlr.service' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing portal-wlr stop"
   grep -F 'systemctl --user stop \' "$shutdown_path" >/dev/null || die "labwc shutdown hook missing explicit pipewire shutdown"
@@ -250,12 +257,34 @@ verify_gpg_agent_semantics() {
   grep -F 'enable-ssh-support' "$gpg_agent_config" >/dev/null || die "gpg-agent config missing ssh agent support"
   grep -F 'pinentry-program /usr/bin/pinentry-gtk-2' "$gpg_agent_config" >/dev/null || die "gpg-agent config missing explicit pinentry"
   grep -F 'disable-scdaemon' "$gpg_agent_config" >/dev/null || die "gpg-agent config missing scdaemon disablement"
+  grep -F 'no-allow-external-cache' "$gpg_agent_config" >/dev/null || die "gpg-agent config missing KWallet external cache disablement"
   grep -F "default-cache-ttl ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}" "$gpg_agent_config" >/dev/null || die "gpg-agent config missing configured cache ttl"
   grep -F "max-cache-ttl ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}" "$gpg_agent_config" >/dev/null || die "gpg-agent config missing configured max cache ttl"
   grep -F "default-cache-ttl-ssh ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}" "$gpg_agent_config" >/dev/null || die "gpg-agent config missing configured ssh cache ttl"
   grep -F "max-cache-ttl-ssh ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}" "$gpg_agent_config" >/dev/null || die "gpg-agent config missing configured ssh max cache ttl"
   grep -F 'gpgconf --launch gpg-agent' "$session_wrapper" >/dev/null || die "session wrapper missing gpg-agent launch"
   grep -F 'export SSH_AUTH_SOCK=' "$session_wrapper" >/dev/null || die "session wrapper missing SSH_AUTH_SOCK export"
+}
+
+verify_kwallet_semantics() {
+  local kwallet_config="$LABWC_TARGET_HOME/.config/kwalletrc"
+  local portals_path="$LABWC_TARGET_HOME/.config/xdg-desktop-portal/portals.conf"
+  grep -F '[Wallet]' "$kwallet_config" >/dev/null || die "kwalletrc missing Wallet section"
+  grep -F 'Enabled=true' "$kwallet_config" >/dev/null || die "kwalletrc does not enable KWallet"
+  grep -F '[org.freedesktop.secrets]' "$kwallet_config" >/dev/null || die "kwalletrc missing Secret Service section"
+  grep -F 'apiEnabled=true' "$kwallet_config" >/dev/null || die "kwalletrc does not enable Secret Service compatibility"
+  grep -F 'org.freedesktop.impl.portal.Secret=kwallet' "$portals_path" >/dev/null || die "portals.conf does not force the KWallet Secret portal"
+}
+
+verify_keepsecret_semantics() {
+  grep -Fx "$KEEPSECRET_BIN_PATH" "$KEEPSECRET_MANIFEST_PATH" >/dev/null || die "keepsecret install manifest is missing the binary path"
+  grep -Fx "$KEEPSECRET_DESKTOP_PATH" "$KEEPSECRET_MANIFEST_PATH" >/dev/null || die "keepsecret install manifest is missing the desktop path"
+  grep -Fx "$KEEPSECRET_APPDATA_PATH" "$KEEPSECRET_MANIFEST_PATH" >/dev/null || die "keepsecret install manifest is missing the metainfo path"
+  while IFS= read -r installed_path; do
+    [[ -n "$installed_path" ]] || continue
+    require_file "$installed_path"
+  done <"$KEEPSECRET_MANIFEST_PATH"
+  grep -F 'Exec=keepsecret' "$KEEPSECRET_DESKTOP_PATH" >/dev/null || die "keepsecret desktop file missing keepsecret Exec"
 }
 
 verify_shell_config_semantics() {
@@ -363,6 +392,8 @@ verify_install() {
   verify_labwc_tweaks_semantics
   verify_swaylock_semantics
   verify_gpg_agent_semantics
+  verify_kwallet_semantics
+  verify_keepsecret_semantics
   verify_shell_config_semantics
   verify_tmux_semantics
   verify_mako_semantics

@@ -18,8 +18,7 @@ readonly BACKPORTS_PACKAGES=(
   swaybg
   swayidle
   swaylock
-  # Debian trixie currently lacks xfce-polkit, so keep the auth agent on lxpolkit.
-  lxpolkit
+  polkit-kde-agent-1
   thunar
   thunar-volman
   nnn
@@ -50,6 +49,11 @@ readonly BACKPORTS_PACKAGES=(
   kwallet6
   qtwayland5
   qt6-wayland
+  qml6-module-org-kde-config
+  qml6-module-org-kde-coreaddons
+  qml6-module-org-kde-kirigami
+  qml6-module-org-kde-kirigamiaddons-formcard
+  qml6-module-qtquick-window
   gvfs
   gvfs-fuse
   gvfs-backends
@@ -108,9 +112,26 @@ readonly TWEAKS_BUILD_PACKAGES=(
 
 readonly TWEAKS_BACKPORTS_PACKAGES=(
   qt6-base-dev
+  qt6-base-dev-tools
+  qt6-declarative-dev
+  qt6-declarative-dev-tools
   qt6-l10n-tools
+  qt6-svg-dev
   qt6-tools-dev
   qt6-tools-dev-tools
+)
+
+readonly KEEPSECRET_BUILD_PACKAGES=(
+  extra-cmake-modules
+  libkf6config-dev
+  libkf6coreaddons-dev
+  libkf6crash-dev
+  libkf6dbusaddons-dev
+  libkf6i18n-dev
+  libkf6itemmodels-dev
+  libkirigami-dev
+  kirigami-addons-dev
+  libsecret-1-dev
 )
 
 readonly INTEL_PACKAGES=(
@@ -149,6 +170,7 @@ resolved_requested_packages() {
   printf '%s\n' "${GRAPHICS_PACKAGES[@]}"
   printf '%s\n' "${TWEAKS_BUILD_PACKAGES[@]}"
   printf '%s\n' "${TWEAKS_BACKPORTS_PACKAGES[@]}"
+  printf '%s\n' "${KEEPSECRET_BUILD_PACKAGES[@]}"
   if [[ "${LABWC_HAS_INTEL_GPU:-no}" == "yes" ]]; then
     printf '%s\n' "${INTEL_PACKAGES[@]}"
   fi
@@ -160,11 +182,13 @@ install_requested_packages() {
   local -a graphics_package_list=()
   local -a tweaks_build_package_list=()
   local -a tweaks_backports_package_list=()
+  local -a keepsecret_build_package_list=()
   local -a apt_args=()
   mapfile -t backports_package_list < <(printf '%s\n' "${BACKPORTS_PACKAGES[@]}")
   mapfile -t graphics_package_list < <(printf '%s\n' "${GRAPHICS_PACKAGES[@]}")
   mapfile -t tweaks_build_package_list < <(printf '%s\n' "${TWEAKS_BUILD_PACKAGES[@]}")
   mapfile -t tweaks_backports_package_list < <(printf '%s\n' "${TWEAKS_BACKPORTS_PACKAGES[@]}")
+  mapfile -t keepsecret_build_package_list < <(printf '%s\n' "${KEEPSECRET_BUILD_PACKAGES[@]}")
   if [[ "${LABWC_HAS_INTEL_GPU:-no}" == "yes" ]]; then
     mapfile -O "${#graphics_package_list[@]}" -t graphics_package_list < <(printf '%s\n' "${INTEL_PACKAGES[@]}")
   fi
@@ -176,4 +200,6 @@ install_requested_packages() {
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${tweaks_build_package_list[@]}"
   log_info "installing Qt build dependencies for labwc-tweaks source build from backports"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${tweaks_backports_package_list[@]}"
+  log_info "installing keepsecret source build dependencies"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${keepsecret_build_package_list[@]}"
 }

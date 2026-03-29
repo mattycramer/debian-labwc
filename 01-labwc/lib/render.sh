@@ -661,7 +661,7 @@ update_activation_environment \
   QT_QPA_PLATFORM \
   QT_WAYLAND_DISABLE_WINDOWDECORATION
 
-pgrep -x lxpolkit >/dev/null 2>&1 || lxpolkit &
+pgrep -x polkit-kde-authentication-agent-1 >/dev/null 2>&1 || /usr/lib/x86_64-linux-gnu/libexec/polkit-kde-authentication-agent-1 &
 /usr/local/bin/debian-labwc-workspace-state 1 >/dev/null 2>&1 || true
 pgrep -x waybar >/dev/null 2>&1 || waybar &
 pgrep -x kanshi >/dev/null 2>&1 || kanshi &
@@ -707,7 +707,7 @@ IFS='
 pkill -x "waybar" >/dev/null 2>&1 || true
 pkill -x "kanshi" >/dev/null 2>&1 || true
 pkill -x "mako" >/dev/null 2>&1 || true
-pkill -x "lxpolkit" >/dev/null 2>&1 || true
+pkill -x "polkit-kde-authentication-agent-1" >/dev/null 2>&1 || true
 pkill -x "swayidle" >/dev/null 2>&1 || true
 pkill -x "crystal-dock" >/dev/null 2>&1 || true
 pkill -x "nwg-dock" >/dev/null 2>&1 || true
@@ -745,11 +745,16 @@ render_gpg_agent_config() {
   render_user_private_file "$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf" "enable-ssh-support
 pinentry-program /usr/bin/pinentry-gtk-2
 disable-scdaemon
+no-allow-external-cache
 default-cache-ttl ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}
 max-cache-ttl ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}
 default-cache-ttl-ssh ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}
 max-cache-ttl-ssh ${KWALLET_SESSION_GPG_CACHE_TTL_SEC}
 "
+}
+
+render_kwallet_config() {
+  render_user_file "$LABWC_TARGET_HOME/.config/kwalletrc" $'[Wallet]\nEnabled=true\n\n[org.freedesktop.secrets]\napiEnabled=true\n'
 }
 
 render_waybar_config() {
@@ -1092,6 +1097,15 @@ kanshi_output_line() {
   printf '%s\n' "$line"
 }
 
+mode_width() {
+  local mode_name="$1"
+  if [[ "$mode_name" =~ ^([0-9]+)x[0-9]+$ ]]; then
+    printf '%s\n' "${BASH_REMATCH[1]}"
+    return 0
+  fi
+  printf '%s\n' "1920"
+}
+
 render_kanshi_config() {
   local internal_output="${LABWC_INTERNAL_OUTPUT:-}"
   local external_output="${LABWC_EXTERNAL_OUTPUT:-}"
@@ -1111,10 +1125,11 @@ EOF
 
   if [[ -n "$external_output" ]]; then
     if [[ -n "$internal_output" ]]; then
-      local external_line dual_external_line dual_internal_line
+      local external_line dual_external_line dual_internal_line external_width
+      external_width="$(mode_width "${LABWC_EXTERNAL_MODE}")"
       external_line="$(kanshi_output_line "$external_output" "${LABWC_EXTERNAL_MODE}" "${LABWC_EXTERNAL_HZ}" "0,0" "enable")"
       dual_external_line="$(kanshi_output_line "$external_output" "${LABWC_EXTERNAL_MODE}" "${LABWC_EXTERNAL_HZ}" "0,0" "enable")"
-      dual_internal_line="$(kanshi_output_line "$internal_output" "${LABWC_INTERNAL_MODE}" "${LABWC_INTERNAL_HZ}" "1920,0" "enable")"
+      dual_internal_line="$(kanshi_output_line "$internal_output" "${LABWC_INTERNAL_MODE}" "${LABWC_INTERNAL_HZ}" "${external_width},0" "enable")"
       external_clause="$(cat <<EOF
 profile external {
 ${external_line}
@@ -1200,7 +1215,7 @@ render_gammastep() {
 }
 
 render_portals() {
-  render_user_file "$LABWC_TARGET_HOME/.config/xdg-desktop-portal/portals.conf" $'[preferred]\ndefault=gtk\norg.freedesktop.impl.portal.ScreenCast=wlr\norg.freedesktop.impl.portal.Screenshot=wlr\norg.freedesktop.impl.portal.FileChooser=gtk\n'
+  render_user_file "$LABWC_TARGET_HOME/.config/xdg-desktop-portal/portals.conf" $'[preferred]\ndefault=gtk\norg.freedesktop.impl.portal.ScreenCast=wlr\norg.freedesktop.impl.portal.Screenshot=wlr\norg.freedesktop.impl.portal.FileChooser=gtk\norg.freedesktop.impl.portal.Secret=kwallet\n'
 }
 
 install_wallpaper() {
@@ -1251,6 +1266,7 @@ render_all_configs() {
   render_labwc_shutdown
   render_gpg_agent_override
   render_gpg_agent_config
+  render_kwallet_config
   render_portal_unit_overrides
   render_waybar_config
   render_waybar_style

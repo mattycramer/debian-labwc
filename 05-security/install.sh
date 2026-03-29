@@ -99,6 +99,7 @@ phase_install() {
   initialize_crowdsec
   initialize_aide_database
   enable_security_services
+  record_installed_security_versions
 }
 
 phase_verify() {

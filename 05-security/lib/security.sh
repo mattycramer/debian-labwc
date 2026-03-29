@@ -64,6 +64,7 @@ readonly AIDE_DB_PATH="/var/lib/aide/aide.db.gz"
 readonly AIDE_DB_NEW_PATH="/var/lib/aide/aide.db.new.gz"
 readonly AIDE_CHECK_SERVICE_PATH="/etc/systemd/system/debian-labwc-security-aide-check.service"
 readonly AIDE_CHECK_TIMER_PATH="/etc/systemd/system/debian-labwc-security-aide-check.timer"
+readonly SECURITY_VERSIONS_PATH="${SECURITY_RUNTIME_ROOT}/installed-versions.env"
 readonly LDCONFIG_BIN="/usr/sbin/ldconfig"
 
 detect_security_download_user() {
@@ -175,7 +176,7 @@ install_crowdsec_packages() {
 resolve_nftables_release() {
   local page
   page="$(fetch_as_security_user "https://www.nftables.org/projects/nftables/downloads.html")"
-  NFTABLES_TARBALL="$(printf '%s' "$page" | grep -o 'nftables-[0-9][0-9.]*\.tar\.xz' | head -n1)"
+  NFTABLES_TARBALL="$(printf '%s' "$page" | grep -o 'nftables-[0-9][0-9.]*\.tar\.xz' | sort -Vu | tail -n1)"
   [[ -n "${NFTABLES_TARBALL:-}" ]] || die "could not resolve latest nftables release"
   NFTABLES_VERSION="${NFTABLES_TARBALL#nftables-}"
   NFTABLES_VERSION="${NFTABLES_VERSION%.tar.xz}"
@@ -186,7 +187,7 @@ resolve_nftables_release() {
 resolve_libmnl_release() {
   local page
   page="$(fetch_as_security_user "https://www.netfilter.org/projects/libmnl/downloads.html")"
-  LIBMNL_TARBALL="$(printf '%s' "$page" | grep -o 'libmnl-[0-9][0-9.]*\.tar\.bz2' | head -n1)"
+  LIBMNL_TARBALL="$(printf '%s' "$page" | grep -o 'libmnl-[0-9][0-9.]*\.tar\.bz2' | sort -Vu | tail -n1)"
   [[ -n "${LIBMNL_TARBALL:-}" ]] || die "could not resolve latest libmnl release"
   LIBMNL_VERSION="${LIBMNL_TARBALL#libmnl-}"
   LIBMNL_VERSION="${LIBMNL_VERSION%.tar.bz2}"
@@ -197,7 +198,7 @@ resolve_libmnl_release() {
 resolve_libnftnl_release() {
   local page
   page="$(fetch_as_security_user "https://www.netfilter.org/projects/libnftnl/downloads.html")"
-  LIBNFTNL_TARBALL="$(printf '%s' "$page" | grep -o 'libnftnl-[0-9][0-9.]*\.tar\.xz' | head -n1)"
+  LIBNFTNL_TARBALL="$(printf '%s' "$page" | grep -o 'libnftnl-[0-9][0-9.]*\.tar\.xz' | sort -Vu | tail -n1)"
   [[ -n "${LIBNFTNL_TARBALL:-}" ]] || die "could not resolve latest libnftnl release"
   LIBNFTNL_VERSION="${LIBNFTNL_TARBALL#libnftnl-}"
   LIBNFTNL_VERSION="${LIBNFTNL_VERSION%.tar.xz}"
@@ -511,6 +512,27 @@ initialize_aide_database() {
   run_cmd chmod 0600 "$AIDE_DB_PATH"
 }
 
+record_installed_security_versions() {
+  local installed_nft_version installed_aide_version installed_crowdsec_version installed_bouncer_version
+  local content
+  installed_nft_version="$("$NFT_BIN" --version 2>/dev/null | grep -o '[0-9][0-9.]*' | head -n1)"
+  [[ -n "$installed_nft_version" ]] || die "could not determine installed nftables version"
+  installed_aide_version="$(/usr/local/bin/aide --version 2>/dev/null | grep -o '[0-9][0-9.]*' | head -n1)"
+  [[ -n "$installed_aide_version" ]] || die "could not determine installed AIDE version"
+  installed_crowdsec_version="$(crowdsec -version 2>/dev/null | grep -o '[0-9][0-9.]*' | head -n1)"
+  [[ -n "$installed_crowdsec_version" ]] || die "could not determine installed CrowdSec version"
+  installed_bouncer_version="$(crowdsec-firewall-bouncer -version 2>/dev/null | grep -o '[0-9][0-9.]*' | head -n1)"
+  [[ -n "$installed_bouncer_version" ]] || die "could not determine installed firewall bouncer version"
+  content="$(cat <<EOF
+NFTABLES_VERSION="${installed_nft_version}"
+AIDE_VERSION="${installed_aide_version}"
+CROWDSEC_VERSION="${installed_crowdsec_version}"
+CROWDSEC_BOUNCER_VERSION="${installed_bouncer_version}"
+EOF
+)"
+  write_text_file "$SECURITY_VERSIONS_PATH" "$content"
+}
+
 enable_security_services() {
   run_cmd systemctl enable --now crowdsec-firewall-bouncer.service
   run_cmd systemctl enable --now debian-labwc-security-aide-check.timer
@@ -541,6 +563,7 @@ verify_security_install() {
   verify_path_exists "$AIDE_DB_PATH"
   verify_path_exists "$AIDE_CHECK_SERVICE_PATH"
   verify_path_exists "$AIDE_CHECK_TIMER_PATH"
+  verify_path_exists "$SECURITY_VERSIONS_PATH"
   verify_path_exists "${MANIFEST_ROOT}/nftables.files"
   verify_path_exists "${MANIFEST_ROOT}/aide.files"
   verify_path_exists "${MANIFEST_ROOT}/libmnl.files"
@@ -550,19 +573,17 @@ verify_security_install() {
     command_is_available "$cmd" || die "missing command: $cmd"
   done
 
-  resolve_nftables_release
+  # shellcheck disable=SC1090
+  source "$SECURITY_VERSIONS_PATH"
   installed_nft_version="$("$NFT_BIN" --version 2>/dev/null | grep -o '[0-9][0-9.]*' | head -n1)"
   [[ "$installed_nft_version" == "$NFTABLES_VERSION" ]] || die "expected nftables ${NFTABLES_VERSION}, found ${installed_nft_version:-unknown}"
 
-  resolve_aide_release
   installed_aide_version="$(/usr/local/bin/aide --version 2>/dev/null | grep -o '[0-9][0-9.]*' | head -n1)"
   [[ "$installed_aide_version" == "$AIDE_VERSION" ]] || die "expected AIDE ${AIDE_VERSION}, found ${installed_aide_version:-unknown}"
 
-  resolve_crowdsec_release
   installed_crowdsec_version="$(crowdsec -version 2>/dev/null | grep -o '[0-9][0-9.]*' | head -n1)"
   [[ "$installed_crowdsec_version" == "$CROWDSEC_VERSION" ]] || die "expected CrowdSec ${CROWDSEC_VERSION}, found ${installed_crowdsec_version:-unknown}"
 
-  resolve_crowdsec_bouncer_release
   installed_bouncer_version="$(crowdsec-firewall-bouncer -version 2>/dev/null | grep -o '[0-9][0-9.]*' | head -n1)"
   [[ "$installed_bouncer_version" == "$CROWDSEC_BOUNCER_VERSION" ]] || die "expected firewall bouncer ${CROWDSEC_BOUNCER_VERSION}, found ${installed_bouncer_version:-unknown}"
 
@@ -612,7 +633,7 @@ remove_security_install() {
   run_cmd rmdir --ignore-fail-on-non-empty "$NFTABLES_DROPIN_DIR" >/dev/null 2>&1 || true
   run_cmd rmdir --ignore-fail-on-non-empty "$NFTABLES_RULES_DIR" >/dev/null 2>&1 || true
   run_cmd rm -f -- "$CROWDSEC_ACQUIS_PATH" "$CROWDSEC_BOUNCER_CONFIG_PATH" "$CROWDSEC_BOUNCER_KEY_PATH" "$CROWDSEC_CONSOLE_MARKER"
-  run_cmd rm -f -- "$AIDE_CONF_PATH" "$AIDE_CHECK_SERVICE_PATH" "$AIDE_CHECK_TIMER_PATH" "$AIDE_DB_PATH" "$AIDE_DB_NEW_PATH"
+  run_cmd rm -f -- "$AIDE_CONF_PATH" "$AIDE_CHECK_SERVICE_PATH" "$AIDE_CHECK_TIMER_PATH" "$AIDE_DB_PATH" "$AIDE_DB_NEW_PATH" "$SECURITY_VERSIONS_PATH"
   run_cmd rmdir --ignore-fail-on-non-empty "$AIDE_CONF_DIR" >/dev/null 2>&1 || true
   run_cmd rmdir --ignore-fail-on-non-empty "$AIDE_DB_DIR" >/dev/null 2>&1 || true
 

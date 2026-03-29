@@ -270,6 +270,8 @@ nuke_all_state() {
   remove_if_present "$LABWC_TARGET_HOME/.config/foot"
   remove_if_present "$LABWC_TARGET_HOME/.config/gammastep"
   remove_if_present "$LABWC_TARGET_HOME/.config/xdg-desktop-portal"
+  remove_if_present "$LABWC_TARGET_HOME/.config/kwalletrc"
+  remove_if_present "$LABWC_TARGET_HOME/.config/systemd/user/gpg-agent.service.d"
   remove_if_present "$LABWC_TARGET_HOME/.config/systemd/user/xdg-desktop-portal.service.d"
   remove_if_present "$LABWC_TARGET_HOME/.config/systemd/user/xdg-desktop-portal-wlr.service.d"
   remove_if_present "$LABWC_TARGET_HOME/.config/debian-labwc"
@@ -282,6 +284,7 @@ nuke_all_state() {
   remove_if_present "$LABWC_TARGET_HOME/.zprofile"
   remove_if_present "$LABWC_TARGET_HOME/.nanorc"
   remove_if_present "$LABWC_TARGET_HOME/.tmux.conf"
+  remove_if_present "$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf"
 
   log_info "removing installed helper scripts and session files"
   remove_if_present "/usr/local/bin/debian-labwc-session"
@@ -291,10 +294,12 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/debian-labwc-record-toggle"
   remove_if_present "/usr/local/bin/debian-labwc-dpms"
   remove_if_present "/usr/local/bin/debian-labwc-refresh-outputs"
+  remove_if_present "/usr/local/bin/debian-labwc-lock"
   remove_if_present "/usr/local/bin/debian-labwc-launcher-menu"
   remove_if_present "/usr/local/bin/debian-labwc-module-menu"
   remove_if_present "/usr/local/bin/debian-labwc-player-status"
   remove_if_present "/usr/local/bin/debian-labwc-unlock-gpg-key"
+  remove_if_present "/usr/local/bin/debian-labwc-workspacectl"
   remove_if_present "/usr/local/bin/debian-labwc-workspace-activate"
   remove_if_present "/usr/local/bin/debian-labwc-workspace-send"
   remove_if_present "/usr/local/bin/debian-labwc-workspace-state"
@@ -305,6 +310,8 @@ nuke_all_state() {
   remove_if_present "$UDISKS2_DROPIN_PATH"
   remove_if_present "/etc/greetd/config.toml"
   remove_if_present "/etc/systemd/system/greetd.service.d/10-vt.conf"
+  remove_labwc_tweaks_install
+  remove_keepsecret_install
   rmdir --ignore-fail-on-non-empty "/etc/systemd/system/greetd.service.d" >/dev/null 2>&1 || true
   rmdir --ignore-fail-on-non-empty "$UDISKS2_DROPIN_DIR" >/dev/null 2>&1 || true
   rmdir --ignore-fail-on-non-empty "/usr/local/share/polkit-1" >/dev/null 2>&1 || true

@@ -25,6 +25,8 @@ source "$SCRIPT_DIR/lib/services.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/tweaks.sh"
 # shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/keepsecret.sh"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/verify.sh"
 
 usage() {
@@ -106,7 +108,9 @@ phase_build_doctor() {
   require_command tar
   require_command cmake
   require_command ctest
+  require_command git
   require_command ninja
+  require_command timeout
 }
 
 phase_enable() {
@@ -121,6 +125,7 @@ phase_enable() {
   enable_all_services "$ENV_FILE"
   phase_build_doctor
   install_labwc_tweaks
+  install_keepsecret
 }
 
 phase_verify() {

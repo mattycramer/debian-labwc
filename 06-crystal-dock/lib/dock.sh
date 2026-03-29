@@ -149,10 +149,11 @@ ensure_labwc_autostart_hook() {
 
 $CRYSTAL_DOCK_AUTOSTART_MARKER_BEGIN
 autostart_dir="$DOCK_TARGET_HOME/.config/labwc/autostart.d"
-if [[ -d "\$autostart_dir" ]]; then
-  while IFS= read -r -d '' autostart_fragment; do
-    bash "\$autostart_fragment" >/dev/null 2>&1 || true
-  done < <(find "\$autostart_dir" -maxdepth 1 -type f -name '*.sh' -print0 | sort -z)
+if [ -d "\$autostart_dir" ]; then
+  find "\$autostart_dir" -maxdepth 1 -type f -name '*.sh' | sort | while IFS= read -r autostart_fragment; do
+    [ -n "\$autostart_fragment" ] || continue
+    "\$autostart_fragment" >/dev/null 2>&1 || true
+  done
 fi
 $CRYSTAL_DOCK_AUTOSTART_MARKER_END
 EOF
