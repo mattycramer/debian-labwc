@@ -9,6 +9,7 @@ readonly SID_PACKAGES=(
   labwc
   kanshi
   waybar
+  wdisplays
   gsimplecal
   wofi
   switcheroo-control
