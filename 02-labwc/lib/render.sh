@@ -308,13 +308,13 @@ mauve = "#c4b5fd"
 panel = "#0f1720"
 
 [username]
-show_always = false
+show_always = true
 style_user = "bold amber"
 style_root = "bold red"
 format = "[$user](style) "
 
 [hostname]
-ssh_only = true
+ssh_only = false
 style = "bold cyan"
 format = "[@$hostname](style) "
 
@@ -1805,11 +1805,11 @@ text-wrong-color=fff1f2ff
 }
 
 render_foot() {
-  render_user_file "$LABWC_TARGET_HOME/.config/foot/foot.ini" $'[main]\nterm=foot\napp-id=foot\nfont=Noto Sans Mono:size=10.5\nfont-bold=Noto Sans Mono:weight=bold:size=10.5\nfont-italic=Noto Sans Mono:slant=italic:size=10.5\nfont-bold-italic=Noto Sans Mono:weight=bold:slant=italic:size=10.5\ndpi-aware=yes\ninitial-color-theme=dark\nline-height=15px\nletter-spacing=0px\nunderline-offset=1px\nbox-drawings-uses-font-glyphs=no\ninitial-window-size-chars=104x28\npad=12x10 center\nresize-by-cells=yes\nselection-target=both\nbold-text-in-bright=no\n\n[bell]\nsystem=no\n\n[scrollback]\nlines=120000\n\n[cursor]\nstyle=beam\nunfocused-style=hollow\nblink=yes\nblink-rate=600\nbeam-thickness=1.5\n\n[mouse]\nhide-when-typing=yes\n\n[text-bindings]\n\\x1b[1;3A = Mod1+Up\n\\x1b[1;3B = Mod1+Down\n\\x1b[1;3C = Mod1+Right\n\\x1b[1;3D = Mod1+Left\n\n[colors-dark]\nforeground=e5edf5\nbackground=0f1720\ncursor=07131d f6bd60\nregular0=1a2430\nregular1=ef4444\nregular2=22c55e\nregular3=f59e0b\nregular4=38bdf8\nregular5=c084fc\nregular6=2dd4bf\nregular7=e2e8f0\nbright0=475569\nbright1=f87171\nbright2=4ade80\nbright3=fbbf24\nbright4=7dd3fc\nbright5=d8b4fe\nbright6=5eead4\nbright7=f8fafc\nselection-foreground=07131d\nselection-background=94d2bd\nurls=7dd3fc\nalpha=0.97\n'
+  render_user_file "$LABWC_TARGET_HOME/.config/foot/foot.ini" $'[main]\nterm=foot\napp-id=foot\nfont=Noto Sans Mono:size=10.5\nfont-bold=Noto Sans Mono:weight=bold:size=10.5\nfont-italic=Noto Sans Mono:slant=italic:size=10.5\nfont-bold-italic=Noto Sans Mono:weight=bold:slant=italic:size=10.5\ndpi-aware=yes\ninitial-color-theme=dark\nline-height=15px\nletter-spacing=0px\nunderline-offset=1px\nbox-drawings-uses-font-glyphs=no\ninitial-window-size-pixels=960x620\npad=12x10 center\nresize-by-cells=yes\nselection-target=both\nbold-text-in-bright=no\n\n[bell]\nsystem=no\n\n[scrollback]\nlines=120000\n\n[cursor]\nstyle=beam\nunfocused-style=hollow\nblink=yes\nblink-rate=600\nbeam-thickness=1.5\n\n[mouse]\nhide-when-typing=yes\n\n[text-bindings]\n\\x1b[1;3A = Mod1+Up\n\\x1b[1;3B = Mod1+Down\n\\x1b[1;3C = Mod1+Right\n\\x1b[1;3D = Mod1+Left\n\n[colors-dark]\nforeground=e5edf5\nbackground=0f1720\ncursor=07131d f6bd60\nregular0=1a2430\nregular1=ef4444\nregular2=22c55e\nregular3=f59e0b\nregular4=38bdf8\nregular5=c084fc\nregular6=2dd4bf\nregular7=e2e8f0\nbright0=475569\nbright1=f87171\nbright2=4ade80\nbright3=fbbf24\nbright4=7dd3fc\nbright5=d8b4fe\nbright6=5eead4\nbright7=f8fafc\nselection-foreground=07131d\nselection-background=94d2bd\nurls=7dd3fc\nalpha=0.97\n'
 }
 
 render_kitty() {
-  render_user_file "$LABWC_TARGET_HOME/.config/kitty/kitty.conf" $'font_family Noto Sans Mono\nbold_font auto\nitalic_font auto\nbold_italic_font auto\nfont_size 10.5\ncursor_shape beam\ncursor_shape_unfocused hollow\ncursor_beam_thickness 1.5\ncursor_blink_interval 0.6\nenable_audio_bell no\nvisual_bell_duration 0.0\ncopy_on_select clipboard\nclear_selection_on_clipboard_loss yes\nclipboard_control write-clipboard write-primary read-clipboard-ask read-primary-ask\nshell_integration enabled\nconfirm_os_window_close -1 count-background\nscrollback_lines 30000\nremember_window_size yes\ninitial_window_width 104c\ninitial_window_height 28c\nwindow_padding_width 12\nwayland_titlebar_color background\nactive_border_color #6dc4ed\ninactive_border_color #334155\nurl_color #7dd3fc\nforeground #e5edf5\nbackground #0f1720\nselection_foreground #07131d\nselection_background #94d2bd\ncursor #f6bd60\ncursor_text_color #07131d\ncolor0 #1a2430\ncolor1 #ef4444\ncolor2 #22c55e\ncolor3 #f59e0b\ncolor4 #38bdf8\ncolor5 #c084fc\ncolor6 #2dd4bf\ncolor7 #e2e8f0\ncolor8 #475569\ncolor9 #f87171\ncolor10 #4ade80\ncolor11 #fbbf24\ncolor12 #7dd3fc\ncolor13 #d8b4fe\ncolor14 #5eead4\ncolor15 #f8fafc\nmap alt+up send_text all \\e[1;3A\nmap alt+down send_text all \\e[1;3B\nmap alt+right send_text all \\e[1;3C\nmap alt+left send_text all \\e[1;3D\n'
+  render_user_file "$LABWC_TARGET_HOME/.config/kitty/kitty.conf" $'font_family Noto Sans Mono\nbold_font auto\nitalic_font auto\nbold_italic_font auto\nfont_size 10.5\ncursor_shape beam\ncursor_shape_unfocused hollow\ncursor_beam_thickness 1.5\ncursor_blink_interval 0.6\nenable_audio_bell no\nvisual_bell_duration 0.0\ncopy_on_select clipboard\nclear_selection_on_clipboard_loss yes\nclipboard_control write-clipboard write-primary read-clipboard-ask read-primary-ask\nshell_integration enabled\nconfirm_os_window_close -1 count-background\nscrollback_lines 30000\nremember_window_size no\ninitial_window_width 960\ninitial_window_height 620\nwindow_padding_width 12\nwayland_titlebar_color background\nactive_border_color #6dc4ed\ninactive_border_color #334155\nurl_color #7dd3fc\nforeground #e5edf5\nbackground #0f1720\nselection_foreground #07131d\nselection_background #94d2bd\ncursor #f6bd60\ncursor_text_color #07131d\ncolor0 #1a2430\ncolor1 #ef4444\ncolor2 #22c55e\ncolor3 #f59e0b\ncolor4 #38bdf8\ncolor5 #c084fc\ncolor6 #2dd4bf\ncolor7 #e2e8f0\ncolor8 #475569\ncolor9 #f87171\ncolor10 #4ade80\ncolor11 #fbbf24\ncolor12 #7dd3fc\ncolor13 #d8b4fe\ncolor14 #5eead4\ncolor15 #f8fafc\nmap alt+up send_text all \\e[1;3A\nmap alt+down send_text all \\e[1;3B\nmap alt+right send_text all \\e[1;3C\nmap alt+left send_text all \\e[1;3D\n'
 }
 
 render_gammastep() {
