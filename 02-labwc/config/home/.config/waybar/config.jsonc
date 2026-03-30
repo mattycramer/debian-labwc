@@ -3,8 +3,8 @@
   "position": "top",
   "height": 42,
   "spacing": 4,
+  "include": "@TARGET_HOME@/.config/waybar/grouped-taskbar.generated.jsonc",
   "modules-left": ["custom/launcher", "custom/workspace-1", "custom/workspace-2", "custom/workspace-3", "custom/workspace-4"],
-  "modules-center": ["wlr/taskbar"],
   "modules-right": ["custom/gpulaunch", "custom/updates", "network", "pulseaudio", "battery", "backlight", "cpu", "memory", "disk", "custom/player", "clock", "tray", "custom/power"],
   "custom/launcher": {
     "format": "Apps",
@@ -43,28 +43,6 @@
     "signal": 10,
     "tooltip": false,
     "on-click": "/usr/local/bin/debian-labwc-workspace-activate 4"
-  },
-  "wlr/taskbar": {
-    "format": "{icon} {name}",
-    "icon-size": 18,
-    "tooltip-format": "{title}",
-    "on-click": "activate",
-    "on-click-middle": "close",
-    "on-click-right": "minimize-raise",
-    "ignore-list": ["waybar"],
-    "app_ids-mapping": {
-      "footclient": "foot",
-      "code-url-handler": "code"
-    },
-    "rewrite": {
-      "Foot Server": "Foot",
-      "kitty": "Kitty",
-      "foot": "Foot",
-      "mousepad": "Mousepad",
-      "geeqie": "Geeqie",
-      "obsidian": "Obsidian",
-      "bitwarden": "Bitwarden"
-    }
   },
   "custom/updates": {
     "exec": "@UPDATES_SCRIPT@",

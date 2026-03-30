@@ -13,6 +13,8 @@
 @define-color red #ef4444;
 @define-color mauve #c4b5fd;
 
+@import url("grouped-taskbar.generated.css");
+
 * {
   font-family: "Noto Sans", "Font Awesome 6 Free", "Material Design Icons";
   font-size: 13px;
@@ -74,47 +76,6 @@ window#waybar {
   background: rgba(246, 189, 96, 0.94);
   border-color: rgba(246, 189, 96, 0.66);
   color: #07131d;
-}
-
-#taskbar {
-  margin: 5px 8px;
-  padding: 4px 8px;
-  border-radius: 16px;
-  background: @panel_alt;
-  border: 1px solid @border;
-}
-
-#taskbar button {
-  margin: 0 4px;
-  padding: 0 10px;
-  min-height: 30px;
-  border-radius: 12px;
-  background: transparent;
-  border: 1px solid transparent;
-  color: @text;
-}
-
-#taskbar button:hover {
-  background: @panel_hover;
-  border-color: @border_strong;
-}
-
-#taskbar button.active {
-  background: rgba(109, 196, 237, 0.18);
-  border-color: rgba(109, 196, 237, 0.42);
-  color: @sky;
-}
-
-#taskbar button.minimized {
-  color: @muted;
-}
-
-#taskbar button.maximized {
-  color: @amber;
-}
-
-#taskbar button.fullscreen {
-  color: @mint;
 }
 
 #custom-updates {

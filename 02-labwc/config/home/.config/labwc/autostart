@@ -83,6 +83,12 @@ update_activation_environment \
 warm_polkit_service || true
 pgrep -x polkit-kde-authentication-agent-1 >/dev/null 2>&1 || /usr/lib/x86_64-linux-gnu/libexec/polkit-kde-authentication-agent-1 &
 /usr/local/bin/debian-labwc-workspace-state 1 >/dev/null 2>&1 || true
+grouped_taskbar_script="@TARGET_HOME@/.config/waybar/scripts/grouped-taskbar.py"
+grouped_taskbar_daemon="/usr/local/bin/debian-labwc-grouped-taskbar-daemon"
+if [ -x "$grouped_taskbar_script" ] && [ -x "$grouped_taskbar_daemon" ]; then
+  "$grouped_taskbar_script" render >/dev/null 2>&1 || true
+  pgrep -f "$grouped_taskbar_daemon" >/dev/null 2>&1 || "$grouped_taskbar_daemon" >/dev/null 2>&1 &
+fi
 pgrep -x waybar >/dev/null 2>&1 || waybar &
 if [ ! -f "@TARGET_HOME@/.config/debian-labwc/.outputs-refined" ]; then
   /usr/local/bin/debian-labwc-refresh-outputs >/dev/null 2>&1 || true

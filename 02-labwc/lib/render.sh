@@ -197,10 +197,13 @@ render_waybar_scripts() {
   render_home_template_script ".config/waybar/scripts/pending-updates.sh"
   render_home_template_script ".config/waybar/scripts/run-upgrades.sh"
   render_home_template_script ".config/waybar/scripts/gpu-launch.sh"
+  render_home_template_script ".config/waybar/scripts/grouped-taskbar.py"
 }
 
 render_waybar_config() {
   render_home_template_file ".config/waybar/config.jsonc"
+  render_home_template_file ".config/waybar/grouped-taskbar.generated.jsonc"
+  render_home_template_file ".config/waybar/grouped-taskbar.generated.css"
 }
 
 render_waybar_style() {
