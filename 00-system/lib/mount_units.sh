@@ -81,6 +81,12 @@ validate_mount_timeout() {
   [[ "$1" =~ ^[0-9]+(ms|s|min|h)$ ]] || die "unsupported mount timeout: $1"
 }
 
+validate_automount_idle_timeout() {
+  [[ -z "$1" || "$1" =~ ^([0-9]+(ms|s|min|h)|infinity)$ ]] || {
+    die "unsupported automount idle timeout: $1"
+  }
+}
+
 validate_permission_mode() {
   [[ "$1" =~ ^0?[0-7]{3,4}$ ]] || die "unsupported permission mode: $1"
 }
@@ -114,6 +120,7 @@ validate_mount_entry() {
   local owner_token="$6"
   local group_token="$7"
   local mode="$8"
+  local automount_idle_timeout="${9:-}"
 
   [[ -n "$source" ]] || die "mount source is required"
   [[ "$where" == /* ]] || die "mount target must be absolute: $where"
@@ -126,6 +133,7 @@ validate_mount_entry() {
   resolve_mount_device_path "$source" >/dev/null
   validate_mount_option_list "$where" "$fs_type" "$options"
   validate_mount_timeout "$timeout"
+  validate_automount_idle_timeout "$automount_idle_timeout"
   resolve_principal_token "$owner_token" user >/dev/null
   resolve_principal_token "$group_token" group >/dev/null
   validate_permission_mode "$mode"
@@ -195,7 +203,10 @@ EOF
 
 generate_automount_unit_file() {
   local where="$1"
-  local destination_path="$2"
+  local idle_timeout="${2:-}"
+  local destination_path="$3"
+
+  [[ -n "$idle_timeout" ]] || idle_timeout="$SYSTEM_AUTOMOUNT_IDLE_TIMEOUT"
 
   cat >"$destination_path" <<EOF
 # Managed locally. Do not edit manually.
@@ -206,7 +217,7 @@ Documentation=man:systemd.automount(5)
 [Automount]
 Where=$where
 DirectoryMode=0755
-TimeoutIdleSec=$SYSTEM_AUTOMOUNT_IDLE_TIMEOUT
+TimeoutIdleSec=$idle_timeout
 
 [Install]
 WantedBy=local-fs.target
@@ -258,7 +269,7 @@ build_mount_unit_candidates() {
   local destination_dir="$1"
   local manifest_path="$2"
   local line_no=0
-  local source where fs_type options timeout owner_token group_token mode extra
+  local source where fs_type options timeout owner_token group_token mode automount_idle_timeout extra
   local unit_name parent_path parent_unit candidate_path automount_unit ownership_unit
   local parent_dir idx
   local -a sources=()
@@ -269,6 +280,7 @@ build_mount_unit_candidates() {
   local -a owner_tokens=()
   local -a group_tokens=()
   local -a modes=()
+  local -a automount_idle_timeouts=()
   local -A seen_units=()
   local -A seen_targets=()
   local -A target_exists=()
@@ -282,10 +294,10 @@ build_mount_unit_candidates() {
     [[ "$raw_line" =~ ^[[:space:]]*$ ]] && continue
     [[ "$raw_line" =~ ^[[:space:]]*# ]] && continue
 
-    IFS='|' read -r source where fs_type options timeout owner_token group_token mode extra <<<"$raw_line"
-    [[ -z "${extra:-}" ]] || die "invalid mount config line $line_no in $MOUNTS_CONFIG_FILE: expected 8 fields"
+    IFS='|' read -r source where fs_type options timeout owner_token group_token mode automount_idle_timeout extra <<<"$raw_line"
+    [[ -z "${extra:-}" ]] || die "invalid mount config line $line_no in $MOUNTS_CONFIG_FILE: expected 8 or 9 fields"
 
-    validate_mount_entry "$source" "$where" "$fs_type" "$options" "$timeout" "$owner_token" "$group_token" "$mode"
+    validate_mount_entry "$source" "$where" "$fs_type" "$options" "$timeout" "$owner_token" "$group_token" "$mode" "$automount_idle_timeout"
     unit_name="$(mount_unit_name_from_target "$where")"
 
     [[ -z "${seen_units[$unit_name]:-}" ]] || die "duplicate mount unit target in $MOUNTS_CONFIG_FILE: $where"
@@ -303,6 +315,7 @@ build_mount_unit_candidates() {
     owner_tokens+=("$owner_token")
     group_tokens+=("$group_token")
     modes+=("$mode")
+    automount_idle_timeouts+=("$automount_idle_timeout")
   done <"$MOUNTS_CONFIG_FILE"
 
   mount_config_has_entries || die "no mount entries defined in $MOUNTS_CONFIG_FILE"
@@ -316,6 +329,7 @@ build_mount_unit_candidates() {
     owner_token="${owner_tokens[$idx]}"
     group_token="${group_tokens[$idx]}"
     mode="${modes[$idx]}"
+    automount_idle_timeout="${automount_idle_timeouts[$idx]}"
     unit_name="${mount_unit_by_target[$where]}"
 
     parent_path=""
@@ -343,7 +357,7 @@ build_mount_unit_candidates() {
       [[ -z "${seen_units[$automount_unit]:-}" ]] || die "duplicate automount unit target in $MOUNTS_CONFIG_FILE: $where"
       seen_units["$automount_unit"]=1
       candidate_path="$destination_dir/$automount_unit"
-      generate_automount_unit_file "$where" "$candidate_path"
+      generate_automount_unit_file "$where" "$automount_idle_timeout" "$candidate_path"
       printf '%s|automount|\n' "$automount_unit" >>"$manifest_path"
     fi
 

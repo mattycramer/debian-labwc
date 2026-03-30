@@ -8,6 +8,10 @@ readonly QBT_CONFIG_PATH="${QBT_CONFIG_DIR}/qBittorrent.conf"
 readonly QBT_DATA_DIR="${QBT_RUNTIME_ROOT}/.local/share/data/qBittorrent"
 readonly QBT_SERVICE_NAME="qbittorrent-nox.service"
 readonly QBT_SERVICE_PATH="/etc/systemd/system/${QBT_SERVICE_NAME}"
+readonly QBT_DEVICE_WATCH_SERVICE_NAME="qbittorrent-nox-device-watch.service"
+readonly QBT_DEVICE_WATCH_SERVICE_PATH="/etc/systemd/system/${QBT_DEVICE_WATCH_SERVICE_NAME}"
+readonly QBT_DEVICE_WATCH_PATH_NAME="qbittorrent-nox-device-watch.path"
+readonly QBT_DEVICE_WATCH_PATH_PATH="/etc/systemd/system/${QBT_DEVICE_WATCH_PATH_NAME}"
 readonly QBT_APPARMOR_PROFILE_NAME="usr.bin.qbittorrent-nox"
 readonly QBT_APPARMOR_PROFILE_PATH="/etc/apparmor.d/${QBT_APPARMOR_PROFILE_NAME}"
 readonly QBT_HELPER_DIR="/usr/local/libexec/labwc-qbittorrent"
@@ -18,6 +22,7 @@ readonly QBT_TORRENTS_TEMP="${QBT_TORRENTS_ROOT}/temp"
 readonly QBT_TORRENTS_ROOT_MOUNT_UNIT="data-mnt-g\\x2ddrive-torrents.mount"
 readonly QBT_TORRENTS_COMPLETE_MOUNT_UNIT="data-mnt-g\\x2ddrive-torrents-complete.mount"
 readonly QBT_TORRENTS_TEMP_MOUNT_UNIT="data-mnt-g\\x2ddrive-torrents-temp.mount"
+readonly QBT_TORRENTS_DEVICE_WATCH_PATH="/dev/disk/by-label/torrents"
 
 torrent_nologin_shell() {
   command -v nologin
@@ -382,6 +387,42 @@ EOF
   write_root_file "$QBT_SERVICE_PATH" 0644 "$content"
 }
 
+render_device_watch_service() {
+  local content
+  content="$(cat <<EOF
+[Unit]
+Description=Start qBittorrent when the torrents device appears
+Documentation=man:systemd.path(5) man:systemd.service(5)
+ConditionPathExists=${QBT_TORRENTS_DEVICE_WATCH_PATH}
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl start ${QBT_SERVICE_NAME}
+EOF
+)"
+
+  write_root_file "$QBT_DEVICE_WATCH_SERVICE_PATH" 0644 "$content"
+}
+
+render_device_watch_path() {
+  local content
+  content="$(cat <<EOF
+[Unit]
+Description=Watch the torrents device path and start qBittorrent on hot-plug
+Documentation=man:systemd.path(5)
+
+[Path]
+PathExists=${QBT_TORRENTS_DEVICE_WATCH_PATH}
+Unit=${QBT_DEVICE_WATCH_SERVICE_NAME}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+)"
+
+  write_root_file "$QBT_DEVICE_WATCH_PATH_PATH" 0644 "$content"
+}
+
 render_apparmor_profile() {
   local content
   content="$(cat <<EOF
@@ -433,6 +474,8 @@ render_all_configs() {
   render_mount_check_script
   render_qbittorrent_config
   render_systemd_service
+  render_device_watch_service
+  render_device_watch_path
   render_apparmor_profile
 }
 
@@ -445,16 +488,20 @@ load_qbittorrent_apparmor_profile() {
   run_cmd apparmor_parser -r -W "$QBT_APPARMOR_PROFILE_PATH"
 }
 
-validate_qbittorrent_service_file() {
+validate_qbittorrent_unit_files() {
   if command -v systemd-analyze >/dev/null 2>&1; then
-    run_cmd systemd-analyze verify "$QBT_SERVICE_PATH"
+    run_cmd systemd-analyze verify \
+      "$QBT_SERVICE_PATH" \
+      "$QBT_DEVICE_WATCH_SERVICE_PATH" \
+      "$QBT_DEVICE_WATCH_PATH_PATH"
   fi
 }
 
 enable_qbittorrent_service() {
   load_qbittorrent_apparmor_profile
   run_cmd systemctl daemon-reload
-  validate_qbittorrent_service_file
+  validate_qbittorrent_unit_files
+  run_cmd systemctl enable --now "$QBT_DEVICE_WATCH_PATH_NAME"
   run_cmd systemctl enable --now "$QBT_SERVICE_NAME"
 }
 
@@ -471,12 +518,23 @@ remove_qbittorrent_install() {
   if systemctl list-unit-files "$QBT_SERVICE_NAME" >/dev/null 2>&1; then
     run_cmd systemctl disable --now "$QBT_SERVICE_NAME" >/dev/null 2>&1 || true
   fi
+  if systemctl list-unit-files "$QBT_DEVICE_WATCH_PATH_NAME" >/dev/null 2>&1; then
+    run_cmd systemctl disable --now "$QBT_DEVICE_WATCH_PATH_NAME" >/dev/null 2>&1 || true
+  fi
+  if systemctl list-unit-files "$QBT_DEVICE_WATCH_SERVICE_NAME" >/dev/null 2>&1; then
+    run_cmd systemctl disable --now "$QBT_DEVICE_WATCH_SERVICE_NAME" >/dev/null 2>&1 || true
+  fi
 
   if [[ -f "$QBT_APPARMOR_PROFILE_PATH" ]] && command -v apparmor_parser >/dev/null 2>&1; then
     run_cmd apparmor_parser -R "$QBT_APPARMOR_PROFILE_PATH" >/dev/null 2>&1 || true
   fi
 
-  run_cmd rm -f -- "$QBT_SERVICE_PATH" "$QBT_APPARMOR_PROFILE_PATH" "$QBT_MOUNT_CHECK_PATH"
+  run_cmd rm -f -- \
+    "$QBT_SERVICE_PATH" \
+    "$QBT_DEVICE_WATCH_SERVICE_PATH" \
+    "$QBT_DEVICE_WATCH_PATH_PATH" \
+    "$QBT_APPARMOR_PROFILE_PATH" \
+    "$QBT_MOUNT_CHECK_PATH"
   run_cmd rmdir --ignore-fail-on-non-empty "$QBT_HELPER_DIR" 2>/dev/null || true
   run_cmd rm -rf -- "$QBT_RUNTIME_ROOT"
   run_cmd systemctl daemon-reload >/dev/null 2>&1 || true

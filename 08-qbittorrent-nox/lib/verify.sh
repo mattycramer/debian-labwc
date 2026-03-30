@@ -98,6 +98,8 @@ verify_runtime_paths() {
   require_file "$QBT_CONFIG_PATH"
   require_file "$QBT_MOUNT_CHECK_PATH"
   require_file "$QBT_SERVICE_PATH"
+  require_file "$QBT_DEVICE_WATCH_SERVICE_PATH"
+  require_file "$QBT_DEVICE_WATCH_PATH_PATH"
   require_file "$QBT_APPARMOR_PROFILE_PATH"
 
   assert_path_state "$QBT_RUNTIME_ROOT" "$QBT_SERVICE_USER" "$QBT_SERVICE_GROUP" "700"
@@ -106,6 +108,8 @@ verify_runtime_paths() {
   assert_path_state "$QBT_CONFIG_PATH" "$QBT_SERVICE_USER" "$QBT_SERVICE_GROUP" "600"
   assert_path_state "$QBT_MOUNT_CHECK_PATH" "root" "root" "755"
   assert_path_state "$QBT_SERVICE_PATH" "root" "root" "644"
+  assert_path_state "$QBT_DEVICE_WATCH_SERVICE_PATH" "root" "root" "644"
+  assert_path_state "$QBT_DEVICE_WATCH_PATH_PATH" "root" "root" "644"
   assert_path_state "$QBT_APPARMOR_PROFILE_PATH" "root" "root" "644"
 
   assert_path_state "$QBT_TORRENTS_ROOT" "$QBT_SERVICE_USER" "$QBT_SERVICE_GROUP" "2770"
@@ -154,6 +158,20 @@ verify_service_unit() {
   fi
 }
 
+verify_device_watch_units() {
+  grep -F "ConditionPathExists=${QBT_TORRENTS_DEVICE_WATCH_PATH}" "$QBT_DEVICE_WATCH_SERVICE_PATH" >/dev/null || die "device-watch service is missing the torrents device path condition"
+  grep -F "ExecStart=/usr/bin/systemctl start ${QBT_SERVICE_NAME}" "$QBT_DEVICE_WATCH_SERVICE_PATH" >/dev/null || die "device-watch service is missing the qBittorrent start action"
+  grep -F "PathExists=${QBT_TORRENTS_DEVICE_WATCH_PATH}" "$QBT_DEVICE_WATCH_PATH_PATH" >/dev/null || die "device-watch path unit is missing the torrents device path watch"
+  grep -F "Unit=${QBT_DEVICE_WATCH_SERVICE_NAME}" "$QBT_DEVICE_WATCH_PATH_PATH" >/dev/null || die "device-watch path unit is missing the activator unit binding"
+
+  systemctl is-enabled "$QBT_DEVICE_WATCH_PATH_NAME" >/dev/null 2>&1 || die "$QBT_DEVICE_WATCH_PATH_NAME is not enabled"
+  systemctl is-active "$QBT_DEVICE_WATCH_PATH_NAME" >/dev/null 2>&1 || die "$QBT_DEVICE_WATCH_PATH_NAME is not active"
+
+  if command -v systemd-analyze >/dev/null 2>&1; then
+    run_cmd systemd-analyze verify "$QBT_DEVICE_WATCH_SERVICE_PATH" "$QBT_DEVICE_WATCH_PATH_PATH"
+  fi
+}
+
 verify_apparmor_profile() {
   grep -F "${QBT_RUNTIME_ROOT}/** rwk," "$QBT_APPARMOR_PROFILE_PATH" >/dev/null || die "AppArmor profile is missing runtime write access"
   grep -F "${QBT_TORRENTS_COMPLETE}/** rwk," "$QBT_APPARMOR_PROFILE_PATH" >/dev/null || die "AppArmor profile is missing complete-directory write access"
@@ -176,6 +194,7 @@ verify_install() {
   verify_runtime_paths
   verify_config_file
   verify_service_unit
+  verify_device_watch_units
   verify_apparmor_profile
   log_info "verification completed"
 }

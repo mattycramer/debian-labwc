@@ -1,10 +1,11 @@
 SHELL := /usr/bin/env bash
 
-.PHONY: help doctor mounts permissions sudoers install verify print-env nuke
+.PHONY: help guard-non-root doctor mounts permissions sudoers install verify print-env nuke
 
 help:
 	@printf '%s\n' \
 	  '00-system targets:' \
+	  '  NOTE:        Run make as a non-root user; do not use sudo make' \
 	  '  help         Show this message' \
 	  '  doctor       Validate platform assumptions and resolve the invoking user' \
 	  '  mounts       Install generated systemd automount/mount units from mounts.conf' \
@@ -15,26 +16,32 @@ help:
 	  '  print-env    Print resolved target user/path state' \
 	  '  nuke         Remove generated mount units and sudoers policy; directory permissions stay in place'
 
-doctor:
-	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase doctor; else sudo bash ./install.sh --phase doctor; fi
+guard-non-root:
+	@if [ "$$(id -u)" -eq 0 ]; then \
+	  printf '%s\n' "Refusing to run 00-system from a root make process. Run 'make <target>' as a non-root user; do not use sudo make." >&2; \
+	  exit 1; \
+	fi
 
-mounts:
-	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase mounts; else sudo bash ./install.sh --phase mounts; fi
+doctor: guard-non-root
+	@SYSTEM_MAKE_WRAPPER=1 sudo --preserve-env=SYSTEM_MAKE_WRAPPER bash ./install.sh --phase doctor
 
-permissions:
-	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase permissions; else sudo bash ./install.sh --phase permissions; fi
+mounts: guard-non-root
+	@SYSTEM_MAKE_WRAPPER=1 sudo --preserve-env=SYSTEM_MAKE_WRAPPER bash ./install.sh --phase mounts
 
-sudoers:
-	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase sudoers; else sudo bash ./install.sh --phase sudoers; fi
+permissions: guard-non-root
+	@SYSTEM_MAKE_WRAPPER=1 sudo --preserve-env=SYSTEM_MAKE_WRAPPER bash ./install.sh --phase permissions
 
-install:
-	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase all; else sudo bash ./install.sh --phase all; fi
+sudoers: guard-non-root
+	@SYSTEM_MAKE_WRAPPER=1 sudo --preserve-env=SYSTEM_MAKE_WRAPPER bash ./install.sh --phase sudoers
 
-verify:
-	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase verify; else sudo bash ./install.sh --phase verify; fi
+install: guard-non-root
+	@SYSTEM_MAKE_WRAPPER=1 sudo --preserve-env=SYSTEM_MAKE_WRAPPER bash ./install.sh --phase all
 
-print-env:
-	@bash ./install.sh --phase print-env
+verify: guard-non-root
+	@SYSTEM_MAKE_WRAPPER=1 sudo --preserve-env=SYSTEM_MAKE_WRAPPER bash ./install.sh --phase verify
 
-nuke:
-	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase nuke; else sudo bash ./install.sh --phase nuke; fi
+print-env: guard-non-root
+	@SYSTEM_MAKE_WRAPPER=1 bash ./install.sh --phase print-env
+
+nuke: guard-non-root
+	@SYSTEM_MAKE_WRAPPER=1 sudo --preserve-env=SYSTEM_MAKE_WRAPPER bash ./install.sh --phase nuke

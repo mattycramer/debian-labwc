@@ -50,6 +50,12 @@ parse_args() {
   done
 }
 
+require_make_wrapper() {
+  [[ "${SYSTEM_MAKE_WRAPPER:-}" == "1" ]] || {
+    die "run this installer via 'make <target>' from 00-system; do not call install.sh directly"
+  }
+}
+
 phase_doctor() {
   log_info "phase: doctor"
   run_preflight_checks 1
@@ -142,6 +148,7 @@ phase_nuke() {
 
 main() {
   parse_args "$@"
+  require_make_wrapper
   case "$PHASE" in
     doctor) phase_doctor ;;
     mounts) phase_mounts ;;
