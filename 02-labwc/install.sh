@@ -28,12 +28,9 @@ source "$SCRIPT_DIR/lib/services.sh"
 source "$SCRIPT_DIR/lib/tweaks.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/keepsecret.sh"
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/lib/verify.sh"
-
 usage() {
   cat <<'EOF'
-Usage: ./install.sh --phase doctor|detect|packages|render|enable|verify|print-env|nuke|all [--yes]
+Usage: ./install.sh --phase doctor|detect|packages|render|enable|print-env|nuke|all [--yes]
 EOF
 }
 
@@ -129,13 +126,6 @@ phase_enable() {
   install_keepsecret
 }
 
-phase_verify() {
-  log_info "phase: verify"
-  phase_doctor
-  load_env_file
-  verify_install "$ENV_FILE"
-}
-
 phase_print_env() {
   log_info "phase: print-env"
   load_env_file
@@ -157,7 +147,6 @@ main() {
     packages) phase_packages ;;
     render) phase_render ;;
     enable) phase_enable ;;
-    verify) phase_verify ;;
     print-env) phase_print_env ;;
     nuke) phase_nuke ;;
     all)
@@ -166,7 +155,6 @@ main() {
       phase_packages
       phase_render
       phase_enable
-      phase_verify
       ;;
     *)
       die "unsupported phase: $PHASE"

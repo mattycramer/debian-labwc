@@ -1,6 +1,6 @@
 SHELL := /usr/bin/env bash
 
-.PHONY: help doctor detect install render enable verify reconfigure print-env nuke
+.PHONY: help doctor detect install render enable reconfigure print-env nuke
 
 help:
 	@printf '%s\n' \
@@ -8,11 +8,10 @@ help:
 	  '  help        Show this message' \
 	  '  doctor      Validate platform assumptions' \
 	  '  detect      Detect user, GPU, and outputs into .env' \
-	  '  install     Run doctor, detect, packages, render, enable, verify' \
+	  '  install     Run doctor, detect, packages, render, enable' \
 	  '  render      Render configs from .env' \
 	  '  enable      Install root-owned files and enable services' \
-	  '  verify      Check install state' \
-	  '  reconfigure Run detect, render, enable, verify' \
+	  '  reconfigure Run detect, render, enable' \
 	  '  print-env   Print effective env values' \
 	  '  nuke        Remove generated state and disable installed wiring'
 
@@ -31,14 +30,10 @@ render:
 enable:
 	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase enable; else sudo bash ./install.sh --phase enable; fi
 
-verify:
-	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase verify; else sudo bash ./install.sh --phase verify; fi
-
 reconfigure:
 	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase detect; else sudo bash ./install.sh --phase detect; fi
 	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase render; else sudo bash ./install.sh --phase render; fi
 	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase enable; else sudo bash ./install.sh --phase enable; fi
-	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase verify; else sudo bash ./install.sh --phase verify; fi
 
 print-env:
 	@bash ./install.sh --phase print-env
