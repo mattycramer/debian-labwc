@@ -13,7 +13,7 @@ detect_target_user() {
     candidate="$(getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $7 !~ /(false|nologin)$/ {print $1; exit}')"
   fi
 
-  [[ -n "$candidate" ]] || die "could not determine the invoking non-root user for torrent group membership"
+  [[ -n "$candidate" ]] || die "could not determine the invoking non-root user for torrent access checks"
   QBT_TARGET_USER="$candidate"
   QBT_TARGET_HOME="$(getent passwd "$candidate" | awk -F: '{print $6}')"
   [[ -n "$QBT_TARGET_HOME" ]] || die "could not determine the home directory for '$candidate'"

@@ -58,39 +58,18 @@ validate_env_settings() {
   require_integer_or_minus_one "QBT_GLOBAL_MAX_SEEDING_MINUTES" "${QBT_GLOBAL_MAX_SEEDING_MINUTES:-}"
 }
 
-ensure_torrent_group() {
-  local gid
-  if getent group "$QBT_SERVICE_GROUP" >/dev/null 2>&1; then
-    gid="$(getent group "$QBT_SERVICE_GROUP" | awk -F: '{print $3}')"
-    [[ "$gid" =~ ^[0-9]+$ ]] || die "could not parse GID for '$QBT_SERVICE_GROUP'"
-    ((gid < 1000)) || die "existing group '$QBT_SERVICE_GROUP' is not a system group (gid=$gid)"
-    return 0
-  fi
+require_torrent_service_account() {
+  local uid gid home shell primary_group expected_shell shadow_hash
+  getent group "$QBT_SERVICE_GROUP" >/dev/null 2>&1 || die "missing group '$QBT_SERVICE_GROUP'; install 00-system first"
+  id "$QBT_SERVICE_USER" >/dev/null 2>&1 || die "missing user '$QBT_SERVICE_USER'; install 00-system first"
 
-  run_cmd groupadd --system "$QBT_SERVICE_GROUP"
-}
-
-ensure_torrent_user_locked() {
-  local shadow_hash
-  shadow_hash="$(getent shadow "$QBT_SERVICE_USER" | awk -F: '{print $2}')"
-  case "$shadow_hash" in
-    '!'*|'*')
-      return 0
-      ;;
-    *)
-      run_cmd usermod --lock "$QBT_SERVICE_USER"
-      ;;
-  esac
-}
-
-verify_existing_torrent_user() {
-  local uid gid home shell primary_group expected_shell
   uid="$(id -u "$QBT_SERVICE_USER")"
   gid="$(id -g "$QBT_SERVICE_USER")"
   home="$(getent passwd "$QBT_SERVICE_USER" | awk -F: '{print $6}')"
   shell="$(getent passwd "$QBT_SERVICE_USER" | awk -F: '{print $7}')"
   primary_group="$(id -gn "$QBT_SERVICE_USER")"
   expected_shell="$(readlink -f "$(torrent_nologin_shell)")"
+  shadow_hash="$(getent shadow "$QBT_SERVICE_USER" | awk -F: '{print $2}')"
 
   [[ "$uid" =~ ^[0-9]+$ ]] || die "could not parse UID for '$QBT_SERVICE_USER'"
   [[ "$gid" =~ ^[0-9]+$ ]] || die "could not parse GID for '$QBT_SERVICE_USER'"
@@ -99,52 +78,19 @@ verify_existing_torrent_user() {
   [[ "$primary_group" == "$QBT_SERVICE_GROUP" ]] || die "existing user '$QBT_SERVICE_USER' does not have primary group '$QBT_SERVICE_GROUP'"
   [[ "$home" == "/nonexistent" ]] || die "existing user '$QBT_SERVICE_USER' does not use the required home '/nonexistent'"
   [[ "$(readlink -f "$shell")" == "$expected_shell" ]] || die "existing user '$QBT_SERVICE_USER' does not use the required nologin shell"
-}
-
-ensure_torrent_service_account() {
-  ensure_torrent_group
-
-  if id "$QBT_SERVICE_USER" >/dev/null 2>&1; then
-    verify_existing_torrent_user
-    ensure_torrent_user_locked
-    return 0
-  fi
-
-  run_cmd useradd \
-    --system \
-    --gid "$QBT_SERVICE_GROUP" \
-    --home-dir /nonexistent \
-    --no-create-home \
-    --shell "$(torrent_nologin_shell)" \
-    "$QBT_SERVICE_USER"
-  ensure_torrent_user_locked
-}
-
-ensure_target_user_membership() {
-  [[ -n "${QBT_TARGET_USER:-}" ]] || die "QBT_TARGET_USER is empty; run the detect phase first"
-  [[ "$QBT_TARGET_USER" != "root" ]] || die "refusing to manage torrent group membership for root"
-
-  if id -nG "$QBT_TARGET_USER" | tr ' ' '\n' | grep -Fx "$QBT_SERVICE_GROUP" >/dev/null 2>&1; then
-    return 0
-  fi
-
-  run_cmd usermod -a -G "$QBT_SERVICE_GROUP" "$QBT_TARGET_USER"
+  case "$shadow_hash" in
+    '!'*|'*')
+      ;;
+    *)
+      die "existing user '$QBT_SERVICE_USER' does not have a locked password"
+      ;;
+  esac
 }
 
 ensure_torrent_mounts_present() {
   require_exact_mountpoint "$QBT_TORRENTS_ROOT"
   require_exact_mountpoint "$QBT_TORRENTS_COMPLETE"
   require_exact_mountpoint "$QBT_TORRENTS_TEMP"
-}
-
-enforce_torrent_mount_ownership() {
-  local path
-  ensure_torrent_mounts_present
-
-  for path in "$QBT_TORRENTS_ROOT" "$QBT_TORRENTS_COMPLETE" "$QBT_TORRENTS_TEMP"; do
-    run_cmd chown "$QBT_SERVICE_USER:$QBT_SERVICE_GROUP" "$path"
-    run_cmd chmod 2770 "$path"
-  done
 }
 
 ensure_runtime_directories() {

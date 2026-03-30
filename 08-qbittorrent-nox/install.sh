@@ -68,7 +68,6 @@ phase_doctor() {
   require_command findmnt
   require_command getent
   require_command grep
-  require_command groupadd
   require_command install
   require_command python3
   require_command readlink
@@ -76,8 +75,6 @@ phase_doctor() {
   require_command stat
   require_command systemctl
   require_command tr
-  require_command useradd
-  require_command usermod
   require_command nologin
   require_command dpkg-query
 }
@@ -102,7 +99,7 @@ phase_render() {
   phase_doctor
   load_env_file
   validate_env_settings
-  ensure_torrent_service_account
+  require_torrent_service_account
   ensure_runtime_directories
   render_all_configs
 }
@@ -115,11 +112,9 @@ phase_enable() {
   require_command apparmor_parser
   require_command qbittorrent-nox
   require_apparmor_runtime
-  ensure_torrent_service_account
-  ensure_target_user_membership
+  require_torrent_service_account
   ensure_torrent_mounts_present
   ensure_runtime_directories
-  enforce_torrent_mount_ownership
   render_all_configs
   enable_qbittorrent_service
 }

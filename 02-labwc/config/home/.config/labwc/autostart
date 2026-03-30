@@ -128,7 +128,7 @@ if command -v /usr/local/bin/labwc-unlock-gpg-key >/dev/null 2>&1; then
   ) >/dev/null 2>&1 &
 fi
 if ! pgrep -u "$current_uid" -x swayidle >/dev/null 2>&1; then
-  swayidle \
+  swayidle -w \
   timeout "@IDLE_LOCK_SECONDS@" '/usr/local/bin/labwc-lock' \
   timeout "@IDLE_DPMS_SECONDS@" '/usr/local/bin/labwc-dpms off' \
   resume '/usr/local/bin/labwc-dpms on' \

@@ -95,6 +95,11 @@ remove_spotify_legacy_source_list() {
   run_cmd rm -f "$SPOTIFY_LIST_PATH"
 }
 
+finalize_tools_install() {
+  log_info "removing any legacy spotify.list before finishing install"
+  remove_spotify_legacy_source_list
+}
+
 install_spotify_repository_files() {
   local spotify_key_asc="/tmp/spotify-key.asc"
   run_cmd install -d -m 0755 "$TOOLS_KEYRING_DIR"

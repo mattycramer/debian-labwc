@@ -8,7 +8,7 @@ help:
 	  '  help         Show this message' \
 	  '  doctor       Validate platform assumptions and resolve the invoking user' \
 	  '  mounts       Install generated systemd automount/mount units from mounts.conf' \
-	  '  permissions  Create required system paths and repair user ownership/modes' \
+	  '  permissions  Create the hardened torrent account, add the invoking user to torrent, and repair required path ownership/modes' \
 	  '  sudoers      Install the hardened invoking-user policy under /etc/sudoers.d' \
 	  '  install      Run doctor, mounts, permissions, sudoers, and verify' \
 	  '  verify       Check generated mount units, sudoers, and required path permissions' \

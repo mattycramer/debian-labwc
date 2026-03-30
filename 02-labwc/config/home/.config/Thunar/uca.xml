@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <actions>
   <action>
-    <icon>org.gnome.FileRoller</icon>
-    <name>Extract Here</name>
+    <icon>package-x-generic</icon>
+    <name>_Extract Here</name>
     <submenu></submenu>
     <unique-id>1700000000000001-1</unique-id>
     <command>/usr/local/bin/thunar-extract-here %f</command>
@@ -10,5 +10,20 @@
     <patterns>*.7z;*.apk;*.ar;*.cab;*.cpio;*.deb;*.gz;*.iso;*.lz;*.lz4;*.lzma;*.rar;*.rpm;*.tar;*.tar.bz2;*.tar.gz;*.tar.lz;*.tar.lz4;*.tar.lzma;*.tar.xz;*.tar.zst;*.tbz;*.tbz2;*.tgz;*.txz;*.tzst;*.xz;*.zip;*.zst</patterns>
     <other-files/>
     <range>1-1</range>
+  </action>
+  <action>
+    <icon>utilities-terminal</icon>
+    <name>Open _Terminal Here</name>
+    <submenu></submenu>
+    <unique-id>1700000000000002-1</unique-id>
+    <command>/usr/local/bin/thunar-open-terminal-here %f %d</command>
+    <description>Open Foot in the current location</description>
+    <patterns>*</patterns>
+    <directories/>
+    <other-files/>
+    <audio-files/>
+    <image-files/>
+    <text-files/>
+    <video-files/>
   </action>
 </actions>

@@ -8,6 +8,13 @@ runtime_wallpaper="${XDG_DATA_HOME:-$HOME/.local/share}/labwc-session/${wallpape
 fallback_wallpaper="@TARGET_HOME@/.local/share/labwc-session/${wallpaper_name}"
 wallpaper_path="$runtime_wallpaper"
 scaling_mode="${LABWC_WALLPAPER_MODE:-fill}"
+ready_fifo=""
+ready_fd=""
+
+cleanup_ready_fifo() {
+  [[ -n "$ready_fd" ]] && eval "exec ${ready_fd}<&-" || true
+  [[ -n "$ready_fifo" ]] && rm -f -- "$ready_fifo" || true
+}
 
 if [[ ! -r "$wallpaper_path" && -r "$fallback_wallpaper" ]]; then
   wallpaper_path="$fallback_wallpaper"
@@ -18,8 +25,16 @@ if [[ ! -r "$wallpaper_path" ]]; then
   exit 1
 fi
 
-exec swaylock \
+ready_fifo="$(mktemp -u "${XDG_RUNTIME_DIR:-/tmp}/labwc-swaylock-ready.XXXXXX")"
+mkfifo -m 0600 "$ready_fifo"
+exec {ready_fd}<>"$ready_fifo"
+trap cleanup_ready_fifo EXIT
+rm -f -- "$ready_fifo"
+ready_fifo=""
+
+swaylock \
   --daemonize \
+  --ready-fd "$ready_fd" \
   --config "$config_path" \
   --image "$wallpaper_path" \
   --scaling "$scaling_mode" \
@@ -49,3 +64,8 @@ exec swaylock \
   --text-ver-color e5e7ebff \
   --text-wrong-color fff1f2ff \
   "$@"
+
+IFS= read -r -t 5 -u "$ready_fd" _ || {
+  printf '%s\n' "swaylock did not signal readiness" >&2
+  exit 1
+}

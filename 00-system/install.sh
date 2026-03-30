@@ -13,6 +13,8 @@ source "$SCRIPT_DIR/lib/log.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/assert.sh"
 # shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/accounts.sh"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/detect.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/mount_units.sh"
@@ -66,16 +68,22 @@ run_preflight_checks() {
   require_command cp
   require_command dpkg
   require_command find
+  require_command findmnt
   require_command getent
   require_command grep
+  require_command groupadd
   require_command id
   require_command install
   require_command mktemp
+  require_command nologin
+  require_command readlink
   require_command sed
   require_command stat
   require_command systemctl
   require_command systemd-analyze
   require_command systemd-escape
+  require_command useradd
+  require_command usermod
   detect_target_user
   require_supported_sudoers_user
   resolve_visudo_bin
@@ -99,6 +107,7 @@ phase_mounts() {
 phase_permissions() {
   log_info "phase: permissions"
   phase_doctor
+  apply_system_account_policies
   apply_system_path_permissions
   apply_home_permissions
 }
@@ -143,8 +152,8 @@ main() {
     nuke) phase_nuke ;;
     install|all)
       phase_doctor
-      phase_mounts
       phase_permissions
+      phase_mounts
       phase_sudoers
       phase_verify
       ;;

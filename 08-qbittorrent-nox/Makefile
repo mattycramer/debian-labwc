@@ -10,7 +10,7 @@ help:
 	  '  install   Run doctor, detect, packages, render, enable, and verify' \
 	  '  packages  Install qBittorrent-nox and AppArmor tooling' \
 	  '  render    Render the managed qBittorrent config, mount-check helper, systemd unit, and AppArmor profile' \
-	  '  enable    Create the torrent service account, enforce ownership, load AppArmor, and enable the service' \
+	  '  enable    Use the existing hardened torrent account, load AppArmor, and enable the service' \
 	  '  verify    Verify package state, mount enforcement, service hardening, and AppArmor enforcement' \
 	  '  nuke      Disable the managed service and remove managed config, helper, AppArmor, and state files' \
 	  '  print-env Show the effective managed environment values with secrets redacted'

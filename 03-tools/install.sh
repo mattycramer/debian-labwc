@@ -64,6 +64,7 @@ phase_install() {
   install_sid_tools
   install_deb_tools
   render_mpv_config
+  finalize_tools_install
 }
 
 phase_verify() {

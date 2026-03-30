@@ -34,6 +34,104 @@ Usage: ./install.sh --phase doctor|detect|packages|render|enable|print-env|nuke|
 EOF
 }
 
+gpg_prompt_required_for_phase() {
+  case "$PHASE" in
+    all|enable) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+read_env_value() {
+  local key="$1"
+  python3 - "$ENV_FILE" "$key" <<'PY'
+from pathlib import Path
+import sys
+
+env_path = Path(sys.argv[1])
+key = sys.argv[2]
+
+for line in env_path.read_text(encoding="utf-8").splitlines():
+    if not line.startswith(f"{key}="):
+        continue
+    value = line.split("=", 1)[1].strip()
+    if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
+        value = bytes(value[1:-1], "utf-8").decode("unicode_escape")
+    print(value, end="")
+    break
+PY
+}
+
+write_env_value() {
+  local key="$1"
+  local value="$2"
+  local value_file
+
+  value_file="$(mktemp)"
+  printf '%s' "$value" >"$value_file"
+
+  python3 - "$ENV_FILE" "$key" "$value_file" <<'PY'
+from pathlib import Path
+import sys
+
+env_path = Path(sys.argv[1])
+key = sys.argv[2]
+value = Path(sys.argv[3]).read_text(encoding="utf-8")
+
+escaped = (
+    value
+    .replace("\\", "\\\\")
+    .replace('"', '\\"')
+    .replace("$", "\\$")
+    .replace("`", "\\`")
+)
+
+replacement = f'{key}="{escaped}"'
+lines = env_path.read_text(encoding="utf-8").splitlines()
+
+for index, line in enumerate(lines):
+    if line.startswith(f"{key}="):
+        lines[index] = replacement
+        break
+else:
+    lines.append(replacement)
+
+env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
+
+  rm -f -- "$value_file"
+}
+
+ensure_gpg_password_in_env() {
+  local current_value prompt_value confirm_value
+
+  gpg_prompt_required_for_phase || return 0
+  [[ -f "$ENV_FILE" ]] || die "missing env file: $ENV_FILE"
+
+  current_value="$(read_env_value "KWALLET_SESSION_GPG_PASSWD")"
+  [[ -z "$current_value" ]] || return 0
+  [[ -t 0 && -t 1 ]] || die "KWALLET_SESSION_GPG_PASSWD is empty in $ENV_FILE and no interactive terminal is available for prompting"
+
+  while true; do
+    IFS= read -r -s -p "Enter GPG encryption password: " prompt_value
+    printf '\n'
+    IFS= read -r -s -p "Confirm GPG encryption password: " confirm_value
+    printf '\n'
+
+    [[ -n "$prompt_value" ]] || {
+      printf '%s\n' "GPG encryption password cannot be empty." >&2
+      continue
+    }
+    [[ "$prompt_value" == "$confirm_value" ]] || {
+      printf '%s\n' "GPG encryption password confirmation did not match." >&2
+      continue
+    }
+    [[ "$prompt_value" != *$'\n'* && "$prompt_value" != *$'\r'* ]] || die "GPG encryption password must not contain newlines"
+    break
+  done
+
+  write_env_value "KWALLET_SESSION_GPG_PASSWD" "$prompt_value"
+}
+
 parse_args() {
   while (($#)); do
     case "$1" in
@@ -142,6 +240,7 @@ phase_nuke() {
 
 main() {
   parse_args "$@"
+  ensure_gpg_password_in_env
   case "$PHASE" in
     doctor) phase_doctor ;;
     detect) phase_detect ;;

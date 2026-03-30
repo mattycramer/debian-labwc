@@ -143,6 +143,7 @@ render_mimeapps() {
 }
 
 render_thunar_config() {
+  render_home_template_file ".config/Thunar/thunarrc"
   render_home_template_file ".config/Thunar/uca.xml"
 }
 

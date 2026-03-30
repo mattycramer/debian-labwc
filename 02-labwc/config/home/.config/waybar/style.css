@@ -69,13 +69,13 @@ window#waybar {
 }
 
 #taskbar {
-  padding: 0 4px;
+  padding: 0 8px;
 }
 
 #taskbar button {
-  margin: 0 4px 0 0;
-  padding: 0 8px;
-  min-width: 34px;
+  margin: 0 6px 0 0;
+  padding: 0 9px;
+  min-width: 38px;
   min-height: 26px;
   border-radius: 14px;
   background: @panel_alt;
@@ -107,6 +107,10 @@ window#waybar {
 
 #taskbar button image {
   -gtk-icon-transform: scale(1);
+}
+
+#taskbar button:last-child {
+  margin-right: 0;
 }
 
 #custom-workspace-1.active,

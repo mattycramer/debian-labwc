@@ -53,17 +53,25 @@ verify_home_permissions() {
 }
 
 verify_mount_targets() {
-  local mountpoint
+  local mountpoint owner_token group_token mode owner group expected actual
 
-  while IFS= read -r mountpoint; do
+  while IFS='|' read -r mountpoint owner_token group_token mode; do
     [[ -n "$mountpoint" ]] || continue
-    assert_directory_state "$mountpoint" root root 0755
-  done < <(list_mount_targets)
+    require_dir "$mountpoint"
+    if mount_target_has_real_fs "$mountpoint"; then
+      owner="$(resolve_principal_token "$owner_token" user)"
+      group="$(resolve_principal_token "$group_token" group)"
+      expected="${owner}:${group}:${mode#0}"
+      actual="$(path_state "$mountpoint")"
+      [[ "$actual" == "$expected" ]] || die "unexpected mounted directory state for $mountpoint: expected $expected, found $actual"
+    fi
+  done < <(read_mount_policies)
 }
 
 verify_install() {
   verify_managed_mount_units
   verify_managed_sudoers
+  verify_system_account_policies
   verify_mount_targets
   verify_system_path_permissions
   verify_home_permissions

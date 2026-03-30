@@ -26,6 +26,9 @@ readonly SID_PACKAGES=(
   polkit-kde-agent-1
   thunar
   thunar-volman
+  thunar-archive-plugin
+  tumbler
+  ffmpegthumbnailer
   nnn
   nano
   librsvg2-common

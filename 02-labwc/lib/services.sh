@@ -96,6 +96,7 @@ install_root_files() {
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-module-menu")" "/usr/local/bin/labwc-module-menu" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-player-status")" "/usr/local/bin/labwc-player-status" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/thunar-extract-here")" "/usr/local/bin/thunar-extract-here" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/thunar-open-terminal-here")" "/usr/local/bin/thunar-open-terminal-here" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-unlock-gpg-key")" "/usr/local/bin/labwc-unlock-gpg-key" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-workspacectl")" "/usr/local/bin/labwc-workspacectl" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-workspace-activate")" "/usr/local/bin/labwc-workspace-activate" 0755
@@ -253,6 +254,7 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/labwc-module-menu"
   remove_if_present "/usr/local/bin/labwc-player-status"
   remove_if_present "/usr/local/bin/thunar-extract-here"
+  remove_if_present "/usr/local/bin/thunar-open-terminal-here"
   remove_if_present "/usr/local/bin/labwc-unlock-gpg-key"
   remove_if_present "/usr/local/bin/labwc-workspacectl"
   remove_if_present "/usr/local/bin/labwc-workspace-activate"
