@@ -61,7 +61,7 @@ bootstrap_target_user_gpg_key() {
     LABWC_GPG_KEY_REALNAME="${LABWC_GPG_KEY_REALNAME:-}" \
     LABWC_GPG_KEY_EMAIL="${LABWC_GPG_KEY_EMAIL:-}" \
     LABWC_GPG_KEY_EXPIRE="${LABWC_GPG_KEY_EXPIRE:-2y}" \
-    runuser -u "$LABWC_TARGET_USER" -- bash "$SCRIPT_DIR/bin/ensure-gpg-key.sh"
+    runuser -u "$LABWC_TARGET_USER" -- bash "$SCRIPT_DIR/libexec/ensure-gpg-key.sh"
   stage_target_user_gpg_secret_seed "$gpg_passphrase"
 }
 

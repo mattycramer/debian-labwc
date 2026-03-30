@@ -354,9 +354,13 @@ verify_foot_semantics() {
   grep -F 'initial-color-theme=dark' "$foot_path" >/dev/null || die "foot config missing initial dark theme selection"
   grep -F 'initial-window-size-pixels=960x620' "$foot_path" >/dev/null || die "foot config missing pixel-based initial window sizing"
   grep -F 'line-height=14px' "$foot_path" >/dev/null || die "foot config missing explicit line height"
+  grep -F 'vertical-letter-offset=-1px' "$foot_path" >/dev/null || die "foot config missing vertical letter offset tuning"
+  grep -F 'underline-offset=2px' "$foot_path" >/dev/null || die "foot config missing underline offset tuning"
+  grep -F 'underline-thickness=1px' "$foot_path" >/dev/null || die "foot config missing underline thickness tuning"
   grep -F 'pad=12x10 center' "$foot_path" >/dev/null || die "foot config missing centered padding"
   grep -F 'lines=120000' "$foot_path" >/dev/null || die "foot config missing expanded scrollback"
   grep -F 'cursor=07131d f6bd60' "$foot_path" >/dev/null || die "foot config missing dark theme cursor colors"
+  grep -F 'beam-thickness=1px' "$foot_path" >/dev/null || die "foot config missing tuned beam cursor thickness"
   grep -F '\x1b[1;3A = Mod1+Up' "$foot_path" >/dev/null || die "foot config missing Alt+Up text binding"
   grep -F '\x1b[1;3B = Mod1+Down' "$foot_path" >/dev/null || die "foot config missing Alt+Down text binding"
 }
