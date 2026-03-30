@@ -345,12 +345,14 @@ verify_keepsecret_semantics() {
 
 verify_foot_semantics() {
   local foot_path="$LABWC_TARGET_HOME/.config/foot/foot.ini"
-  grep -F '[colors]' "$foot_path" >/dev/null || die "foot config is missing the colors section"
+  grep -F '[colors-dark]' "$foot_path" >/dev/null || die "foot config is missing the colors-dark section"
   grep -F 'selection-target=both' "$foot_path" >/dev/null || die "foot config missing copy-on-select clipboard behavior"
+  grep -F 'initial-color-theme=dark' "$foot_path" >/dev/null || die "foot config missing initial dark theme selection"
   grep -F 'initial-window-size-chars=104x28' "$foot_path" >/dev/null || die "foot config missing compact initial window sizing"
   grep -F 'line-height=15px' "$foot_path" >/dev/null || die "foot config missing explicit line height"
   grep -F 'pad=12x10 center' "$foot_path" >/dev/null || die "foot config missing centered padding"
   grep -F 'lines=120000' "$foot_path" >/dev/null || die "foot config missing expanded scrollback"
+  grep -F 'cursor=07131d f6bd60' "$foot_path" >/dev/null || die "foot config missing dark theme cursor colors"
   grep -F '\x1b[1;3A = Mod1+Up' "$foot_path" >/dev/null || die "foot config missing Alt+Up text binding"
   grep -F '\x1b[1;3B = Mod1+Down' "$foot_path" >/dev/null || die "foot config missing Alt+Down text binding"
 }
