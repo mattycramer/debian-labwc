@@ -1,0 +1,111 @@
+#!/bin/sh
+set -eu
+IFS='
+	'
+
+export XDG_CURRENT_DESKTOP=labwc:wlroots
+
+wait_for_session_bus() {
+  bus_socket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus"
+  attempt=1
+  while [ "$attempt" -le 10 ]; do
+    if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] || [ -S "$bus_socket" ]; then
+      return 0
+    fi
+    sleep 1
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
+wait_for_system_bus() {
+  bus_socket="/run/dbus/system_bus_socket"
+  attempt=1
+  while [ "$attempt" -le 10 ]; do
+    if [ -S "$bus_socket" ]; then
+      return 0
+    fi
+    sleep 1
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
+warm_polkit_service() {
+  if ! command -v systemctl >/dev/null 2>&1; then
+    return 0
+  fi
+  attempt=1
+  while [ "$attempt" -le 10 ]; do
+    systemctl start polkit.service >/dev/null 2>&1 || true
+    if systemctl is-active --quiet polkit.service >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
+update_activation_environment() {
+  if [ "${LABWC_UPDATE_ACTIVATION_ENV:-0}" != "1" ]; then
+    return 0
+  fi
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl --user import-environment "$@" >/dev/null 2>&1 || true
+  fi
+  if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+    dbus-update-activation-environment --systemd "$@" >/dev/null 2>&1 || true
+  fi
+}
+
+pgrep -x foot >/dev/null 2>&1 || foot --server &
+pgrep -x swaybg >/dev/null 2>&1 || swaybg -i "@BACKGROUND_WALLPAPER_PATH@" -m "@WALLPAPER_MODE@" &
+
+wait_for_session_bus || true
+wait_for_system_bus || true
+update_activation_environment \
+  DISPLAY \
+  WAYLAND_DISPLAY \
+  XDG_CURRENT_DESKTOP \
+  XDG_SESSION_TYPE \
+  XDG_SESSION_DESKTOP \
+  DESKTOP_SESSION \
+  XCURSOR_THEME \
+  XCURSOR_SIZE \
+  GPG_TTY \
+  SSH_AUTH_SOCK \
+  PASSWORD_STORE \
+  ELECTRON_OZONE_PLATFORM_HINT \
+  QT_QPA_PLATFORM \
+  QT_WAYLAND_DISABLE_WINDOWDECORATION
+
+warm_polkit_service || true
+pgrep -x polkit-kde-authentication-agent-1 >/dev/null 2>&1 || /usr/lib/x86_64-linux-gnu/libexec/polkit-kde-authentication-agent-1 &
+/usr/local/bin/debian-labwc-workspace-state 1 >/dev/null 2>&1 || true
+pgrep -x waybar >/dev/null 2>&1 || waybar &
+if [ ! -f "@TARGET_HOME@/.config/debian-labwc/.outputs-refined" ]; then
+  /usr/local/bin/debian-labwc-refresh-outputs >/dev/null 2>&1 || true
+else
+  pgrep -x kanshi >/dev/null 2>&1 || kanshi &
+fi
+pgrep -x mako >/dev/null 2>&1 || mako &
+if command -v /usr/local/bin/debian-labwc-unlock-gpg-key >/dev/null 2>&1; then
+  (
+    sleep 1
+    /usr/local/bin/debian-labwc-unlock-gpg-key
+  ) >/dev/null 2>&1 &
+fi
+pgrep -x swayidle >/dev/null 2>&1 || swayidle \
+  timeout "@IDLE_LOCK_SECONDS@" '/usr/local/bin/debian-labwc-lock' \
+  timeout "@IDLE_DPMS_SECONDS@" '/usr/local/bin/debian-labwc-dpms off' \
+  resume '/usr/local/bin/debian-labwc-dpms on' \
+  before-sleep '/usr/local/bin/debian-labwc-lock' &
+
+autostart_dir="@TARGET_HOME@/.config/labwc/autostart.d"
+if [ -d "$autostart_dir" ]; then
+  find "$autostart_dir" -maxdepth 1 -type f -name '*.sh' | sort | while IFS= read -r autostart_fragment; do
+    [ -n "$autostart_fragment" ] || continue
+    "$autostart_fragment" >/dev/null 2>&1 || true
+  done
+fi

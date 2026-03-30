@@ -1,0 +1,224 @@
+@define-color panel rgba(10, 16, 23, 0.88);
+@define-color panel_alt rgba(20, 28, 39, 0.82);
+@define-color panel_hover rgba(35, 50, 68, 0.94);
+@define-color border rgba(129, 146, 165, 0.28);
+@define-color border_strong rgba(129, 146, 165, 0.46);
+@define-color text #e5edf5;
+@define-color muted #9aa9ba;
+@define-color amber #f6bd60;
+@define-color sky #7dd3fc;
+@define-color cyan #6dc4ed;
+@define-color mint #94d2bd;
+@define-color rose #ffb4a2;
+@define-color red #ef4444;
+@define-color mauve #c4b5fd;
+
+* {
+  font-family: "Noto Sans", "Font Awesome 6 Free", "Material Design Icons";
+  font-size: 13px;
+  min-height: 0;
+  font-feature-settings: "tnum";
+}
+
+window#waybar {
+  background: @panel;
+  color: @text;
+  border-bottom: 1px solid @border;
+}
+
+#custom-launcher,
+#custom-workspace-1,
+#custom-workspace-2,
+#custom-workspace-3,
+#custom-workspace-4,
+#custom-gpulaunch,
+#custom-updates,
+#clock,
+#network,
+#pulseaudio,
+#battery,
+#backlight,
+#cpu,
+#memory,
+#disk,
+#custom-player,
+#custom-power,
+#tray {
+  margin: 4px 0 4px 6px;
+  padding: 0 10px;
+  min-height: 26px;
+  border-radius: 14px;
+  background: @panel_alt;
+  border: 1px solid @border;
+}
+
+#custom-launcher {
+  color: @amber;
+  font-weight: 600;
+}
+
+#custom-workspace-1,
+#custom-workspace-2,
+#custom-workspace-3,
+#custom-workspace-4 {
+  min-width: 18px;
+  padding: 0 11px;
+  color: @text;
+  font-weight: 600;
+}
+
+#custom-workspace-1.active,
+#custom-workspace-2.active,
+#custom-workspace-3.active,
+#custom-workspace-4.active {
+  background: rgba(246, 189, 96, 0.94);
+  border-color: rgba(246, 189, 96, 0.66);
+  color: #07131d;
+}
+
+#taskbar {
+  margin: 5px 8px;
+  padding: 4px 8px;
+  border-radius: 16px;
+  background: @panel_alt;
+  border: 1px solid @border;
+}
+
+#taskbar button {
+  margin: 0 4px;
+  padding: 0 10px;
+  min-height: 30px;
+  border-radius: 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: @text;
+}
+
+#taskbar button:hover {
+  background: @panel_hover;
+  border-color: @border_strong;
+}
+
+#taskbar button.active {
+  background: rgba(109, 196, 237, 0.18);
+  border-color: rgba(109, 196, 237, 0.42);
+  color: @sky;
+}
+
+#taskbar button.minimized {
+  color: @muted;
+}
+
+#taskbar button.maximized {
+  color: @amber;
+}
+
+#taskbar button.fullscreen {
+  color: @mint;
+}
+
+#custom-updates {
+  font-weight: 600;
+}
+
+#custom-gpulaunch {
+  background: rgba(27, 53, 27, 0.84);
+  border-color: rgba(140, 200, 75, 0.34);
+  color: #bde47e;
+  font-weight: 700;
+}
+
+#custom-updates.pending {
+  color: @sky;
+}
+
+#custom-updates.warning {
+  color: @amber;
+}
+
+#custom-updates.critical,
+#custom-updates.error {
+  color: @rose;
+}
+
+#custom-updates.up-to-date {
+  color: @mint;
+}
+
+#clock {
+  color: @text;
+}
+
+#network.disconnected,
+#network.disabled {
+  color: @amber;
+}
+
+#pulseaudio.muted {
+  color: @amber;
+}
+
+#battery.charging,
+#battery.full {
+  color: @mint;
+}
+
+#battery.warning,
+#cpu.warning,
+#memory.warning,
+#disk.warning {
+  color: @amber;
+}
+
+#battery.critical,
+#cpu.critical,
+#memory.critical,
+#disk.critical {
+  color: @red;
+}
+
+#custom-player {
+  color: @mauve;
+}
+
+#custom-power {
+  background: rgba(68, 25, 33, 0.78);
+  border-color: rgba(246, 173, 173, 0.34);
+  color: @rose;
+  font-weight: 600;
+}
+
+#custom-launcher:hover,
+#custom-workspace-1:hover,
+#custom-workspace-2:hover,
+#custom-workspace-3:hover,
+#custom-workspace-4:hover,
+#custom-gpulaunch:hover,
+#custom-updates:hover,
+#clock:hover,
+#network:hover,
+#pulseaudio:hover,
+#battery:hover,
+#backlight:hover,
+#cpu:hover,
+#memory:hover,
+#disk:hover,
+#custom-player:hover,
+#custom-power:hover,
+#tray:hover {
+  background: @panel_hover;
+  border-color: @border_strong;
+}
+
+#custom-gpulaunch:hover {
+  background: rgba(39, 72, 38, 0.92);
+  border-color: rgba(140, 200, 75, 0.54);
+}
+
+#custom-workspace-1.active:hover,
+#custom-workspace-2.active:hover,
+#custom-workspace-3.active:hover,
+#custom-workspace-4.active:hover {
+  background: rgba(246, 189, 96, 0.94);
+  border-color: rgba(246, 189, 96, 0.66);
+}

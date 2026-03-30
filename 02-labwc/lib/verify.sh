@@ -287,7 +287,7 @@ verify_swaylock_semantics() {
   grep -F 'show-failed-attempts' "$swaylock_path" >/dev/null || die "swaylock config is missing failed-attempt feedback"
   grep -F -- '--image "$wallpaper_path"' "$lock_helper" >/dev/null || die "lock helper is not passing the wallpaper explicitly"
   grep -F -- '--config "$config_path"' "$lock_helper" >/dev/null || die "lock helper is not using the generated swaylock config"
-  grep -F 'exec /usr/local/bin/debian-labwc-lock' "$SCRIPT_DIR/bin/power-menu.sh" >/dev/null || die "power menu is not using the dedicated lock helper"
+  grep -F 'exec /usr/local/bin/debian-labwc-lock' "$SCRIPT_DIR/config/system/usr/local/bin/debian-labwc-power-menu" >/dev/null || die "power menu is not using the dedicated lock helper"
 }
 
 verify_gpg_agent_semantics() {
@@ -461,10 +461,10 @@ verify_shell_config_semantics() {
   grep -F '[git_state]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing git_state config"
   grep -F '[cmd_duration]' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml missing cmd_duration config"
   grep -F 'show_always = true' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml username is not always shown"
-  grep -F 'format = "[$user](style) "' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml username format is incorrect"
+  grep -F 'format = "[$user]($style)"' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml username format is incorrect"
   grep -F 'ssh_only = false' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml hostname is not shown locally"
-  grep -F 'format = "[@$hostname](style) "' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml hostname format is incorrect"
-  grep -F 'format = "[$path](style) "' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml directory format is incorrect"
+  grep -F 'format = "[@$hostname]($style) "' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml hostname format is incorrect"
+  grep -F 'format = "[$path]($style) "' "$LABWC_TARGET_HOME/.config/starship.toml" >/dev/null || die "starship.toml directory format is incorrect"
   grep -F -- '--layout=reverse' "$LABWC_TARGET_HOME/.config/fzf/default-opts" >/dev/null || die "fzf default opts missing layout"
   grep -F -- '--bind=ctrl-/:toggle-preview' "$LABWC_TARGET_HOME/.config/fzf/default-opts" >/dev/null || die "fzf default opts missing preview toggle"
   grep -F -- '--color=bg:#0f1720' "$LABWC_TARGET_HOME/.config/fzf/default-opts" >/dev/null || die "fzf default opts missing color theme"

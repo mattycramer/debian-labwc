@@ -1,0 +1,210 @@
+{
+  "layer": "top",
+  "position": "top",
+  "height": 42,
+  "spacing": 4,
+  "modules-left": ["custom/launcher", "custom/workspace-1", "custom/workspace-2", "custom/workspace-3", "custom/workspace-4"],
+  "modules-center": ["wlr/taskbar"],
+  "modules-right": ["custom/gpulaunch", "custom/updates", "network", "pulseaudio", "battery", "backlight", "cpu", "memory", "disk", "custom/player", "clock", "tray", "custom/power"],
+  "custom/launcher": {
+    "format": "Apps",
+    "tooltip": false,
+    "on-click": "/usr/local/bin/debian-labwc-launcher-menu",
+    "on-click-right": "wofi --show drun"
+  },
+  "custom/workspace-1": {
+    "exec": "/usr/local/bin/debian-labwc-workspace-status 1",
+    "return-type": "json",
+    "interval": "once",
+    "signal": 10,
+    "tooltip": false,
+    "on-click": "/usr/local/bin/debian-labwc-workspace-activate 1"
+  },
+  "custom/workspace-2": {
+    "exec": "/usr/local/bin/debian-labwc-workspace-status 2",
+    "return-type": "json",
+    "interval": "once",
+    "signal": 10,
+    "tooltip": false,
+    "on-click": "/usr/local/bin/debian-labwc-workspace-activate 2"
+  },
+  "custom/workspace-3": {
+    "exec": "/usr/local/bin/debian-labwc-workspace-status 3",
+    "return-type": "json",
+    "interval": "once",
+    "signal": 10,
+    "tooltip": false,
+    "on-click": "/usr/local/bin/debian-labwc-workspace-activate 3"
+  },
+  "custom/workspace-4": {
+    "exec": "/usr/local/bin/debian-labwc-workspace-status 4",
+    "return-type": "json",
+    "interval": "once",
+    "signal": 10,
+    "tooltip": false,
+    "on-click": "/usr/local/bin/debian-labwc-workspace-activate 4"
+  },
+  "wlr/taskbar": {
+    "format": "{icon} {name}",
+    "icon-size": 18,
+    "tooltip-format": "{title}",
+    "on-click": "activate",
+    "on-click-middle": "close",
+    "on-click-right": "minimize-raise",
+    "ignore-list": ["waybar"],
+    "app_ids-mapping": {
+      "footclient": "foot",
+      "code-url-handler": "code"
+    },
+    "rewrite": {
+      "Foot Server": "Foot",
+      "kitty": "Kitty",
+      "foot": "Foot",
+      "mousepad": "Mousepad",
+      "geeqie": "Geeqie",
+      "obsidian": "Obsidian",
+      "bitwarden": "Bitwarden"
+    }
+  },
+  "custom/updates": {
+    "exec": "@UPDATES_SCRIPT@",
+    "return-type": "json",
+    "interval": 1800,
+    "signal": 12,
+    "format": "{text}",
+    "on-click": "@UPGRADE_SCRIPT@"
+  },
+  "custom/gpulaunch": {
+    "format": "dGPU",
+    "tooltip": true,
+    "tooltip-format": "Launch app on Nvidia GPU",
+    "on-click": "@GPU_LAUNCH_SCRIPT@"
+  },
+  "clock": {
+    "interval": 30,
+    "format": "{:%a %H:%M}",
+    "format-alt": "{:%Y-%m-%d  %H:%M:%S}",
+    "tooltip": true,
+    "tooltip-format": "<tt><small>{calendar}</small></tt>",
+    "calendar": {
+      "mode": "month",
+      "weeks-pos": "right",
+      "on-scroll": 1,
+      "format": {
+        "months": "<span color='#f6bd60'><b>{}</b></span>",
+        "weekdays": "<span color='#8ecae6'><b>{}</b></span>",
+        "weeks": "<span color='#94d2bd'><b>W{}</b></span>",
+        "today": "<span color='#ffb4a2'><b><u>{}</u></b></span>"
+      }
+    },
+    "actions": {
+      "on-click-right": "mode",
+      "on-scroll-up": "shift_up",
+      "on-scroll-down": "shift_down"
+    },
+    "on-click": "gsimplecal"
+  },
+  "tray": {
+    "spacing": 8
+  },
+  "network": {
+    "interval": 5,
+    "family": "ipv4",
+    "format-wifi": "WiFi {signalStrength}%",
+    "format-ethernet": "LAN",
+    "format-linked": "LAN ?",
+    "format-disconnected": "Net off",
+    "format-disabled": "Net off",
+    "tooltip-format-wifi": "{essid}\n{signalStrength}%  {ipaddr}\n↑ {bandwidthUpBytes}  ↓ {bandwidthDownBytes}",
+    "tooltip-format-ethernet": "{ifname}\n{ipaddr}\n↑ {bandwidthUpBytes}  ↓ {bandwidthDownBytes}",
+    "tooltip-format-disconnected": "Network disconnected",
+    "on-click": "/usr/local/bin/debian-labwc-module-menu network quick",
+    "on-click-right": "/usr/local/bin/debian-labwc-module-menu network menu"
+  },
+  "pulseaudio": {
+    "format": "Vol  {volume}%",
+    "format-muted": "Mute",
+    "tooltip-format": "{desc}",
+    "scroll-step": 5,
+    "reverse-scrolling": true,
+    "reverse-mouse-scrolling": true,
+    "on-click": "pavucontrol",
+    "on-click-middle": "wpctl set-mute __DEFAULT_AUDIO_SINK__ toggle",
+    "on-click-right": "/usr/local/bin/debian-labwc-module-menu audio menu"
+  },
+  "battery": {
+    "interval": 15,
+    "states": {
+      "warning": 30,
+      "critical": 15
+    },
+    "format": "Bat  {capacity}%",
+    "format-charging": "Charge  {capacity}%",
+    "format-full": "Full  {capacity}%",
+    "format-warning": "Low  {capacity}%",
+    "format-critical": "Crit  {capacity}%",
+    "tooltip-format": "{timeTo}\nHealth {health}%  Cycles {cycles}",
+    "on-click": "/usr/local/bin/debian-labwc-module-menu battery menu",
+    "on-click-right": "/usr/local/bin/debian-labwc-module-menu battery details"
+  },
+  "backlight": {
+    "format": "Bri {percent}%",
+    "scroll-step": 5,
+    "tooltip-format": "Brightness {percent}%",
+    "reverse-scrolling": true,
+    "reverse-mouse-scrolling": true,
+    "on-click-right": "/usr/local/bin/debian-labwc-module-menu brightness menu"
+  },
+  "cpu": {
+    "interval": 5,
+    "states": {
+      "warning": 65,
+      "critical": 85
+    },
+    "format": "CPU  {usage}%",
+    "tooltip": true,
+    "on-click": "/usr/local/bin/debian-labwc-module-menu system monitor",
+    "on-click-right": "/usr/local/bin/debian-labwc-module-menu system menu"
+  },
+  "memory": {
+    "interval": 10,
+    "states": {
+      "warning": 70,
+      "critical": 90
+    },
+    "format": "RAM  {percentage}%",
+    "tooltip-format": "{used:0.1f} GiB / {total:0.1f} GiB\nSwap {swapUsed:0.1f} / {swapTotal:0.1f} GiB",
+    "on-click": "/usr/local/bin/debian-labwc-module-menu system monitor",
+    "on-click-right": "/usr/local/bin/debian-labwc-module-menu system memory"
+  },
+  "disk": {
+    "interval": 30,
+    "path": "/",
+    "unit": "GiB",
+    "states": {
+      "warning": 75,
+      "critical": 90
+    },
+    "format": "Disk  {percentage_used}%",
+    "tooltip-format": "{used} used of {total}\n{free} free on {path}",
+    "on-click": "/usr/local/bin/debian-labwc-module-menu storage ncdu",
+    "on-click-right": "/usr/local/bin/debian-labwc-module-menu storage menu"
+  },
+  "custom/player": {
+    "exec": "/usr/local/bin/debian-labwc-player-status",
+    "interval": 2,
+    "return-type": "text",
+    "max-length": 24,
+    "tooltip": false,
+    "on-click": "playerctl play-pause",
+    "on-click-middle": "playerctl stop",
+    "on-click-right": "/usr/local/bin/debian-labwc-module-menu player menu",
+    "on-scroll-up": "playerctl next",
+    "on-scroll-down": "playerctl previous"
+  },
+  "custom/power": {
+    "format": "Power",
+    "tooltip": false,
+    "on-click": "/usr/local/bin/debian-labwc-power-menu"
+  }
+}

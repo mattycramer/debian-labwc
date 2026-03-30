@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+if ! declare -F render_template_content >/dev/null 2>&1; then
+  # shellcheck disable=SC1091
+  source "$SCRIPT_DIR/lib/templates.sh"
+fi
+
 ensure_greeter_user() {
   if getent passwd greeter >/dev/null 2>&1; then
     return 0
@@ -31,35 +36,11 @@ render_template_to_file() {
   local template_path="$1"
   local destination="$2"
   local mode="$3"
+  local content=""
+  content="$(render_template_content "$template_path")"
   run_cmd install -D -m "$mode" /dev/null "$destination"
-  sed \
-    -e "s|@GREETD_VT@|$LABWC_GREETD_VT|g" \
-    -e "s|@TARGET_USER@|$LABWC_TARGET_USER|g" \
-    -e "s|@TARGET_HOME@|$LABWC_TARGET_HOME|g" \
-    -e "s|@XCURSOR_THEME@|$LABWC_XCURSOR_THEME|g" \
-    -e "s|@XCURSOR_SIZE@|$LABWC_XCURSOR_SIZE|g" \
-    -e "s|@SESSION_WRAPPER@|/usr/local/bin/debian-labwc-session|g" \
-    "$template_path" >"$destination"
+  printf '%s' "$content" >"$destination"
   run_cmd chmod "$mode" "$destination"
-}
-
-install_helper_script() {
-  local source_path="$1"
-  local destination="$2"
-  local lock_wallpaper_name
-  lock_wallpaper_name="$(basename "$(lock_wallpaper_source_path)")"
-  run_cmd install -D -m 0755 /dev/null "$destination"
-  sed \
-    -e "s|@TARGET_HOME@|$LABWC_TARGET_HOME|g" \
-    -e "s|@LOCK_WALLPAPER_NAME@|$lock_wallpaper_name|g" \
-    -e "s|@INTERNAL_OUTPUT@|${LABWC_INTERNAL_OUTPUT}|g" \
-    -e "s|@EXTERNAL_OUTPUT@|${LABWC_EXTERNAL_OUTPUT}|g" \
-    -e "s|@INTERNAL_MODE@|${LABWC_INTERNAL_MODE}|g" \
-    -e "s|@EXTERNAL_MODE@|${LABWC_EXTERNAL_MODE}|g" \
-    -e "s|@INTERNAL_HZ@|${LABWC_INTERNAL_HZ}|g" \
-    -e "s|@EXTERNAL_HZ@|${LABWC_EXTERNAL_HZ}|g" \
-    "$source_path" >"$destination"
-  run_cmd chmod 0755 "$destination"
 }
 
 bootstrap_target_user_gpg_key() {
@@ -100,27 +81,26 @@ install_root_files() {
   validate_greetd_settings
   ensure_greeter_user
   ensure_greeter_runtime_dirs
-  render_template_to_file "$SCRIPT_DIR/templates/greetd-config.toml.tpl" "/etc/greetd/config.toml" 0644
-  render_template_to_file "$SCRIPT_DIR/templates/greetd-vt.conf.tpl" "/etc/systemd/system/greetd.service.d/10-vt.conf" 0644
-  render_template_to_file "$SCRIPT_DIR/templates/labwc.desktop.tpl" "/usr/share/wayland-sessions/labwc.desktop" 0644
-  render_template_to_file "$SCRIPT_DIR/templates/labwc-session.tpl" "/usr/local/bin/debian-labwc-session" 0755
-
-  install_helper_script "$SCRIPT_DIR/bin/power-menu.sh" "/usr/local/bin/debian-labwc-power-menu"
-  install_helper_script "$SCRIPT_DIR/bin/screenshot-full.sh" "/usr/local/bin/debian-labwc-screenshot-full"
-  install_helper_script "$SCRIPT_DIR/bin/screenshot-region.sh" "/usr/local/bin/debian-labwc-screenshot-region"
-  install_helper_script "$SCRIPT_DIR/bin/record-toggle.sh" "/usr/local/bin/debian-labwc-record-toggle"
-  install_helper_script "$SCRIPT_DIR/bin/dpms.sh" "/usr/local/bin/debian-labwc-dpms"
-  install_helper_script "$SCRIPT_DIR/bin/refresh-outputs.sh" "/usr/local/bin/debian-labwc-refresh-outputs"
-  install_helper_script "$SCRIPT_DIR/bin/lock.sh" "/usr/local/bin/debian-labwc-lock"
-  install_helper_script "$SCRIPT_DIR/bin/launcher-menu.sh" "/usr/local/bin/debian-labwc-launcher-menu"
-  install_helper_script "$SCRIPT_DIR/bin/module-menu.sh" "/usr/local/bin/debian-labwc-module-menu"
-  install_helper_script "$SCRIPT_DIR/bin/player-status.sh" "/usr/local/bin/debian-labwc-player-status"
-  install_helper_script "$SCRIPT_DIR/bin/unlock-gpg-key.sh" "/usr/local/bin/debian-labwc-unlock-gpg-key"
-  install_helper_script "$SCRIPT_DIR/bin/workspacectl.py" "/usr/local/bin/debian-labwc-workspacectl"
-  install_helper_script "$SCRIPT_DIR/bin/workspace-activate.sh" "/usr/local/bin/debian-labwc-workspace-activate"
-  install_helper_script "$SCRIPT_DIR/bin/workspace-send.sh" "/usr/local/bin/debian-labwc-workspace-send"
-  install_helper_script "$SCRIPT_DIR/bin/workspace-state.sh" "/usr/local/bin/debian-labwc-workspace-state"
-  install_helper_script "$SCRIPT_DIR/bin/workspace-status.sh" "/usr/local/bin/debian-labwc-workspace-status"
+  render_template_to_file "$(config_system_template_path "greetd/config.toml")" "/etc/greetd/config.toml" 0644
+  render_template_to_file "$(config_system_template_path "greetd/10-vt.conf")" "/etc/systemd/system/greetd.service.d/10-vt.conf" 0644
+  render_template_to_file "$(config_system_template_path "usr/share/wayland-sessions/labwc.desktop")" "/usr/share/wayland-sessions/labwc.desktop" 0644
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-session")" "/usr/local/bin/debian-labwc-session" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-power-menu")" "/usr/local/bin/debian-labwc-power-menu" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-screenshot-full")" "/usr/local/bin/debian-labwc-screenshot-full" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-screenshot-region")" "/usr/local/bin/debian-labwc-screenshot-region" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-record-toggle")" "/usr/local/bin/debian-labwc-record-toggle" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-dpms")" "/usr/local/bin/debian-labwc-dpms" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-refresh-outputs")" "/usr/local/bin/debian-labwc-refresh-outputs" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-lock")" "/usr/local/bin/debian-labwc-lock" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-launcher-menu")" "/usr/local/bin/debian-labwc-launcher-menu" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-module-menu")" "/usr/local/bin/debian-labwc-module-menu" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-player-status")" "/usr/local/bin/debian-labwc-player-status" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-unlock-gpg-key")" "/usr/local/bin/debian-labwc-unlock-gpg-key" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-workspacectl")" "/usr/local/bin/debian-labwc-workspacectl" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-workspace-activate")" "/usr/local/bin/debian-labwc-workspace-activate" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-workspace-send")" "/usr/local/bin/debian-labwc-workspace-send" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-workspace-state")" "/usr/local/bin/debian-labwc-workspace-state" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-workspace-status")" "/usr/local/bin/debian-labwc-workspace-status" 0755
 }
 
 resolve_user_unit_path() {

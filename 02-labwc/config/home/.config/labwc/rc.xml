@@ -1,0 +1,137 @@
+<?xml version="1.0"?>
+<labwc_config>
+  <focus>
+    <followMouse>@FOLLOW_MOUSE@</followMouse>
+    <followMouseRequiresMovement>no</followMouseRequiresMovement>
+    <raiseOnFocus>@RAISE_ON_FOCUS@</raiseOnFocus>
+    <focusDelay>@FOCUS_DELAY_MS@</focusDelay>
+  </focus>
+  <windowSwitcher preview="yes" outlines="yes" unshade="yes" order="focus">
+    <osd show="yes" style="classic" output="focused" />
+  </windowSwitcher>
+  <mouse>
+    <default />
+    <doubleClickTime>@DOUBLECLICK_TIME_MS@</doubleClickTime>
+    <context name="Root">
+      <mousebind button="Left" action="Press">
+        <action name="Unfocus" />
+      </mousebind>
+    </context>
+    <context name="Title">
+      <mousebind button="Left" action="DoubleClick">
+        <action name="ToggleMaximize" />
+      </mousebind>
+    </context>
+  </mouse>
+  <libinput>
+    <device category="default">
+      <naturalScroll>@NATURAL_SCROLL@</naturalScroll>
+    </device>
+    <device category="touchpad">
+      <naturalScroll>@NATURAL_SCROLL@</naturalScroll>
+    </device>
+    <device category="non-touch">
+      <naturalScroll>no</naturalScroll>
+    </device>
+  </libinput>
+  <desktops>
+    <popupTime>1000</popupTime>
+    <names>
+      <name>1</name>
+      <name>2</name>
+      <name>3</name>
+      <name>4</name>
+    </names>
+  </desktops>
+  <keyboard>
+    <default />
+    <keybind key="A-Tab">
+      <action name="NextWindow" />
+    </keybind>
+    <keybind key="A-S-Tab">
+      <action name="PreviousWindow" />
+    </keybind>
+    <keybind key="W-Return">
+      <action name="Execute"><command>@TERMINAL@</command></action>
+    </keybind>
+    <keybind key="W-b">
+      <action name="Execute"><command>bitwarden</command></action>
+    </keybind>
+    <keybind key="W-c">
+      <action name="Execute"><command>code</command></action>
+    </keybind>
+    <keybind key="W-d">
+      <action name="Execute"><command>@LAUNCHER_CMD@</command></action>
+    </keybind>
+    <keybind key="W-space">
+      <action name="Execute"><command>@LAUNCHER_CMD@</command></action>
+    </keybind>
+    <keybind key="W-e">
+      <action name="Execute"><command>thorium-browser</command></action>
+    </keybind>
+    <keybind key="W-f">
+      <action name="Execute"><command>footclient</command></action>
+    </keybind>
+    <keybind key="W-g">
+      <action name="Execute"><command>geeqie</command></action>
+    </keybind>
+    <keybind key="W-k">
+      <action name="Execute"><command>kitty</command></action>
+    </keybind>
+    <keybind key="W-m">
+      <action name="Execute"><command>mousepad</command></action>
+    </keybind>
+    <keybind key="W-o">
+      <action name="Execute"><command>obsidian</command></action>
+    </keybind>
+    <keybind key="W-t">
+      <action name="Execute"><command>thunar</command></action>
+    </keybind>
+    <keybind key="W-1">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-workspace-state 1</command></action>
+      <action name="GoToDesktop" to="1" />
+    </keybind>
+    <keybind key="W-2">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-workspace-state 2</command></action>
+      <action name="GoToDesktop" to="2" />
+    </keybind>
+    <keybind key="W-3">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-workspace-state 3</command></action>
+      <action name="GoToDesktop" to="3" />
+    </keybind>
+    <keybind key="W-4">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-workspace-state 4</command></action>
+      <action name="GoToDesktop" to="4" />
+    </keybind>
+    <keybind key="W-S-1">
+      <action name="SendToDesktop" to="1" follow="no" />
+    </keybind>
+    <keybind key="W-S-2">
+      <action name="SendToDesktop" to="2" follow="no" />
+    </keybind>
+    <keybind key="W-S-3">
+      <action name="SendToDesktop" to="3" follow="no" />
+    </keybind>
+    <keybind key="W-S-4">
+      <action name="SendToDesktop" to="4" follow="no" />
+    </keybind>
+    <keybind key="W-q">
+      <action name="Close" />
+    </keybind>
+    <keybind key="W-l">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-lock</command></action>
+    </keybind>
+    <keybind key="Print">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-screenshot-full</command></action>
+    </keybind>
+    <keybind key="S-Print">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-screenshot-region</command></action>
+    </keybind>
+    <keybind key="W-S-r">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-record-toggle</command></action>
+    </keybind>
+    <keybind key="W-S-e">
+      <action name="Execute"><command>/usr/local/bin/debian-labwc-power-menu</command></action>
+    </keybind>
+  </keyboard>
+</labwc_config>

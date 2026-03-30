@@ -15,6 +15,8 @@ source "$SCRIPT_DIR/lib/log.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/assert.sh"
 # shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/templates.sh"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/apt.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/detect.sh"

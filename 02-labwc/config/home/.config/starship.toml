@@ -1,0 +1,71 @@
+add_newline = true
+command_timeout = 1000
+scan_timeout = 20
+palette = "labwc"
+format = """
+$username$hostname$directory$git_branch$git_status$git_state$cmd_duration
+$character
+"""
+
+[palettes.labwc]
+text = "#e5edf5"
+muted = "#94a3b8"
+sky = "#7dd3fc"
+cyan = "#6dc4ed"
+mint = "#94d2bd"
+amber = "#f6bd60"
+rose = "#ffb4a2"
+red = "#ef4444"
+mauve = "#c4b5fd"
+panel = "#0f1720"
+
+[username]
+show_always = true
+style_user = "bold amber"
+style_root = "bold red"
+format = "[$user]($style)"
+
+[hostname]
+ssh_only = false
+style = "bold cyan"
+format = "[@$hostname]($style) "
+
+[character]
+success_symbol = "[>](bold mint)"
+error_symbol = "[>](bold red)"
+vimcmd_symbol = "[<](bold amber)"
+vimcmd_replace_one_symbol = "[<](bold rose)"
+vimcmd_replace_symbol = "[<](bold rose)"
+vimcmd_visual_symbol = "[<](bold mauve)"
+
+[directory]
+style = "bold sky"
+format = "[$path]($style) "
+home_symbol = "~"
+truncation_length = 3
+truncate_to_repo = false
+read_only = " ro"
+
+[directory.substitutions]
+"Documents" = "docs"
+"Downloads" = "dl"
+"Pictures" = "img"
+"Projects" = "proj"
+
+[git_branch]
+symbol = "git "
+style = "bold mauve"
+format = "[${symbol}$branch]($style) "
+
+[git_status]
+style = "bold rose"
+format = "[$all_status$ahead_behind]($style) "
+
+[git_state]
+style = "bold rose"
+format = "[$state($progress_current/$progress_total)]($style) "
+
+[cmd_duration]
+min_time = 1200
+style = "bold muted"
+format = "[$duration]($style) "

@@ -1,0 +1,7 @@
+[Default Applications]
+x-scheme-handler/terminal=foot.desktop
+application/x-terminal-emulator=foot.desktop
+
+[Added Associations]
+x-scheme-handler/terminal=foot.desktop;kitty.desktop;
+application/x-terminal-emulator=foot.desktop;kitty.desktop;

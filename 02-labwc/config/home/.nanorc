@@ -1,0 +1,11 @@
+set mouse
+set autoindent
+set tabsize 4
+set tabstospaces
+set softwrap
+set indicator
+set titlecolor bold,white,blue
+set numbercolor cyan
+set keycolor cyan
+set functioncolor green
+include "/usr/share/nano/*.nanorc"

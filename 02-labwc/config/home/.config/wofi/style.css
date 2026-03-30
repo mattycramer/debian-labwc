@@ -1,0 +1,29 @@
+window {
+  margin: 0;
+  padding: 14px;
+  border: 1px solid rgba(111, 124, 143, 0.32);
+  border-radius: 18px;
+  background-color: rgba(12, 17, 24, 0.96);
+}
+#outer-box {
+  padding: 4px;
+}
+#input {
+  margin: 0 0 12px 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(80, 97, 119, 0.35);
+  background-color: rgba(24, 31, 43, 0.92);
+  color: #edf2f7;
+}
+#entry {
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+#entry:selected {
+  background: linear-gradient(180deg, rgba(109, 196, 237, 0.92), rgba(71, 167, 214, 0.92));
+  color: #07111b;
+}
+#text {
+  color: inherit;
+}
