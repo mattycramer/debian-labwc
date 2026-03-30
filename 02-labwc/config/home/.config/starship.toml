@@ -39,7 +39,7 @@ vimcmd_replace_symbol = "[<](bold rose)"
 vimcmd_visual_symbol = "[<](bold mauve)"
 
 [directory]
-style = "bold sky"
+style = "bold mint"
 format = "[$path]($style) "
 home_symbol = "~"
 truncation_length = 3
