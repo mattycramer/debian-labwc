@@ -70,7 +70,7 @@
       <action name="Execute"><command>thorium-browser</command></action>
     </keybind>
     <keybind key="W-f">
-      <action name="Execute"><command>footclient</command></action>
+      <action name="Execute"><command>foot</command></action>
     </keybind>
     <keybind key="W-g">
       <action name="Execute"><command>geeqie</command></action>

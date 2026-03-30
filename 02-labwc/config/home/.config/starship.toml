@@ -23,12 +23,12 @@ panel = "#0f1720"
 show_always = true
 style_user = "bold amber"
 style_root = "bold red"
-format = "[$user]($style)"
+format = "[$user@]($style)"
 
 [hostname]
 ssh_only = false
 style = "bold cyan"
-format = "[@$hostname]($style) "
+format = "[$hostname]($style) "
 
 [character]
 success_symbol = "[>](bold mint)"

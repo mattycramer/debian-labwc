@@ -20,9 +20,7 @@ run_gui() {
 run_terminal() {
   local title="$1"
   local command_string="$2"
-  if command -v footclient >/dev/null 2>&1; then
-    nohup footclient -T "$title" -e bash -lc "$command_string" >/dev/null 2>&1 &
-  elif command -v foot >/dev/null 2>&1; then
+  if command -v foot >/dev/null 2>&1; then
     nohup foot -T "$title" -e bash -lc "$command_string" >/dev/null 2>&1 &
   fi
 }
