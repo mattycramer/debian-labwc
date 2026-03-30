@@ -88,19 +88,19 @@
       <action name="Execute"><command>thunar</command></action>
     </keybind>
     <keybind key="W-1">
-      <action name="Execute"><command>/usr/local/bin/debian-labwc-workspace-state 1</command></action>
+      <action name="Execute"><command>/usr/local/bin/labwc-workspace-state 1</command></action>
       <action name="GoToDesktop" to="1" />
     </keybind>
     <keybind key="W-2">
-      <action name="Execute"><command>/usr/local/bin/debian-labwc-workspace-state 2</command></action>
+      <action name="Execute"><command>/usr/local/bin/labwc-workspace-state 2</command></action>
       <action name="GoToDesktop" to="2" />
     </keybind>
     <keybind key="W-3">
-      <action name="Execute"><command>/usr/local/bin/debian-labwc-workspace-state 3</command></action>
+      <action name="Execute"><command>/usr/local/bin/labwc-workspace-state 3</command></action>
       <action name="GoToDesktop" to="3" />
     </keybind>
     <keybind key="W-4">
-      <action name="Execute"><command>/usr/local/bin/debian-labwc-workspace-state 4</command></action>
+      <action name="Execute"><command>/usr/local/bin/labwc-workspace-state 4</command></action>
       <action name="GoToDesktop" to="4" />
     </keybind>
     <keybind key="W-S-1">
@@ -119,19 +119,19 @@
       <action name="Close" />
     </keybind>
     <keybind key="W-l">
-      <action name="Execute"><command>/usr/local/bin/debian-labwc-lock</command></action>
+      <action name="Execute"><command>/usr/local/bin/labwc-lock</command></action>
     </keybind>
     <keybind key="Print">
-      <action name="Execute"><command>/usr/local/bin/debian-labwc-screenshot-full</command></action>
+      <action name="Execute"><command>/usr/local/bin/labwc-screenshot-full</command></action>
     </keybind>
     <keybind key="S-Print">
-      <action name="Execute"><command>/usr/local/bin/debian-labwc-screenshot-region</command></action>
+      <action name="Execute"><command>/usr/local/bin/labwc-screenshot-region</command></action>
     </keybind>
     <keybind key="W-S-r">
-      <action name="Execute"><command>/usr/local/bin/debian-labwc-record-toggle</command></action>
+      <action name="Execute"><command>/usr/local/bin/labwc-record-toggle</command></action>
     </keybind>
     <keybind key="W-S-e">
-      <action name="Execute"><command>/usr/local/bin/debian-labwc-power-menu</command></action>
+      <action name="Execute"><command>/usr/local/bin/labwc-power-menu</command></action>
     </keybind>
   </keyboard>
 </labwc_config>

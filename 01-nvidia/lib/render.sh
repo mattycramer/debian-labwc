@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-readonly NVIDIA_MODULE_CONFIG_PATH="/etc/modprobe.d/debian-labwc-nvidia.conf"
+readonly NVIDIA_MODULE_CONFIG_PATH="/etc/modprobe.d/labwc-nvidia.conf"
 
 render_nvidia_module_config() {
   local content=""
@@ -10,7 +10,7 @@ render_nvidia_module_config() {
   fi
 
   content="$(cat <<'EOF'
-# Managed by debian-labwc 01-nvidia
+# Managed by labwc 01-nvidia
 # Keep Intel/iHD as the default render/video path. This only enables DRM KMS
 # for NVIDIA so Wayland compositors and switcherooctl offload work correctly.
 options nvidia-drm modeset=1

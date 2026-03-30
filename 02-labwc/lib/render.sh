@@ -81,7 +81,7 @@ lock_wallpaper_source_path() {
 
 wallpaper_target_path() {
   local wallpaper_source_path="$1"
-  printf '%s/.local/share/debian-labwc/%s\n' "$LABWC_TARGET_HOME" "$(basename "$wallpaper_source_path")"
+  printf '%s/.local/share/labwc-session/%s\n' "$LABWC_TARGET_HOME" "$(basename "$wallpaper_source_path")"
 }
 
 background_wallpaper_target_path() {
@@ -142,6 +142,10 @@ render_mimeapps() {
   render_home_template_file ".config/mimeapps.list"
 }
 
+render_thunar_config() {
+  render_home_template_file ".config/Thunar/uca.xml"
+}
+
 render_xdg_terminal_exec() {
   render_home_template_script ".local/bin/xdg-terminal-exec"
 }
@@ -197,13 +201,10 @@ render_waybar_scripts() {
   render_home_template_script ".config/waybar/scripts/pending-updates.sh"
   render_home_template_script ".config/waybar/scripts/run-upgrades.sh"
   render_home_template_script ".config/waybar/scripts/gpu-launch.sh"
-  render_home_template_script ".config/waybar/scripts/grouped-taskbar.py"
 }
 
 render_waybar_config() {
   render_home_template_file ".config/waybar/config.jsonc"
-  render_home_template_file ".config/waybar/grouped-taskbar.generated.jsonc"
-  render_home_template_file ".config/waybar/grouped-taskbar.generated.css"
 }
 
 render_waybar_style() {
@@ -323,11 +324,11 @@ render_portals() {
 
 install_wallpaper() {
   local wallpaper_source_path wallpaper_name
-  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.local/share/debian-labwc"
+  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.local/share/labwc-session"
   while IFS= read -r wallpaper_source_path; do
     [[ -n "$wallpaper_source_path" ]] || continue
     wallpaper_name="$(basename "$wallpaper_source_path")"
-    run_cmd install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$wallpaper_source_path" "$LABWC_TARGET_HOME/.local/share/debian-labwc/$wallpaper_name"
+    run_cmd install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$wallpaper_source_path" "$LABWC_TARGET_HOME/.local/share/labwc-session/$wallpaper_name"
   done < <(find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f | LC_ALL=C sort)
   require_file "$(background_wallpaper_target_path)"
   require_file "$(lock_wallpaper_target_path)"
@@ -342,6 +343,7 @@ render_all_configs() {
     "$config_root/waybar/scripts" \
     "$config_root/kanshi" \
     "$config_root/kitty" \
+    "$config_root/Thunar" \
     "$config_root/xfce4" \
     "$config_root/wofi" \
     "$config_root/mako" \
@@ -350,7 +352,7 @@ render_all_configs() {
     "$config_root/foot" \
     "$config_root/gammastep" \
     "$config_root/xdg-desktop-portal" \
-    "$config_root/debian-labwc" \
+    "$config_root/labwc-session" \
     "$config_root/systemd/user/gpg-agent.service.d" \
     "$config_root/systemd/user/xdg-desktop-portal.service.d" \
     "$config_root/systemd/user/xdg-desktop-portal-wlr.service.d" \
@@ -360,6 +362,7 @@ render_all_configs() {
 
   render_home_dirs
   render_shell_startup_files
+  render_thunar_config
   render_xfce_helpers
   render_mimeapps
   render_xdg_terminal_exec

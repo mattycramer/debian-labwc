@@ -4,7 +4,7 @@ IFS=$'\n\t'
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
-readonly FSTAB_ENV_FILE="$SCRIPT_DIR/fstab.env"
+readonly MOUNTS_CONFIG_FILE="$SCRIPT_DIR/mounts.conf"
 
 PHASE="all"
 
@@ -15,15 +15,17 @@ source "$SCRIPT_DIR/lib/assert.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/detect.sh"
 # shellcheck disable=SC1091
-source "$SCRIPT_DIR/lib/fstab.sh"
+source "$SCRIPT_DIR/lib/mount_units.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/permissions.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/sudoers.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/verify.sh"
 
 usage() {
   cat <<'EOF'
-Usage: ./install.sh --phase doctor|fstab|permissions|verify|print-env|nuke|all
+Usage: ./install.sh --phase doctor|mounts|permissions|sudoers|verify|print-env|nuke|all
 EOF
 }
 
@@ -48,6 +50,12 @@ parse_args() {
 
 phase_doctor() {
   log_info "phase: doctor"
+  run_preflight_checks 1
+}
+
+run_preflight_checks() {
+  local validate_configs="${1:-1}"
+
   require_root
   require_debian_trixie
   require_amd64
@@ -55,23 +63,37 @@ phase_doctor() {
   require_command chmod
   require_command chown
   require_command cmp
+  require_command cp
   require_command dpkg
   require_command find
   require_command getent
+  require_command grep
   require_command id
   require_command install
   require_command mktemp
+  require_command sed
   require_command stat
+  require_command systemctl
+  require_command systemd-analyze
+  require_command systemd-escape
   detect_target_user
-  require_file "$SYSTEM_FSTAB_PATH"
+  require_supported_sudoers_user
+  resolve_visudo_bin
+  resolve_sudoers_dropin_path
+  require_file "$SYSTEM_SUDOERS_PATH"
+  sudoers_includes_dropin_dir || die "$SYSTEM_SUDOERS_PATH must include $SYSTEM_SUDOERS_D_PATH"
   require_dir "$SYSTEM_TARGET_HOME"
-  require_file "$FSTAB_ENV_FILE"
+  if [[ "$validate_configs" -eq 1 ]]; then
+    require_file "$MOUNTS_CONFIG_FILE"
+    validate_managed_mount_units
+    validate_managed_sudoers_policy
+  fi
 }
 
-phase_fstab() {
-  log_info "phase: fstab"
+phase_mounts() {
+  log_info "phase: mounts"
   phase_doctor
-  apply_managed_fstab
+  apply_managed_mount_units
 }
 
 phase_permissions() {
@@ -79,6 +101,12 @@ phase_permissions() {
   phase_doctor
   apply_system_path_permissions
   apply_home_permissions
+}
+
+phase_sudoers() {
+  log_info "phase: sudoers"
+  phase_doctor
+  apply_managed_sudoers
 }
 
 phase_verify() {
@@ -90,13 +118,16 @@ phase_verify() {
 phase_print_env() {
   log_info "phase: print-env"
   detect_target_user
+  require_supported_sudoers_user
+  resolve_sudoers_dropin_path
   print_resolved_config
 }
 
 phase_nuke() {
   log_info "phase: nuke"
-  phase_doctor
-  remove_managed_fstab
+  run_preflight_checks 0
+  remove_managed_mount_units
+  remove_managed_sudoers
   log_warn "directory ownership and permissions are intentionally left in place"
 }
 
@@ -104,15 +135,17 @@ main() {
   parse_args "$@"
   case "$PHASE" in
     doctor) phase_doctor ;;
-    fstab) phase_fstab ;;
+    mounts) phase_mounts ;;
     permissions) phase_permissions ;;
+    sudoers) phase_sudoers ;;
     verify) phase_verify ;;
     print-env) phase_print_env ;;
     nuke) phase_nuke ;;
     install|all)
       phase_doctor
-      phase_fstab
+      phase_mounts
       phase_permissions
+      phase_sudoers
       phase_verify
       ;;
     *)

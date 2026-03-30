@@ -1,4 +1,4 @@
-# Managed by debian-labwc
+# Managed by labwc
 umask 022
 export PATH="/data/usr/local/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
 

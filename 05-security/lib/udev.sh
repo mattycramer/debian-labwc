@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
 readonly THINKPAD_UDEV_HWDB_DIR="/etc/udev/hwdb.d"
-readonly THINKPAD_UDEV_HWDB_PATH="/etc/udev/hwdb.d/90-debian-labwc-thinkpad-extra-buttons.hwdb"
+readonly THINKPAD_UDEV_HWDB_PATH="/etc/udev/hwdb.d/90-labwc-thinkpad-extra-buttons.hwdb"
 
 render_thinkpad_hwdb_override() {
   local content
   content="$(cat <<'EOF'
-# Managed by debian-labwc.
+# Managed by labwc.
 # The stock systemd keyboard hwdb maps several newer ThinkPad extra-button
 # scan codes to Teams/notification actions. On some ThinkPad firmware/input
 # stacks these remaps fail with EVIOCSKEYCODE Invalid argument during udev

@@ -3,7 +3,7 @@ set -Eeuo pipefail
 IFS=$'\n\t'
 
 workspace="${1:-}"
-state_root="${XDG_STATE_HOME:-$HOME/.local/state}/debian-labwc"
+state_root="${XDG_STATE_HOME:-$HOME/.local/state}/labwc-session"
 state_file="$state_root/current-workspace"
 
 case "$workspace" in

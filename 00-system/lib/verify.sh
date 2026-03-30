@@ -52,18 +52,19 @@ verify_home_permissions() {
   done
 }
 
-verify_fstab_mountpoints() {
+verify_mount_targets() {
   local mountpoint
 
   while IFS= read -r mountpoint; do
     [[ -n "$mountpoint" ]] || continue
     assert_directory_state "$mountpoint" root root 0755
-  done < <(list_fstab_mountpoints)
+  done < <(list_mount_targets)
 }
 
 verify_install() {
-  verify_managed_fstab
-  verify_fstab_mountpoints
+  verify_managed_mount_units
+  verify_managed_sudoers
+  verify_mount_targets
   verify_system_path_permissions
   verify_home_permissions
   log_info "verification completed"

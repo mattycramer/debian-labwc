@@ -25,8 +25,6 @@ source "$SCRIPT_DIR/lib/render.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/services.sh"
 # shellcheck disable=SC1091
-source "$SCRIPT_DIR/lib/taskbar.sh"
-# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/tweaks.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/keepsecret.sh"
@@ -125,7 +123,6 @@ phase_enable() {
   bootstrap_target_user_gpg_key
   enable_all_services "$ENV_FILE"
   phase_build_doctor
-  install_grouped_taskbar_daemon
   install_labwc_tweaks
   install_keepsecret
 }

@@ -4,8 +4,8 @@ readonly KEEPSECRET_BIN_PATH="/usr/local/bin/keepsecret"
 readonly KEEPSECRET_DESKTOP_PATH="/usr/local/share/applications/org.kde.keepsecret.desktop"
 readonly KEEPSECRET_APPDATA_PATH="/usr/local/share/metainfo/org.kde.keepsecret.metainfo.xml"
 readonly KEEPSECRET_ICON_PATH="/usr/local/share/icons/hicolor/scalable/apps/org.kde.keepsecret.svg"
-readonly KEEPSECRET_TMP_ROOT_PREFIX="/tmp/debian-labwc-keepsecret"
-readonly KEEPSECRET_MANIFEST_DIR="/var/lib/debian-labwc"
+readonly KEEPSECRET_TMP_ROOT_PREFIX="/tmp/labwc-keepsecret"
+readonly KEEPSECRET_MANIFEST_DIR="/var/lib/labwc-session"
 readonly KEEPSECRET_MANIFEST_PATH="${KEEPSECRET_MANIFEST_DIR}/keepsecret-install-manifest.txt"
 
 keepsecret_work_root() {

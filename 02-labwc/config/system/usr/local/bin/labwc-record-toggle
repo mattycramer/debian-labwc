@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-pid_file="${XDG_RUNTIME_DIR:-/tmp}/debian-labwc-wf-recorder.pid"
+pid_file="${XDG_RUNTIME_DIR:-/tmp}/labwc-wf-recorder.pid"
 output_dir="$HOME/Videos"
 mkdir -p "$output_dir"
 

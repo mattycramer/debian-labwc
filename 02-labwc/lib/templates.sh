@@ -29,7 +29,7 @@ render_template_content() {
 
   [[ -f "$template_path" ]] || die "missing config template: $template_path"
 
-  if [[ -d "$LABWC_TARGET_HOME/.local/share/debian-labwc" || -d "$SCRIPT_DIR/wallpaper" ]]; then
+  if [[ -d "$LABWC_TARGET_HOME/.local/share/labwc-session" || -d "$SCRIPT_DIR/wallpaper" ]]; then
     if declare -F background_wallpaper_target_path >/dev/null 2>&1; then
       background_wallpaper_path="$(background_wallpaper_target_path)"
     fi
@@ -64,7 +64,7 @@ render_template_content() {
     TEMPLATE_KANSHI_INTERNAL_PROFILE="$kanshi_internal_profile" \
     TEMPLATE_KANSHI_EXTERNAL_CLAUSE="$kanshi_external_clause" \
     TEMPLATE_GREETD_VT="${LABWC_GREETD_VT:-}" \
-    TEMPLATE_SESSION_WRAPPER="/usr/local/bin/debian-labwc-session" \
+    TEMPLATE_SESSION_WRAPPER="/usr/local/bin/labwc-session" \
     TEMPLATE_INTERNAL_OUTPUT="${LABWC_INTERNAL_OUTPUT:-}" \
     TEMPLATE_EXTERNAL_OUTPUT="${LABWC_EXTERNAL_OUTPUT:-}" \
     TEMPLATE_INTERNAL_MODE="${LABWC_INTERNAL_MODE:-}" \

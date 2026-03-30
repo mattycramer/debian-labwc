@@ -58,15 +58,15 @@ readonly CROWDSEC_PACKAGES=(
   crowdsec-firewall-bouncer-nftables
 )
 
-readonly SECURITY_RUNTIME_ROOT="/var/lib/debian-labwc-security"
+readonly SECURITY_RUNTIME_ROOT="/var/lib/labwc-security"
 readonly MANIFEST_ROOT="${SECURITY_RUNTIME_ROOT}/manifests"
 readonly CROWDSEC_KEYRING_PATH="/etc/apt/keyrings/crowdsec_crowdsec-archive-keyring.gpg"
 readonly CROWDSEC_SOURCE_PATH="/etc/apt/sources.list.d/crowdsec_crowdsec.sources"
 readonly CROWDSEC_PREFS_PATH="/etc/apt/preferences.d/crowdsec"
-readonly CROWDSEC_ACQUIS_PATH="/etc/crowdsec/acquis.d/debian-labwc-security.yaml"
-readonly CROWDSEC_BOUNCER_KEY_PATH="/etc/crowdsec/bouncers/debian-labwc-firewall-bouncer.key"
+readonly CROWDSEC_ACQUIS_PATH="/etc/crowdsec/acquis.d/labwc-security.yaml"
+readonly CROWDSEC_BOUNCER_KEY_PATH="/etc/crowdsec/bouncers/labwc-firewall-bouncer.key"
 readonly CROWDSEC_BOUNCER_CONFIG_PATH="/etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml.local"
-readonly CROWDSEC_CONSOLE_MARKER="/etc/crowdsec/.console-enrolled-by-debian-labwc-security"
+readonly CROWDSEC_CONSOLE_MARKER="/etc/crowdsec/.console-enrolled-by-labwc-security"
 readonly NFT_BIN="/usr/local/sbin/nft"
 readonly NFTABLES_CONF_PATH="/etc/nftables.conf"
 readonly NFTABLES_DROPIN_DIR="/etc/systemd/system/nftables.service.d"
@@ -81,8 +81,8 @@ readonly AIDE_CONF_PATH="/etc/aide/aide.conf"
 readonly AIDE_DB_DIR="/var/lib/aide"
 readonly AIDE_DB_PATH="/var/lib/aide/aide.db.gz"
 readonly AIDE_DB_NEW_PATH="/var/lib/aide/aide.db.new.gz"
-readonly AIDE_CHECK_SERVICE_PATH="/etc/systemd/system/debian-labwc-security-aide-check.service"
-readonly AIDE_CHECK_TIMER_PATH="/etc/systemd/system/debian-labwc-security-aide-check.timer"
+readonly AIDE_CHECK_SERVICE_PATH="/etc/systemd/system/labwc-security-aide-check.service"
+readonly AIDE_CHECK_TIMER_PATH="/etc/systemd/system/labwc-security-aide-check.timer"
 readonly SECURITY_VERSIONS_PATH="${SECURITY_RUNTIME_ROOT}/installed-versions.env"
 readonly LDCONFIG_BIN="/usr/sbin/ldconfig"
 
@@ -466,10 +466,10 @@ render_all_configs() {
 
   write_text_file "$AIDE_CONF_PATH" $'database_in=file:/var/lib/aide/aide.db.gz\ndatabase_out=file:/var/lib/aide/aide.db.new.gz\ngzip_dbout=yes\nreport_summarize_changes=yes\nreport_grouped=yes\nwarn_dead_symlinks=yes\n\nNORMAL = ftype+p+u+g+n+s+m+c+acl+xattrs+sha256\nDIR = ftype+p+u+g+n+acl+xattrs\n\n-/dev\n-/proc\n-/run\n-/sys\n-/tmp\n-/var/tmp\n-/var/cache\n-/var/spool\n-/var/log\n-/var/log/journal\n-/var/local\n-/var/swap\n-/data/workspace\n-/data/codex\n-/media\n-/mnt\n-/lost\\+found\n-/var/lib/aide\n-/var/lib/crowdsec\n-/var/lib/containerd\n-/var/lib/docker\n-/var/lib/containers\n-/var/lib/systemd/coredump\n\n/etc$ DIR\n/etc/ NORMAL\n/usr$ DIR\n/usr/ NORMAL\n/usr/local$ DIR\n/usr/local/ NORMAL\n/boot$ DIR\n/boot/ NORMAL\n/opt$ DIR\n/opt/ NORMAL\n/root$ DIR\n/root/ NORMAL\n/var/lib/systemd$ DIR\n/var/lib/systemd/ NORMAL\n/var/lib/dpkg$ DIR\n/var/lib/dpkg/ NORMAL\n'
 
-  write_text_file "$AIDE_CHECK_SERVICE_PATH" $'[Unit]\nDescription=Debian Labwc security AIDE integrity check\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nType=oneshot\nExecStart=/usr/local/bin/aide --config=/etc/aide/aide.conf --check\nNice=19\nIOSchedulingClass=best-effort\nIOSchedulingPriority=7\n'
+  write_text_file "$AIDE_CHECK_SERVICE_PATH" $'[Unit]\nDescription=Labwc security AIDE integrity check\nWants=network-online.target\nAfter=network-online.target\n\n[Service]\nType=oneshot\nExecStart=/usr/local/bin/aide --config=/etc/aide/aide.conf --check\nNice=19\nIOSchedulingClass=best-effort\nIOSchedulingPriority=7\n'
 
   write_text_file "$AIDE_CHECK_TIMER_PATH" "[Unit]
-Description=Debian Labwc security AIDE scheduled integrity check
+Description=Labwc security AIDE scheduled integrity check
 
 [Timer]
 OnCalendar=${AIDE_CHECK_ONCALENDAR}
@@ -559,7 +559,7 @@ EOF
 
 enable_security_services() {
   run_cmd systemctl enable --now crowdsec-firewall-bouncer.service
-  run_cmd systemctl enable --now debian-labwc-security-aide-check.timer
+  run_cmd systemctl enable --now labwc-security-aide-check.timer
 }
 
 command_is_available() {
@@ -632,15 +632,15 @@ verify_security_install() {
   systemctl is-active nftables.service >/dev/null 2>&1 || die "nftables.service is not active"
   systemctl is-active crowdsec.service >/dev/null 2>&1 || die "crowdsec.service is not active"
   systemctl is-active crowdsec-firewall-bouncer.service >/dev/null 2>&1 || die "crowdsec-firewall-bouncer.service is not active"
-  systemctl is-active debian-labwc-security-aide-check.timer >/dev/null 2>&1 || die "debian-labwc-security-aide-check.timer is not active"
+  systemctl is-active labwc-security-aide-check.timer >/dev/null 2>&1 || die "labwc-security-aide-check.timer is not active"
   systemctl is-enabled nftables.service >/dev/null 2>&1 || die "nftables.service is not enabled"
   systemctl is-enabled crowdsec.service >/dev/null 2>&1 || die "crowdsec.service is not enabled"
   systemctl is-enabled crowdsec-firewall-bouncer.service >/dev/null 2>&1 || die "crowdsec-firewall-bouncer.service is not enabled"
-  systemctl is-enabled debian-labwc-security-aide-check.timer >/dev/null 2>&1 || die "debian-labwc-security-aide-check.timer is not enabled"
+  systemctl is-enabled labwc-security-aide-check.timer >/dev/null 2>&1 || die "labwc-security-aide-check.timer is not enabled"
 }
 
 remove_security_install() {
-  run_cmd systemctl disable --now debian-labwc-security-aide-check.timer >/dev/null 2>&1 || true
+  run_cmd systemctl disable --now labwc-security-aide-check.timer >/dev/null 2>&1 || true
   run_cmd systemctl disable --now crowdsec-firewall-bouncer.service >/dev/null 2>&1 || true
   run_cmd systemctl disable --now crowdsec.service >/dev/null 2>&1 || true
   run_cmd systemctl disable --now nftables.service >/dev/null 2>&1 || true

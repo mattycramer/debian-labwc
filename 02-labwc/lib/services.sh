@@ -67,7 +67,7 @@ bootstrap_target_user_gpg_key() {
 
 stage_target_user_gpg_secret_seed() {
   local gpg_passphrase="$1"
-  local state_dir="$LABWC_TARGET_HOME/.local/state/debian-labwc"
+  local state_dir="$LABWC_TARGET_HOME/.local/state/labwc-session"
   local seed_path="$state_dir/kwallet-session-gpg-passphrase.seed"
   [[ -n "$gpg_passphrase" ]] || return 0
   run_cmd install -d -m 0700 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$state_dir"
@@ -84,23 +84,24 @@ install_root_files() {
   render_template_to_file "$(config_system_template_path "greetd/config.toml")" "/etc/greetd/config.toml" 0644
   render_template_to_file "$(config_system_template_path "greetd/10-vt.conf")" "/etc/systemd/system/greetd.service.d/10-vt.conf" 0644
   render_template_to_file "$(config_system_template_path "usr/share/wayland-sessions/labwc.desktop")" "/usr/share/wayland-sessions/labwc.desktop" 0644
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-session")" "/usr/local/bin/debian-labwc-session" 0755
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-power-menu")" "/usr/local/bin/debian-labwc-power-menu" 0755
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-screenshot-full")" "/usr/local/bin/debian-labwc-screenshot-full" 0755
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-screenshot-region")" "/usr/local/bin/debian-labwc-screenshot-region" 0755
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-record-toggle")" "/usr/local/bin/debian-labwc-record-toggle" 0755
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-dpms")" "/usr/local/bin/debian-labwc-dpms" 0755
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-refresh-outputs")" "/usr/local/bin/debian-labwc-refresh-outputs" 0755
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-lock")" "/usr/local/bin/debian-labwc-lock" 0755
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-launcher-menu")" "/usr/local/bin/debian-labwc-launcher-menu" 0755
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-module-menu")" "/usr/local/bin/debian-labwc-module-menu" 0755
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-player-status")" "/usr/local/bin/debian-labwc-player-status" 0755
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-unlock-gpg-key")" "/usr/local/bin/debian-labwc-unlock-gpg-key" 0755
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-workspacectl")" "/usr/local/bin/debian-labwc-workspacectl" 0755
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-workspace-activate")" "/usr/local/bin/debian-labwc-workspace-activate" 0755
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-workspace-send")" "/usr/local/bin/debian-labwc-workspace-send" 0755
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-workspace-state")" "/usr/local/bin/debian-labwc-workspace-state" 0755
-  render_template_to_file "$(config_system_template_path "usr/local/bin/debian-labwc-workspace-status")" "/usr/local/bin/debian-labwc-workspace-status" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-session")" "/usr/local/bin/labwc-session" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-power-menu")" "/usr/local/bin/labwc-power-menu" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-screenshot-full")" "/usr/local/bin/labwc-screenshot-full" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-screenshot-region")" "/usr/local/bin/labwc-screenshot-region" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-record-toggle")" "/usr/local/bin/labwc-record-toggle" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-dpms")" "/usr/local/bin/labwc-dpms" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-refresh-outputs")" "/usr/local/bin/labwc-refresh-outputs" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-lock")" "/usr/local/bin/labwc-lock" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-launcher-menu")" "/usr/local/bin/labwc-launcher-menu" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-module-menu")" "/usr/local/bin/labwc-module-menu" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-player-status")" "/usr/local/bin/labwc-player-status" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/thunar-extract-here")" "/usr/local/bin/thunar-extract-here" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-unlock-gpg-key")" "/usr/local/bin/labwc-unlock-gpg-key" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-workspacectl")" "/usr/local/bin/labwc-workspacectl" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-workspace-activate")" "/usr/local/bin/labwc-workspace-activate" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-workspace-send")" "/usr/local/bin/labwc-workspace-send" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-workspace-state")" "/usr/local/bin/labwc-workspace-state" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-workspace-status")" "/usr/local/bin/labwc-workspace-status" 0755
 }
 
 resolve_user_unit_path() {
@@ -210,6 +211,7 @@ nuke_all_state() {
   log_info "removing generated user config"
   remove_if_present "$LABWC_TARGET_HOME/.config/labwc"
   remove_if_present "$LABWC_TARGET_HOME/.config/waybar"
+  remove_if_present "$LABWC_TARGET_HOME/.config/Thunar"
   remove_if_present "$LABWC_TARGET_HOME/.config/kanshi"
   remove_if_present "$LABWC_TARGET_HOME/.config/wofi"
   remove_if_present "$LABWC_TARGET_HOME/.config/mako"
@@ -225,12 +227,11 @@ nuke_all_state() {
   remove_if_present "$LABWC_TARGET_HOME/.config/systemd/user/gpg-agent.service.d"
   remove_if_present "$LABWC_TARGET_HOME/.config/systemd/user/xdg-desktop-portal.service.d"
   remove_if_present "$LABWC_TARGET_HOME/.config/systemd/user/xdg-desktop-portal-wlr.service.d"
-  remove_if_present "$LABWC_TARGET_HOME/.config/debian-labwc"
-  remove_if_present "$LABWC_TARGET_HOME/.cache/debian-labwc/build/grouped-taskbar-daemon"
+  remove_if_present "$LABWC_TARGET_HOME/.config/labwc-session"
   remove_if_present "$LABWC_TARGET_HOME/.local/bin/xdg-terminal-exec"
-  remove_if_present "$LABWC_TARGET_HOME/.local/state/debian-labwc"
+  remove_if_present "$LABWC_TARGET_HOME/.local/state/labwc-session"
   remove_if_present "$LABWC_TARGET_HOME/.config/starship.toml"
-  remove_if_present "$LABWC_TARGET_HOME/.local/share/debian-labwc"
+  remove_if_present "$LABWC_TARGET_HOME/.local/share/labwc-session"
   remove_if_present "$LABWC_TARGET_HOME/.bashrc"
   remove_if_present "$LABWC_TARGET_HOME/.profile"
   remove_if_present "$LABWC_TARGET_HOME/.zshrc"
@@ -240,24 +241,24 @@ nuke_all_state() {
   remove_if_present "$LABWC_TARGET_HOME/.gnupg/gpg-agent.conf"
 
   log_info "removing installed helper scripts and session files"
-  remove_if_present "/usr/local/bin/debian-labwc-session"
-  remove_if_present "/usr/local/bin/debian-labwc-power-menu"
-  remove_if_present "/usr/local/bin/debian-labwc-screenshot-full"
-  remove_if_present "/usr/local/bin/debian-labwc-screenshot-region"
-  remove_if_present "/usr/local/bin/debian-labwc-record-toggle"
-  remove_if_present "/usr/local/bin/debian-labwc-dpms"
-  remove_if_present "/usr/local/bin/debian-labwc-refresh-outputs"
-  remove_if_present "/usr/local/bin/debian-labwc-lock"
-  remove_if_present "/usr/local/bin/debian-labwc-launcher-menu"
-  remove_if_present "/usr/local/bin/debian-labwc-module-menu"
-  remove_if_present "/usr/local/bin/debian-labwc-player-status"
-  remove_if_present "/usr/local/bin/debian-labwc-grouped-taskbar-daemon"
-  remove_if_present "/usr/local/bin/debian-labwc-unlock-gpg-key"
-  remove_if_present "/usr/local/bin/debian-labwc-workspacectl"
-  remove_if_present "/usr/local/bin/debian-labwc-workspace-activate"
-  remove_if_present "/usr/local/bin/debian-labwc-workspace-send"
-  remove_if_present "/usr/local/bin/debian-labwc-workspace-state"
-  remove_if_present "/usr/local/bin/debian-labwc-workspace-status"
+  remove_if_present "/usr/local/bin/labwc-session"
+  remove_if_present "/usr/local/bin/labwc-power-menu"
+  remove_if_present "/usr/local/bin/labwc-screenshot-full"
+  remove_if_present "/usr/local/bin/labwc-screenshot-region"
+  remove_if_present "/usr/local/bin/labwc-record-toggle"
+  remove_if_present "/usr/local/bin/labwc-dpms"
+  remove_if_present "/usr/local/bin/labwc-refresh-outputs"
+  remove_if_present "/usr/local/bin/labwc-lock"
+  remove_if_present "/usr/local/bin/labwc-launcher-menu"
+  remove_if_present "/usr/local/bin/labwc-module-menu"
+  remove_if_present "/usr/local/bin/labwc-player-status"
+  remove_if_present "/usr/local/bin/thunar-extract-here"
+  remove_if_present "/usr/local/bin/labwc-unlock-gpg-key"
+  remove_if_present "/usr/local/bin/labwc-workspacectl"
+  remove_if_present "/usr/local/bin/labwc-workspace-activate"
+  remove_if_present "/usr/local/bin/labwc-workspace-send"
+  remove_if_present "/usr/local/bin/labwc-workspace-state"
+  remove_if_present "/usr/local/bin/labwc-workspace-status"
   remove_if_present "/usr/share/wayland-sessions/labwc.desktop"
   remove_if_present "/etc/greetd/config.toml"
   remove_if_present "/etc/systemd/system/greetd.service.d/10-vt.conf"

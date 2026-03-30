@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+archive_path="${1:-}"
+
+die() {
+  printf 'thunar-extract-here: %s\n' "$1" >&2
+  exit 1
+}
+
+strip_archive_suffix() {
+  local filename="$1"
+  local -a suffixes=(
+    .tar.bz2
+    .tar.gz
+    .tar.lz
+    .tar.lz4
+    .tar.lzma
+    .tar.xz
+    .tar.zst
+    .tbz2
+    .tbz
+    .tgz
+    .txz
+    .tzst
+    .7z
+    .apk
+    .ar
+    .cab
+    .cpio
+    .deb
+    .gz
+    .iso
+    .lz
+    .lz4
+    .lzma
+    .rar
+    .rpm
+    .tar
+    .xz
+    .zip
+    .zst
+  )
+  local suffix
+
+  for suffix in "${suffixes[@]}"; do
+    if [[ "$filename" == *"$suffix" ]]; then
+      printf '%s\n' "${filename%"$suffix"}"
+      return 0
+    fi
+  done
+
+  printf '%s\n' "${filename%.*}"
+}
+
+extract_archive() {
+  local archive="$1"
+  local destination="$2"
+
+  if command -v bsdtar >/dev/null 2>&1; then
+    bsdtar -xf "$archive" -C "$destination"
+    return 0
+  fi
+
+  case "$archive" in
+    *.zip)
+      command -v unzip >/dev/null 2>&1 || die "missing unzip for '$archive'"
+      unzip -q "$archive" -d "$destination"
+      ;;
+    *)
+      command -v tar >/dev/null 2>&1 || die "missing tar for '$archive'"
+      tar -xf "$archive" -C "$destination"
+      ;;
+  esac
+}
+
+[[ -n "$archive_path" ]] || die "missing archive path"
+[[ -f "$archive_path" ]] || die "archive not found: $archive_path"
+
+archive_path="$(readlink -f -- "$archive_path")"
+archive_dir="$(dirname -- "$archive_path")"
+archive_name="$(basename -- "$archive_path")"
+target_name="$(strip_archive_suffix "$archive_name")"
+[[ -n "$target_name" && "$target_name" != "." && "$target_name" != "/" ]] || die "could not derive extraction folder for '$archive_name'"
+
+target_dir="$archive_dir/$target_name"
+[[ ! -e "$target_dir" ]] || die "target already exists: $target_dir"
+
+cleanup_target_dir() {
+  local status="$1"
+  if (( status != 0 )) && [[ -d "$target_dir" ]]; then
+    rm -rf -- "$target_dir"
+  fi
+}
+
+trap 'cleanup_target_dir "$?"' EXIT
+
+mkdir -p -- "$target_dir"
+extract_archive "$archive_path" "$target_dir"
+
+trap - EXIT
+
+if command -v thunar >/dev/null 2>&1; then
+  thunar "$target_dir" >/dev/null 2>&1 &
+fi

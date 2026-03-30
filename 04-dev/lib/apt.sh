@@ -102,7 +102,7 @@ install_dev_packages() {
 
 resolve_node_release() {
   local shasums_url="${NODE_DIST_BASE}/SHASUMS256.txt"
-  local shasums_file="/tmp/debian-labwc-04-dev-shasums.$$"
+  local shasums_file="/tmp/labwc-04-dev-shasums.$$"
   run_cmd runuser -u "$DEV_DOWNLOAD_USER" -- env HOME="$DEV_DOWNLOAD_HOME" TMPDIR=/tmp curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 120 --silent --show-error -o "$shasums_file" "$shasums_url"
   local line
   line="$(awk '/ node-v[0-9]+\.[0-9]+\.[0-9]+-linux-x64\.tar\.xz$/ {print $1, $2; exit}' "$shasums_file")"
@@ -128,7 +128,7 @@ install_node_runtime() {
   run_cmd install -d -m 0755 /usr/local/bin
 
   if [[ ! -x "$install_dir/bin/node" ]]; then
-    tmpdir="/tmp/debian-labwc-04-dev-node.$$"
+    tmpdir="/tmp/labwc-04-dev-node.$$"
     run_cmd runuser -u "$DEV_DOWNLOAD_USER" -- rm -rf -- "$tmpdir"
     run_cmd runuser -u "$DEV_DOWNLOAD_USER" -- mkdir -p "$tmpdir"
     tarball_path="${tmpdir}/${NODE_TARBALL}"

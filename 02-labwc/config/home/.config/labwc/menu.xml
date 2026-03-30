@@ -20,7 +20,7 @@
       <action name="Execute"><command>pavucontrol</command></action>
     </item>
     <item label="Power">
-      <action name="Execute"><command>/usr/local/bin/debian-labwc-power-menu</command></action>
+      <action name="Execute"><command>/usr/local/bin/labwc-power-menu</command></action>
     </item>
   </menu>
 </openbox_menu>

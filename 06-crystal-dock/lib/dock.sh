@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
-readonly CRYSTAL_DOCK_AUTOSTART_MARKER_BEGIN="# >>> MANAGED BY debian-labwc crystal-dock >>>"
-readonly CRYSTAL_DOCK_AUTOSTART_MARKER_END="# <<< MANAGED BY debian-labwc crystal-dock <<<"
-readonly CRYSTAL_DOCK_WRAPPER_PATH="/usr/local/bin/debian-labwc-crystal-dock"
+readonly CRYSTAL_DOCK_AUTOSTART_MARKER_BEGIN="# >>> MANAGED BY labwc crystal-dock >>>"
+readonly CRYSTAL_DOCK_AUTOSTART_MARKER_END="# <<< MANAGED BY labwc crystal-dock <<<"
+readonly CRYSTAL_DOCK_WRAPPER_PATH="/usr/local/bin/labwc-crystal-dock"
 readonly CRYSTAL_DOCK_AUTOSTART_FRAGMENT_PATH_REL=".config/labwc/autostart.d/60-crystal-dock.sh"
 readonly CRYSTAL_DOCK_BIN_PATH="/usr/bin/crystal-dock"
 readonly CRYSTAL_DOCK_DESKTOP_PATH="/usr/share/applications/crystal-dock.desktop"
@@ -123,12 +123,12 @@ render_crystal_dock_autostart_fragment() {
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-command -v /usr/local/bin/debian-labwc-crystal-dock >/dev/null 2>&1 || exit 0
+command -v /usr/local/bin/labwc-crystal-dock >/dev/null 2>&1 || exit 0
 pgrep -u "$(id -u)" -x crystal-dock >/dev/null 2>&1 && exit 0
 
 (
   sleep 2
-  pgrep -u "$(id -u)" -x crystal-dock >/dev/null 2>&1 || exec /usr/local/bin/debian-labwc-crystal-dock
+  pgrep -u "$(id -u)" -x crystal-dock >/dev/null 2>&1 || exec /usr/local/bin/labwc-crystal-dock
 ) >/dev/null 2>&1 &
 EOF
 )"
@@ -242,7 +242,7 @@ verify_crystal_dock_install() {
   grep -F "position=${CRYSTAL_DOCK_POSITION}" "$panel_path" >/dev/null || die "panel config missing expected position"
   grep -F "showTaskManager=${CRYSTAL_DOCK_SHOW_TASK_MANAGER}" "$panel_path" >/dev/null || die "panel config missing expected task manager state"
   grep -F 'sleep 2' "$autostart_fragment_path" >/dev/null || die "crystal-dock autostart fragment missing compositor readiness delay"
-  grep -F 'exec /usr/local/bin/debian-labwc-crystal-dock' "$autostart_fragment_path" >/dev/null || die "labwc autostart fragment missing crystal-dock launcher"
+  grep -F 'exec /usr/local/bin/labwc-crystal-dock' "$autostart_fragment_path" >/dev/null || die "labwc autostart fragment missing crystal-dock launcher"
   grep -F '.config/labwc/autostart.d' "$autostart_path" >/dev/null || die "labwc autostart is not wired to execute autostart fragments"
 
   [[ "$(stat -c '%U:%G' "$appearance_path")" == "$DOCK_TARGET_USER:$DOCK_TARGET_USER" ]] || die "appearance config ownership is wrong"

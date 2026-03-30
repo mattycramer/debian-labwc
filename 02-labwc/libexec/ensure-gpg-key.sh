@@ -10,7 +10,7 @@ command -v gpg >/dev/null 2>&1 || {
 export GNUPGHOME="${GNUPGHOME:-$HOME/.gnupg}"
 install -d -m 0700 "$GNUPGHOME"
 chmod 0700 "$GNUPGHOME"
-state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/debian-labwc"
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/labwc-session"
 fingerprint_path="${state_dir}/kwallet-session-gpg.fpr"
 
 has_encryption_secret_key() {

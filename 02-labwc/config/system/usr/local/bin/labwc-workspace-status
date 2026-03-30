@@ -3,7 +3,7 @@ set -Eeuo pipefail
 IFS=$'\n\t'
 
 workspace="${1:-}"
-state_file="${XDG_STATE_HOME:-$HOME/.local/state}/debian-labwc/current-workspace"
+state_file="${XDG_STATE_HOME:-$HOME/.local/state}/labwc-session/current-workspace"
 active_workspace="1"
 css_class='["inactive"]'
 
@@ -12,8 +12,8 @@ case "$workspace" in
   *) exit 1 ;;
 esac
 
-if command -v /usr/local/bin/debian-labwc-workspacectl >/dev/null 2>&1; then
-  if status_json="$(/usr/local/bin/debian-labwc-workspacectl status "$workspace" 2>/dev/null)"; then
+if command -v /usr/local/bin/labwc-workspacectl >/dev/null 2>&1; then
+  if status_json="$(/usr/local/bin/labwc-workspacectl status "$workspace" 2>/dev/null)"; then
     printf '%s\n' "$status_json"
     exit 0
   fi

@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-state_dir="$HOME/.config/debian-labwc"
+state_dir="$HOME/.config/labwc-session"
 marker_file="$state_dir/.outputs-refined"
 internal_output="@INTERNAL_OUTPUT@"
 external_output="@EXTERNAL_OUTPUT@"

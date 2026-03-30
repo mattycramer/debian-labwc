@@ -13,8 +13,6 @@
 @define-color red #ef4444;
 @define-color mauve #c4b5fd;
 
-@import url("grouped-taskbar.generated.css");
-
 * {
   font-family: "Noto Sans", "Font Awesome 6 Free", "Material Design Icons";
   font-size: 13px;
@@ -35,6 +33,7 @@ window#waybar {
 #custom-workspace-4,
 #custom-gpulaunch,
 #custom-updates,
+#taskbar,
 #clock,
 #network,
 #pulseaudio,
@@ -67,6 +66,47 @@ window#waybar {
   padding: 0 11px;
   color: @text;
   font-weight: 600;
+}
+
+#taskbar {
+  padding: 0 4px;
+}
+
+#taskbar button {
+  margin: 0 4px 0 0;
+  padding: 0 8px;
+  min-width: 34px;
+  min-height: 26px;
+  border-radius: 14px;
+  background: @panel_alt;
+  border: 1px solid @border;
+  color: @text;
+  box-shadow: none;
+}
+
+#taskbar button:hover {
+  background: @panel_hover;
+  border-color: @border_strong;
+  box-shadow: none;
+}
+
+#taskbar button.active {
+  background: rgba(109, 196, 237, 0.18);
+  border-color: rgba(109, 196, 237, 0.42);
+  color: @sky;
+}
+
+#taskbar button.active:hover {
+  background: rgba(109, 196, 237, 0.24);
+  border-color: rgba(109, 196, 237, 0.52);
+}
+
+#taskbar button.minimized {
+  color: @muted;
+}
+
+#taskbar button image {
+  -gtk-icon-transform: scale(1);
 }
 
 #custom-workspace-1.active,

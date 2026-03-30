@@ -3,7 +3,7 @@ set -Eeuo pipefail
 IFS=$'\n\t'
 
 workspace="${1:-}"
-state_root="${XDG_STATE_HOME:-$HOME/.local/state}/debian-labwc"
+state_root="${XDG_STATE_HOME:-$HOME/.local/state}/labwc-session"
 state_file="$state_root/current-workspace"
 
 case "$workspace" in
@@ -11,8 +11,8 @@ case "$workspace" in
   *) exit 1 ;;
 esac
 
-command -v /usr/local/bin/debian-labwc-workspacectl >/dev/null 2>&1 || exit 1
-/usr/local/bin/debian-labwc-workspacectl activate "$workspace"
+command -v /usr/local/bin/labwc-workspacectl >/dev/null 2>&1 || exit 1
+/usr/local/bin/labwc-workspacectl activate "$workspace"
 
 mkdir -p "$state_root"
 printf '%s\n' "$workspace" >"$state_file"

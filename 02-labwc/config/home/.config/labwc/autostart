@@ -5,8 +5,24 @@ IFS='
 
 export XDG_CURRENT_DESKTOP=labwc:wlroots
 
+current_uid="$(id -u)"
+
+wait_for_wayland_display() {
+  display_name="${WAYLAND_DISPLAY:-wayland-0}"
+  display_socket="${XDG_RUNTIME_DIR:-/run/user/${current_uid}}/${display_name}"
+  attempt=1
+  while [ "$attempt" -le 20 ]; do
+    if [ -S "$display_socket" ]; then
+      return 0
+    fi
+    sleep 1
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
 wait_for_session_bus() {
-  bus_socket="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus"
+  bus_socket="${XDG_RUNTIME_DIR:-/run/user/${current_uid}}/bus"
   attempt=1
   while [ "$attempt" -le 10 ]; do
     if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] || [ -S "$bus_socket" ]; then
@@ -59,8 +75,21 @@ update_activation_environment() {
   fi
 }
 
-pgrep -x foot >/dev/null 2>&1 || foot --server &
-pgrep -x swaybg >/dev/null 2>&1 || swaybg -i "@BACKGROUND_WALLPAPER_PATH@" -m "@WALLPAPER_MODE@" &
+start_bg_once() {
+  process_name="$1"
+  shift
+  if ! command -v "$1" >/dev/null 2>&1; then
+    return 0
+  fi
+  if pgrep -u "$current_uid" -x "$process_name" >/dev/null 2>&1; then
+    return 0
+  fi
+  "$@" >/dev/null 2>&1 &
+}
+
+wait_for_wayland_display || true
+start_bg_once foot foot --server
+start_bg_once swaybg swaybg -i "@BACKGROUND_WALLPAPER_PATH@" -m "@WALLPAPER_MODE@"
 
 wait_for_session_bus || true
 wait_for_system_bus || true
@@ -81,32 +110,30 @@ update_activation_environment \
   QT_WAYLAND_DISABLE_WINDOWDECORATION
 
 warm_polkit_service || true
-pgrep -x polkit-kde-authentication-agent-1 >/dev/null 2>&1 || /usr/lib/x86_64-linux-gnu/libexec/polkit-kde-authentication-agent-1 &
-/usr/local/bin/debian-labwc-workspace-state 1 >/dev/null 2>&1 || true
-grouped_taskbar_script="@TARGET_HOME@/.config/waybar/scripts/grouped-taskbar.py"
-grouped_taskbar_daemon="/usr/local/bin/debian-labwc-grouped-taskbar-daemon"
-if [ -x "$grouped_taskbar_script" ] && [ -x "$grouped_taskbar_daemon" ]; then
-  "$grouped_taskbar_script" render >/dev/null 2>&1 || true
-  pgrep -f "$grouped_taskbar_daemon" >/dev/null 2>&1 || "$grouped_taskbar_daemon" >/dev/null 2>&1 &
+if ! pgrep -u "$current_uid" -f '/polkit-kde-authentication-agent-1([[:space:]]|$)' >/dev/null 2>&1; then
+  /usr/lib/x86_64-linux-gnu/libexec/polkit-kde-authentication-agent-1 >/dev/null 2>&1 &
 fi
-pgrep -x waybar >/dev/null 2>&1 || waybar &
-if [ ! -f "@TARGET_HOME@/.config/debian-labwc/.outputs-refined" ]; then
-  /usr/local/bin/debian-labwc-refresh-outputs >/dev/null 2>&1 || true
+/usr/local/bin/labwc-workspace-state 1 >/dev/null 2>&1 || true
+if [ ! -f "@TARGET_HOME@/.config/labwc-session/.outputs-refined" ]; then
+  /usr/local/bin/labwc-refresh-outputs >/dev/null 2>&1 || true
 else
-  pgrep -x kanshi >/dev/null 2>&1 || kanshi &
+  start_bg_once kanshi kanshi
 fi
-pgrep -x mako >/dev/null 2>&1 || mako &
-if command -v /usr/local/bin/debian-labwc-unlock-gpg-key >/dev/null 2>&1; then
+start_bg_once mako mako
+start_bg_once waybar waybar --config "@TARGET_HOME@/.config/waybar/config.jsonc" --style "@TARGET_HOME@/.config/waybar/style.css"
+if command -v /usr/local/bin/labwc-unlock-gpg-key >/dev/null 2>&1; then
   (
     sleep 1
-    /usr/local/bin/debian-labwc-unlock-gpg-key
+    /usr/local/bin/labwc-unlock-gpg-key
   ) >/dev/null 2>&1 &
 fi
-pgrep -x swayidle >/dev/null 2>&1 || swayidle \
-  timeout "@IDLE_LOCK_SECONDS@" '/usr/local/bin/debian-labwc-lock' \
-  timeout "@IDLE_DPMS_SECONDS@" '/usr/local/bin/debian-labwc-dpms off' \
-  resume '/usr/local/bin/debian-labwc-dpms on' \
-  before-sleep '/usr/local/bin/debian-labwc-lock' &
+if ! pgrep -u "$current_uid" -x swayidle >/dev/null 2>&1; then
+  swayidle \
+  timeout "@IDLE_LOCK_SECONDS@" '/usr/local/bin/labwc-lock' \
+  timeout "@IDLE_DPMS_SECONDS@" '/usr/local/bin/labwc-dpms off' \
+  resume '/usr/local/bin/labwc-dpms on' \
+  before-sleep '/usr/local/bin/labwc-lock' >/dev/null 2>&1 &
+fi
 
 autostart_dir="@TARGET_HOME@/.config/labwc/autostart.d"
 if [ -d "$autostart_dir" ]; then

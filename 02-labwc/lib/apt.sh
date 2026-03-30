@@ -90,8 +90,10 @@ readonly SID_PACKAGES=(
   fonts-weather-icons
   adwaita-icon-theme
   file-roller
+  libarchive-tools
   geeqie
   mousepad
+  zathura
   ripgrep
   fd-find
   tmux

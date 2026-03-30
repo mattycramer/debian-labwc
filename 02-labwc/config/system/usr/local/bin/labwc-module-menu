@@ -169,7 +169,7 @@ case "$category:$action" in
       "Open system monitor") run_terminal "System Monitor" 'exec btop' ;;
       "Memory details") run_terminal "Memory" 'free -h; printf "\n"; swapon --show; printf "\nPress Enter to close..."; read -r _' ;;
       "Storage menu") exec "$0" storage menu ;;
-      "Power menu") exec /usr/local/bin/debian-labwc-power-menu ;;
+      "Power menu") exec /usr/local/bin/labwc-power-menu ;;
       *) exit 0 ;;
     esac
     ;;

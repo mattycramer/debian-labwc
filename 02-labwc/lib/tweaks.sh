@@ -9,7 +9,7 @@ readonly XKB_INCLUDE_PATH="/usr/include/xkbcommon/xkbcommon.h"
 readonly XKB_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu/libxkbcommon.so"
 
 labwc_tweaks_cache_root() {
-  printf '%s/.cache/debian-labwc/labwc-tweaks\n' "$LABWC_TARGET_HOME"
+  printf '%s/.cache/labwc-session/labwc-tweaks\n' "$LABWC_TARGET_HOME"
 }
 
 labwc_tweaks_archive_path() {
@@ -29,7 +29,7 @@ prepare_labwc_tweaks_cache() {
   cache_root="$(labwc_tweaks_cache_root)"
   run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
     "$LABWC_TARGET_HOME/.cache" \
-    "$LABWC_TARGET_HOME/.cache/debian-labwc" \
+    "$LABWC_TARGET_HOME/.cache/labwc-session" \
     "$cache_root"
 }
 

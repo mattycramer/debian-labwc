@@ -77,6 +77,6 @@ case "$selection" in
   "Mullvad VPN") run_gui mullvad-vpn ;;
   "Bitwarden") run_gui bitwarden ;;
   "Network") run_terminal "Network" 'exec nmtui' ;;
-  "Power") exec /usr/local/bin/debian-labwc-power-menu ;;
+  "Power") exec /usr/local/bin/labwc-power-menu ;;
   *) exit 0 ;;
 esac

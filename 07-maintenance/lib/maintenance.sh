@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-readonly MAINTENANCE_RUNTIME_ROOT="/var/lib/debian-labwc-maintenance"
+readonly MAINTENANCE_RUNTIME_ROOT="/var/lib/labwc-maintenance"
 readonly MAINTENANCE_STATE_FILE="${MAINTENANCE_RUNTIME_ROOT}/state.env"
 readonly GRUB_BTRFS_CLONE_DIR="/tmp/grub-btrfs"
 readonly GRUB_BTRFS_COMMIT_FILE="${MAINTENANCE_RUNTIME_ROOT}/grub-btrfs.commit"
@@ -22,9 +22,9 @@ readonly GRUB_CUSTOM_CFG_PATH="/boot/grub/custom.cfg"
 readonly TIMESHIFT_HOURLY_CRON_NAME="timeshift-hourly"
 readonly BTRFSMAINT_CONFIG_PATH="/etc/default/btrfsmaintenance"
 readonly BTRFS_SCRUB_DROPIN_DIR="/etc/systemd/system/btrfs-scrub.timer.d"
-readonly BTRFS_SCRUB_DROPIN_PATH="/etc/systemd/system/btrfs-scrub.timer.d/zz-debian-labwc.conf"
+readonly BTRFS_SCRUB_DROPIN_PATH="/etc/systemd/system/btrfs-scrub.timer.d/zz-labwc.conf"
 readonly BTRFS_BALANCE_DROPIN_DIR="/etc/systemd/system/btrfs-balance.timer.d"
-readonly BTRFS_BALANCE_DROPIN_PATH="/etc/systemd/system/btrfs-balance.timer.d/zz-debian-labwc.conf"
+readonly BTRFS_BALANCE_DROPIN_PATH="/etc/systemd/system/btrfs-balance.timer.d/zz-labwc.conf"
 
 write_root_file() {
   local destination="$1"
@@ -194,7 +194,7 @@ EOF
 render_btrfsmaintenance_config() {
   local content
   content="$(cat <<'EOF'
-# Managed by debian-labwc 07-maintenance.
+# Managed by labwc 07-maintenance.
 # Use btrfsmaintenance's device-deduplicating "auto" mountpoint mode so each
 # mounted Btrfs block device is handled once, regardless of how many subvolumes
 # are mounted from it.
@@ -224,7 +224,7 @@ render_grub_btrfs_config() {
   content="$(cat <<EOF
 #!/usr/bin/env bash
 
-# Managed by debian-labwc 07-maintenance.
+# Managed by labwc 07-maintenance.
 GRUB_BTRFS_LIMIT="${GRUB_BTRFS_LIMIT}"
 GRUB_BTRFS_SHOW_SNAPSHOTS_FOUND="${GRUB_BTRFS_SHOW_SNAPSHOTS_FOUND}"
 GRUB_BTRFS_GRUB_DIRNAME="/boot/grub"

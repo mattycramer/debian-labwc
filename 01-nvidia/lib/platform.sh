@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 readonly DEBIAN_ARCHIVE_KEYRING_PATH="/usr/share/keyrings/debian-archive-keyring.gpg"
-readonly DEBIAN_COMPONENTS_SOURCE_PATH="/etc/apt/sources.list.d/debian-labwc-nvidia-debian.sources"
+readonly DEBIAN_COMPONENTS_SOURCE_PATH="/etc/apt/sources.list.d/labwc-nvidia-debian.sources"
 readonly NVIDIA_VENDOR_HEX="0x10de"
 readonly INTEL_VENDOR_HEX="0x8086"
 
