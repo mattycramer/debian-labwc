@@ -75,3 +75,15 @@ require_safe_token() {
   local value="$2"
   [[ "$value" =~ ^[A-Za-z0-9._:-]+$ ]] || die "$label contains unsupported characters: '$value'"
 }
+
+require_loopback_bind_address() {
+  local label="$1"
+  local value="$2"
+  case "$value" in
+    127.0.0.1|::1)
+      ;;
+    *)
+      die "$label must stay bound to a loopback address for this hardened profile, found '$value'"
+      ;;
+  esac
+}

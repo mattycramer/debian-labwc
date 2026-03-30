@@ -63,6 +63,7 @@ phase_doctor() {
   require_debian_trixie
   require_amd64
   require_command apt
+  require_command apt-cache
   require_command awk
   require_command findmnt
   require_command getent

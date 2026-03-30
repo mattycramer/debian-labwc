@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 
+readonly SID_SUITE="sid"
 readonly QBT_PACKAGES=(
-  qbittorrent-nox
   apparmor
   apparmor-utils
+)
+readonly QBT_SID_PACKAGES=(
+  qbittorrent-nox
 )
 
 retry_cmd() {
@@ -38,6 +41,8 @@ install_qbittorrent_packages() {
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
     apt install --no-install-recommends "${apt_args[@]}" "${QBT_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
+    apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${QBT_SID_PACKAGES[@]}"
 }
 
 package_is_installed() {

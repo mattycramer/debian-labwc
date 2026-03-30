@@ -21,6 +21,33 @@ verify_packages() {
   for pkg in "${QBT_PACKAGES[@]}"; do
     package_is_installed "$pkg" || die "package '$pkg' is not installed"
   done
+  for pkg in "${QBT_SID_PACKAGES[@]}"; do
+    package_is_installed "$pkg" || die "package '$pkg' is not installed"
+  done
+}
+
+verify_qbittorrent_sid_origin() {
+  local installed_version
+  installed_version="$(apt-cache policy qbittorrent-nox | awk '/^[[:space:]]*Installed: /{print $2; exit}')"
+  [[ -n "$installed_version" ]] || die "could not determine the installed qbittorrent-nox version"
+  [[ "$installed_version" != "(none)" ]] || die "qbittorrent-nox is not installed"
+
+  apt-cache policy qbittorrent-nox | awk -v version="$installed_version" '
+    $1 == "***" && $2 == version {
+      in_installed = 1
+      next
+    }
+    in_installed && /sid/ {
+      found = 1
+      exit
+    }
+    in_installed && $1 == "Version" {
+      in_installed = 0
+    }
+    END {
+      exit found ? 0 : 1
+    }
+  ' || die "installed qbittorrent-nox version '$installed_version' does not resolve through a sid policy stanza"
 }
 
 verify_detection_state() {
@@ -39,7 +66,7 @@ verify_mounts() {
 }
 
 verify_service_account() {
-  local home shell expected_shell primary_group
+  local home shell expected_shell primary_group supplementary_groups shadow_hash
   getent group "$QBT_SERVICE_GROUP" >/dev/null 2>&1 || die "missing group '$QBT_SERVICE_GROUP'"
   id "$QBT_SERVICE_USER" >/dev/null 2>&1 || die "missing user '$QBT_SERVICE_USER'"
 
@@ -47,10 +74,20 @@ verify_service_account() {
   shell="$(getent passwd "$QBT_SERVICE_USER" | awk -F: '{print $7}')"
   expected_shell="$(readlink -f "$(torrent_nologin_shell)")"
   primary_group="$(id -gn "$QBT_SERVICE_USER")"
+  supplementary_groups="$(id -nG "$QBT_SERVICE_USER" | tr ' ' '\n' | grep -Fvx "$QBT_SERVICE_GROUP" || true)"
+  shadow_hash="$(getent shadow "$QBT_SERVICE_USER" | awk -F: '{print $2}')"
 
   [[ "$home" == "/nonexistent" ]] || die "torrent service account home is '$home', expected '/nonexistent'"
   [[ "$(readlink -f "$shell")" == "$expected_shell" ]] || die "torrent service account shell is '$shell', expected nologin"
   [[ "$primary_group" == "$QBT_SERVICE_GROUP" ]] || die "torrent service account primary group is '$primary_group', expected '$QBT_SERVICE_GROUP'"
+  [[ -z "$supplementary_groups" ]] || die "torrent service account has unexpected supplementary groups: $supplementary_groups"
+  case "$shadow_hash" in
+    '!'*|'*')
+      ;;
+    *)
+      die "torrent service account password is not locked"
+      ;;
+  esac
   id -nG "$QBT_TARGET_USER" | tr ' ' '\n' | grep -Fx "$QBT_SERVICE_GROUP" >/dev/null 2>&1 || die "target user '$QBT_TARGET_USER' is not a member of '$QBT_SERVICE_GROUP'"
 }
 
@@ -63,10 +100,10 @@ verify_runtime_paths() {
   require_file "$QBT_SERVICE_PATH"
   require_file "$QBT_APPARMOR_PROFILE_PATH"
 
-  assert_path_state "$QBT_RUNTIME_ROOT" "$QBT_SERVICE_USER" "$QBT_SERVICE_GROUP" "750"
-  assert_path_state "$QBT_CONFIG_DIR" "$QBT_SERVICE_USER" "$QBT_SERVICE_GROUP" "750"
-  assert_path_state "$QBT_DATA_DIR" "$QBT_SERVICE_USER" "$QBT_SERVICE_GROUP" "750"
-  assert_path_state "$QBT_CONFIG_PATH" "$QBT_SERVICE_USER" "$QBT_SERVICE_GROUP" "640"
+  assert_path_state "$QBT_RUNTIME_ROOT" "$QBT_SERVICE_USER" "$QBT_SERVICE_GROUP" "700"
+  assert_path_state "$QBT_CONFIG_DIR" "$QBT_SERVICE_USER" "$QBT_SERVICE_GROUP" "700"
+  assert_path_state "$QBT_DATA_DIR" "$QBT_SERVICE_USER" "$QBT_SERVICE_GROUP" "700"
+  assert_path_state "$QBT_CONFIG_PATH" "$QBT_SERVICE_USER" "$QBT_SERVICE_GROUP" "600"
   assert_path_state "$QBT_MOUNT_CHECK_PATH" "root" "root" "755"
   assert_path_state "$QBT_SERVICE_PATH" "root" "root" "644"
   assert_path_state "$QBT_APPARMOR_PROFILE_PATH" "root" "root" "644"
@@ -86,6 +123,7 @@ verify_config_file() {
   grep -E '^WebUI\\Password_PBKDF2=@ByteArray\(.+\)$' "$QBT_CONFIG_PATH" >/dev/null || die "qBittorrent config does not contain a PBKDF2 WebUI password hash"
   grep -F 'WebUI\LocalHostAuth=false' "$QBT_CONFIG_PATH" >/dev/null || die "qBittorrent config must keep localhost auth disabled in favor of password auth"
   grep -F 'WebUI\AuthSubnetWhitelistEnabled=false' "$QBT_CONFIG_PATH" >/dev/null || die "qBittorrent config must keep auth subnet bypass disabled"
+  grep -F 'WebUI\SecureCookie=true' "$QBT_CONFIG_PATH" >/dev/null || die "qBittorrent config must keep secure cookies enabled"
   grep -F 'WebUI\HostHeaderValidation=true' "$QBT_CONFIG_PATH" >/dev/null || die "qBittorrent config must keep host header validation enabled"
   grep -F 'Application\FileLoggerEnabled=false' "$QBT_CONFIG_PATH" >/dev/null || die "qBittorrent config must rely on journal logging only"
 }
@@ -131,6 +169,7 @@ verify_apparmor_profile() {
 
 verify_install() {
   verify_packages
+  verify_qbittorrent_sid_origin
   verify_detection_state
   verify_mounts
   verify_service_account

@@ -126,9 +126,12 @@ export EDITOR=nano
 export VISUAL=nano
 export HISTSIZE=10000
 export HISTFILESIZE=20000
+export CLICOLOR=1
+export LS_COLORS='di=1;38;2;125;211;252:ln=1;38;2;109;196;237:so=38;2;148;210;189:pi=38;2;246;189;96:ex=1;38;2;148;210;189:bd=1;38;2;255;180;162:cd=1;38;2;255;180;162:su=37;41:sg=30;43:tw=30;42:ow=30;43:*.tar=38;2;196;181;253:*.tgz=38;2;196;181;253:*.gz=38;2;196;181;253:*.zip=38;2;196;181;253:*.xz=38;2;196;181;253:*.zst=38;2;196;181;253:*.bz2=38;2;196;181;253:*.7z=38;2;196;181;253:*.jpg=38;2;246;189;96:*.jpeg=38;2;246;189;96:*.png=38;2;246;189;96:*.gif=38;2;246;189;96:*.webp=38;2;246;189;96:*.svg=38;2;246;189;96:*.mp3=38;2;196;181;253:*.flac=38;2;196;181;253:*.wav=38;2;196;181;253:*.mp4=38;2;196;181;253:*.mkv=38;2;196;181;253:*.mov=38;2;196;181;253'
 
-alias ll='ls -alFh'
-alias la='ls -A'
+alias ls='ls --color=auto --group-directories-first'
+alias ll='ls --color=auto --group-directories-first -alFh'
+alias la='ls --color=auto --group-directories-first -A'
 
 if [[ -f /etc/bash_completion ]]; then
   # shellcheck disable=SC1091
@@ -211,9 +214,12 @@ export VISUAL=nano
 export HISTSIZE=10000
 export HISTFILESIZE=20000
 SAVEHIST="${HISTFILESIZE}"
+export CLICOLOR=1
+export LS_COLORS='di=1;38;2;125;211;252:ln=1;38;2;109;196;237:so=38;2;148;210;189:pi=38;2;246;189;96:ex=1;38;2;148;210;189:bd=1;38;2;255;180;162:cd=1;38;2;255;180;162:su=37;41:sg=30;43:tw=30;42:ow=30;43:*.tar=38;2;196;181;253:*.tgz=38;2;196;181;253:*.gz=38;2;196;181;253:*.zip=38;2;196;181;253:*.xz=38;2;196;181;253:*.zst=38;2;196;181;253:*.bz2=38;2;196;181;253:*.7z=38;2;196;181;253:*.jpg=38;2;246;189;96:*.jpeg=38;2;246;189;96:*.png=38;2;246;189;96:*.gif=38;2;246;189;96:*.webp=38;2;246;189;96:*.svg=38;2;246;189;96:*.mp3=38;2;196;181;253:*.flac=38;2;196;181;253:*.wav=38;2;196;181;253:*.mp4=38;2;196;181;253:*.mkv=38;2;196;181;253:*.mov=38;2;196;181;253'
 
-alias ll='ls -alFh'
-alias la='ls -A'
+alias ls='ls --color=auto --group-directories-first'
+alias ll='ls --color=auto --group-directories-first -alFh'
+alias la='ls --color=auto --group-directories-first -A'
 
 autoload -Uz compinit
 compinit
@@ -281,11 +287,11 @@ EOF
 )"
   starship="$(cat <<'EOF'
 add_newline = true
-command_timeout = 1200
-scan_timeout = 30
+command_timeout = 1000
+scan_timeout = 20
 palette = "labwc"
 format = """
-$username$hostname$directory$git_branch$git_status$fill$cmd_duration
+$username$hostname$directory$git_branch$git_status$git_state$cmd_duration
 $character
 """
 
@@ -302,19 +308,15 @@ mauve = "#c4b5fd"
 panel = "#0f1720"
 
 [username]
-show_always = true
+show_always = false
 style_user = "bold amber"
 style_root = "bold red"
-format = "[$user](style)@"
+format = "[$user](style) "
 
 [hostname]
-ssh_only = false
+ssh_only = true
 style = "bold cyan"
-format = "[$hostname ](style)"
-
-[fill]
-symbol = " "
-style = "muted"
+format = "[@$hostname](style) "
 
 [character]
 success_symbol = "[>](bold mint)"
@@ -326,29 +328,35 @@ vimcmd_visual_symbol = "[<](bold mauve)"
 
 [directory]
 style = "bold sky"
-format = "[$path ](style)"
+format = "[$path](style) "
 home_symbol = "~"
-truncation_length = 4
+truncation_length = 3
 truncate_to_repo = false
 read_only = " ro"
 
+[directory.substitutions]
+"Documents" = "docs"
+"Downloads" = "dl"
+"Pictures" = "img"
+"Projects" = "proj"
+
 [git_branch]
-symbol = "git:"
+symbol = "git "
 style = "bold mauve"
-format = "[${symbol}$branch ](style)"
+format = "[${symbol}$branch](style) "
 
 [git_status]
 style = "bold rose"
-format = "[$all_status$ahead_behind ](style)"
+format = "[$all_status$ahead_behind](style) "
 
 [git_state]
 style = "bold rose"
-format = "[$state($progress_current/$progress_total) ](style)"
+format = "[$state($progress_current/$progress_total)](style) "
 
 [cmd_duration]
-min_time = 1500
+min_time = 1200
 style = "bold muted"
-format = "[took $duration](style)"
+format = "[$duration](style) "
 EOF
 )"
   nanorc="$(cat <<'EOF'
@@ -1225,12 +1233,12 @@ render_waybar_config() {
   "layer": "top",
   "position": "top",
   "height": 42,
-  "spacing": 6,
+  "spacing": 4,
   "modules-left": ["custom/launcher", "custom/workspace-1", "custom/workspace-2", "custom/workspace-3", "custom/workspace-4"],
   "modules-center": ["wlr/taskbar"],
   "modules-right": ["custom/gpulaunch", "custom/updates", "network", "pulseaudio", "battery", "backlight", "cpu", "memory", "disk", "custom/player", "clock", "tray", "custom/power"],
   "custom/launcher": {
-    "format": "Menu",
+    "format": "Apps",
     "tooltip": false,
     "on-click": "/usr/local/bin/debian-labwc-launcher-menu",
     "on-click-right": "wofi --show drun"
@@ -1298,14 +1306,14 @@ render_waybar_config() {
     "on-click": "${upgrade_script}"
   },
   "custom/gpulaunch": {
-    "format": "Nvidia GPU",
+    "format": "dGPU",
     "tooltip": true,
     "tooltip-format": "Launch app on Nvidia GPU",
     "on-click": "${gpulaunch_script}"
   },
   "clock": {
     "interval": 30,
-    "format": "{:%a %b %d  %H:%M}",
+    "format": "{:%a %H:%M}",
     "format-alt": "{:%Y-%m-%d  %H:%M:%S}",
     "tooltip": true,
     "tooltip-format": "<tt><small>{calendar}</small></tt>",
@@ -1333,11 +1341,11 @@ render_waybar_config() {
   "network": {
     "interval": 5,
     "family": "ipv4",
-    "format-wifi": "WiFi  {essid}",
-    "format-ethernet": "LAN  {ifname}",
-    "format-linked": "LAN  {ifname} (no ip)",
-    "format-disconnected": "Net  offline",
-    "format-disabled": "Net  down",
+    "format-wifi": "WiFi {signalStrength}%",
+    "format-ethernet": "LAN",
+    "format-linked": "LAN ?",
+    "format-disconnected": "Net off",
+    "format-disabled": "Net off",
     "tooltip-format-wifi": "{essid}\n{signalStrength}%  {ipaddr}\n↑ {bandwidthUpBytes}  ↓ {bandwidthDownBytes}",
     "tooltip-format-ethernet": "{ifname}\n{ipaddr}\n↑ {bandwidthUpBytes}  ↓ {bandwidthDownBytes}",
     "tooltip-format-disconnected": "Network disconnected",
@@ -1371,7 +1379,7 @@ render_waybar_config() {
     "on-click-right": "/usr/local/bin/debian-labwc-module-menu battery details"
   },
   "backlight": {
-    "format": "Bright  {percent}%",
+    "format": "Bri {percent}%",
     "scroll-step": 5,
     "tooltip-format": "Brightness {percent}%",
     "reverse-scrolling": true,
@@ -1417,7 +1425,7 @@ render_waybar_config() {
     "exec": "/usr/local/bin/debian-labwc-player-status",
     "interval": 2,
     "return-type": "text",
-    "max-length": 38,
+    "max-length": 24,
     "tooltip": false,
     "on-click": "playerctl play-pause",
     "on-click-middle": "playerctl stop",
@@ -1485,9 +1493,9 @@ window#waybar {
 #custom-player,
 #custom-power,
 #tray {
-  margin: 5px 0 5px 8px;
-  padding: 0 12px;
-  min-height: 28px;
+  margin: 4px 0 4px 6px;
+  padding: 0 10px;
+  min-height: 26px;
   border-radius: 14px;
   background: @panel_alt;
   border: 1px solid @border;
@@ -1527,7 +1535,7 @@ window#waybar {
 
 #taskbar button {
   margin: 0 4px;
-  padding: 0 12px;
+  padding: 0 10px;
   min-height: 30px;
   border-radius: 12px;
   background: transparent;
@@ -1797,11 +1805,11 @@ text-wrong-color=fff1f2ff
 }
 
 render_foot() {
-  render_user_file "$LABWC_TARGET_HOME/.config/foot/foot.ini" $'[main]\nterm=foot\napp-id=foot\nfont=Noto Sans Mono:size=11\ndpi-aware=yes\ninitial-window-size-chars=120x34\npad=10x8\nselection-target=both\n\n[bell]\nsystem=no\n\n[mouse]\nhide-when-typing=yes\n\n[text-bindings]\n\\x1b[1;3A = Mod1+Up\n\\x1b[1;3B = Mod1+Down\n\\x1b[1;3C = Mod1+Right\n\\x1b[1;3D = Mod1+Left\n\n[colors-dark]\nbackground=0f1720\nforeground=e5edf5\nregular0=1a2430\nregular1=ef4444\nregular2=22c55e\nregular3=f59e0b\nregular4=38bdf8\nregular5=c084fc\nregular6=2dd4bf\nregular7=e2e8f0\nbright0=475569\nbright1=f87171\nbright2=4ade80\nbright3=fbbf24\nbright4=7dd3fc\nbright5=d8b4fe\nbright6=5eead4\nbright7=f8fafc\n'
+  render_user_file "$LABWC_TARGET_HOME/.config/foot/foot.ini" $'[main]\nterm=foot\napp-id=foot\nfont=Noto Sans Mono:size=10.5\nfont-bold=Noto Sans Mono:weight=bold:size=10.5\nfont-italic=Noto Sans Mono:slant=italic:size=10.5\nfont-bold-italic=Noto Sans Mono:weight=bold:slant=italic:size=10.5\ndpi-aware=yes\nline-height=15px\nletter-spacing=0px\nunderline-offset=1px\nbox-drawings-uses-font-glyphs=no\ninitial-window-size-chars=104x28\npad=12x10 center\nresize-by-cells=yes\nselection-target=both\nbold-text-in-bright=no\n\n[bell]\nsystem=no\n\n[scrollback]\nlines=120000\n\n[cursor]\nstyle=beam\nblink=yes\ncolor=f6bd60 0f1720\nbeam-thickness=1.5\n\n[mouse]\nhide-when-typing=yes\n\n[text-bindings]\n\\x1b[1;3A = Mod1+Up\n\\x1b[1;3B = Mod1+Down\n\\x1b[1;3C = Mod1+Right\n\\x1b[1;3D = Mod1+Left\n\n[colors]\nforeground=e5edf5\nbackground=0f1720\nregular0=1a2430\nregular1=ef4444\nregular2=22c55e\nregular3=f59e0b\nregular4=38bdf8\nregular5=c084fc\nregular6=2dd4bf\nregular7=e2e8f0\nbright0=475569\nbright1=f87171\nbright2=4ade80\nbright3=fbbf24\nbright4=7dd3fc\nbright5=d8b4fe\nbright6=5eead4\nbright7=f8fafc\nselection-foreground=07131d\nselection-background=94d2bd\nurls=7dd3fc\nalpha=0.97\n'
 }
 
 render_kitty() {
-  render_user_file "$LABWC_TARGET_HOME/.config/kitty/kitty.conf" $'font_family Noto Sans Mono\nfont_size 11.0\ncursor_shape beam\ncursor_beam_thickness 1.5\nenable_audio_bell no\ncopy_on_select clipboard\nclear_selection_on_clipboard_loss yes\nclipboard_control write-clipboard write-primary read-clipboard-ask read-primary-ask\nshell_integration enabled\nconfirm_os_window_close -1 count-background\nscrollback_lines 20000\nremember_window_size yes\ninitial_window_width 120c\ninitial_window_height 34c\nwindow_padding_width 10\nwayland_titlebar_color background\nforeground #e5edf5\nbackground #0f1720\nselection_foreground #07131d\nselection_background #94d2bd\ncursor #f6bd60\ncursor_text_color #07131d\ncolor0 #1a2430\ncolor1 #ef4444\ncolor2 #22c55e\ncolor3 #f59e0b\ncolor4 #38bdf8\ncolor5 #c084fc\ncolor6 #2dd4bf\ncolor7 #e2e8f0\ncolor8 #475569\ncolor9 #f87171\ncolor10 #4ade80\ncolor11 #fbbf24\ncolor12 #7dd3fc\ncolor13 #d8b4fe\ncolor14 #5eead4\ncolor15 #f8fafc\nmap alt+up send_text all \\e[1;3A\nmap alt+down send_text all \\e[1;3B\nmap alt+right send_text all \\e[1;3C\nmap alt+left send_text all \\e[1;3D\n'
+  render_user_file "$LABWC_TARGET_HOME/.config/kitty/kitty.conf" $'font_family Noto Sans Mono\nbold_font auto\nitalic_font auto\nbold_italic_font auto\nfont_size 10.5\ncursor_shape beam\ncursor_shape_unfocused hollow\ncursor_beam_thickness 1.5\ncursor_blink_interval 0.6\nenable_audio_bell no\nvisual_bell_duration 0.0\ncopy_on_select clipboard\nclear_selection_on_clipboard_loss yes\nclipboard_control write-clipboard write-primary read-clipboard-ask read-primary-ask\nshell_integration enabled\nconfirm_os_window_close -1 count-background\nscrollback_lines 30000\nremember_window_size yes\ninitial_window_width 104c\ninitial_window_height 28c\nwindow_padding_width 12\nwayland_titlebar_color background\nactive_border_color #6dc4ed\ninactive_border_color #334155\nurl_color #7dd3fc\nforeground #e5edf5\nbackground #0f1720\nselection_foreground #07131d\nselection_background #94d2bd\ncursor #f6bd60\ncursor_text_color #07131d\ncolor0 #1a2430\ncolor1 #ef4444\ncolor2 #22c55e\ncolor3 #f59e0b\ncolor4 #38bdf8\ncolor5 #c084fc\ncolor6 #2dd4bf\ncolor7 #e2e8f0\ncolor8 #475569\ncolor9 #f87171\ncolor10 #4ade80\ncolor11 #fbbf24\ncolor12 #7dd3fc\ncolor13 #d8b4fe\ncolor14 #5eead4\ncolor15 #f8fafc\nmap alt+up send_text all \\e[1;3A\nmap alt+down send_text all \\e[1;3B\nmap alt+right send_text all \\e[1;3C\nmap alt+left send_text all \\e[1;3D\n'
 }
 
 render_gammastep() {

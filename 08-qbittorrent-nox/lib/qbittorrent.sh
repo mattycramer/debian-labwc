@@ -43,7 +43,7 @@ write_torrent_file() {
 }
 
 validate_env_settings() {
-  require_safe_token "QBT_WEBUI_ADDRESS" "${QBT_WEBUI_ADDRESS:-}"
+  require_loopback_bind_address "QBT_WEBUI_ADDRESS" "${QBT_WEBUI_ADDRESS:-}"
   require_port_number "QBT_WEBUI_PORT" "${QBT_WEBUI_PORT:-}"
   require_safe_token "QBT_WEBUI_USERNAME" "${QBT_WEBUI_USERNAME:-}"
   require_port_number "QBT_TORRENT_LISTEN_PORT" "${QBT_TORRENT_LISTEN_PORT:-}"
@@ -70,6 +70,19 @@ ensure_torrent_group() {
   run_cmd groupadd --system "$QBT_SERVICE_GROUP"
 }
 
+ensure_torrent_user_locked() {
+  local shadow_hash
+  shadow_hash="$(getent shadow "$QBT_SERVICE_USER" | awk -F: '{print $2}')"
+  case "$shadow_hash" in
+    '!'*|'*')
+      return 0
+      ;;
+    *)
+      run_cmd usermod --lock "$QBT_SERVICE_USER"
+      ;;
+  esac
+}
+
 verify_existing_torrent_user() {
   local uid gid home shell primary_group expected_shell
   uid="$(id -u "$QBT_SERVICE_USER")"
@@ -93,6 +106,7 @@ ensure_torrent_service_account() {
 
   if id "$QBT_SERVICE_USER" >/dev/null 2>&1; then
     verify_existing_torrent_user
+    ensure_torrent_user_locked
     return 0
   fi
 
@@ -103,6 +117,7 @@ ensure_torrent_service_account() {
     --no-create-home \
     --shell "$(torrent_nologin_shell)" \
     "$QBT_SERVICE_USER"
+  ensure_torrent_user_locked
 }
 
 ensure_target_user_membership() {
@@ -133,7 +148,7 @@ enforce_torrent_mount_ownership() {
 }
 
 ensure_runtime_directories() {
-  run_cmd install -d -m 0750 -o "$QBT_SERVICE_USER" -g "$QBT_SERVICE_GROUP" \
+  run_cmd install -d -m 0700 -o "$QBT_SERVICE_USER" -g "$QBT_SERVICE_GROUP" \
     "$QBT_RUNTIME_ROOT" \
     "$QBT_CONFIG_DIR" \
     "$QBT_DATA_DIR"
@@ -320,6 +335,7 @@ WebUI\\UseUPnP=false
 WebUI\\HTTPS\\Enabled=false
 WebUI\\CSRFProtection=true
 WebUI\\ClickjackingProtection=true
+WebUI\\SecureCookie=true
 WebUI\\HostHeaderValidation=true
 Downloads\\SavePath=${QBT_TORRENTS_COMPLETE}
 Downloads\\TempPath=${QBT_TORRENTS_TEMP}
@@ -344,7 +360,7 @@ Application\\FileLoggerEnabled=false
 EOF
 )"
 
-  write_torrent_file "$QBT_CONFIG_PATH" 0640 "$content"
+  write_torrent_file "$QBT_CONFIG_PATH" 0600 "$content"
 }
 
 render_systemd_service() {
@@ -369,7 +385,7 @@ Group=${QBT_SERVICE_GROUP}
 UMask=0007
 WorkingDirectory=${QBT_RUNTIME_ROOT}
 StateDirectory=qbittorrent-nox
-StateDirectoryMode=0750
+StateDirectoryMode=0700
 Environment=HOME=${QBT_RUNTIME_ROOT}
 ExecStartPre=${QBT_MOUNT_CHECK_PATH}
 ExecStart=/usr/bin/qbittorrent-nox --webui-port=${QBT_WEBUI_PORT}
@@ -385,7 +401,7 @@ PrivateTmp=yes
 PrivateDevices=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=${QBT_TORRENTS_ROOT} ${QBT_TORRENTS_COMPLETE} ${QBT_TORRENTS_TEMP}
+ReadWritePaths=${QBT_TORRENTS_COMPLETE} ${QBT_TORRENTS_TEMP}
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectKernelLogs=yes
