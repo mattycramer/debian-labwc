@@ -170,8 +170,16 @@ current_mount_fstype() {
   findmnt -rn -T "$1" -o FSTYPE 2>/dev/null || true
 }
 
+current_mount_target() {
+  findmnt -rn -T "$1" -o TARGET 2>/dev/null || true
+}
+
 mount_target_has_real_fs() {
+  local mount_target
   local fs_type
+
+  mount_target="$(current_mount_target "$1")"
+  [[ "$mount_target" == "$1" ]] || return 1
 
   fs_type="$(current_mount_fstype "$1")"
   [[ -n "$fs_type" && "$fs_type" != "autofs" ]]
