@@ -61,7 +61,7 @@ repair_tree_ownership() {
   local path="$1"
 
   [[ -e "$path" ]] || return 0
-  run_cmd find -P -xdev "$path" -exec chown -h "$SYSTEM_TARGET_USER:$SYSTEM_TARGET_GROUP" {} +
+  run_cmd find -P "$path" -xdev -exec chown -h "$SYSTEM_TARGET_USER:$SYSTEM_TARGET_GROUP" {} +
 }
 
 permissions_path_is_nested_under_any() {

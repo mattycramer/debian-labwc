@@ -22,7 +22,7 @@ assert_tree_has_no_root_owned_entries() {
   local first_match
 
   [[ -e "$path" ]] || return 0
-  first_match="$(find -P -xdev "$path" \( -user root -o -group root \) -print -quit)"
+  first_match="$(find -P "$path" -xdev \( -user root -o -group root \) -print -quit)"
   [[ -z "$first_match" ]] || die "root-owned content remains under $path: $first_match"
 }
 
