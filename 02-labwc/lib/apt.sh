@@ -41,8 +41,8 @@ readonly SID_PACKAGES=(
   rtkit
   dbus-user-session
   at-spi2-core
+  libgtk-4-1
   greetd
-  tuigreet
   gammastep
   xdg-user-dirs
   xdg-utils
@@ -217,6 +217,9 @@ Pin-Priority: 100
 
 resolved_requested_packages() {
   printf '%s\n' "${SID_PACKAGES[@]}"
+  if [[ "${LABWC_GREETER:-}" == "tuigreet" ]]; then
+    printf '%s\n' "tuigreet"
+  fi
   printf '%s\n' "${GRAPHICS_PACKAGES[@]}"
   printf '%s\n' "${TWEAKS_BUILD_PACKAGES[@]}"
   printf '%s\n' "${TWEAKS_SID_PACKAGES[@]}"
@@ -235,6 +238,9 @@ install_requested_packages() {
   local -a keepsecret_build_package_list=()
   local -a apt_args=()
   mapfile -t sid_package_list < <(printf '%s\n' "${SID_PACKAGES[@]}")
+  if [[ "${LABWC_GREETER:-}" == "tuigreet" ]]; then
+    sid_package_list+=("tuigreet")
+  fi
   mapfile -t graphics_package_list < <(printf '%s\n' "${GRAPHICS_PACKAGES[@]}")
   mapfile -t tweaks_build_package_list < <(printf '%s\n' "${TWEAKS_BUILD_PACKAGES[@]}")
   mapfile -t tweaks_sid_package_list < <(printf '%s\n' "${TWEAKS_SID_PACKAGES[@]}")

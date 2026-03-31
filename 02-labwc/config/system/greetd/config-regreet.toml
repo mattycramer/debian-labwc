@@ -1,0 +1,7 @@
+[terminal]
+vt = @GREETD_VT@
+switch = true
+
+[default_session]
+command = "/usr/local/bin/labwc-regreet-session"
+user = "greeter"

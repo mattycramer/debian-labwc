@@ -1,0 +1,159 @@
+/* Managed by 02-labwc.
+ * This stylesheet targets the actual GTK widget tree used by regreet's
+ * templates.rs: fullscreen window + background picture + two GtkFrame widgets
+ * carrying the "background" class, with the main login form inside a GtkGrid.
+ */
+
+window,
+overlay {
+  color: #f4ead7;
+  background-color: transparent;
+}
+
+picture {
+  background-color: #0c1117;
+}
+
+selection {
+  color: #17120d;
+  background-color: #e7ba74;
+}
+
+frame.background,
+frame.background > border {
+  background-color: rgba(13, 17, 22, 0.78);
+  border: 1px solid rgba(222, 173, 98, 0.34);
+  border-radius: 28px;
+  box-shadow: 0 22px 76px rgba(0, 0, 0, 0.42);
+}
+
+frame.background > grid {
+  color: #f4ead7;
+}
+
+frame.background > label {
+  color: #f0c97e;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 12px 22px;
+}
+
+frame.background > grid > label {
+  color: #ceb892;
+}
+
+frame.background > grid > label:first-child {
+  color: #f5d9a0;
+  font-size: 20px;
+}
+
+entry,
+passwordentry,
+combobox,
+button,
+togglebutton {
+  color: #f7f0e5;
+  border: 1px solid rgba(227, 195, 136, 0.24);
+  border-radius: 14px;
+  background-color: rgba(7, 11, 16, 0.74);
+  background-image: none;
+  box-shadow: none;
+  padding: 10px 14px;
+}
+
+entry,
+passwordentry {
+  caret-color: #f3ca82;
+}
+
+entry image,
+passwordentry image,
+togglebutton image,
+button image {
+  color: #e7c78b;
+}
+
+entry:focus,
+passwordentry:focus,
+combobox:focus,
+button:focus,
+togglebutton:focus {
+  border-color: rgba(240, 201, 126, 0.92);
+  box-shadow: 0 0 0 3px rgba(240, 201, 126, 0.18);
+}
+
+entry:hover,
+passwordentry:hover,
+combobox:hover,
+button:hover,
+togglebutton:hover {
+  border-color: rgba(240, 201, 126, 0.48);
+}
+
+togglebutton:checked {
+  color: #12151a;
+  border-color: rgba(245, 214, 151, 0.9);
+  background-color: rgba(245, 214, 151, 0.92);
+}
+
+button {
+  font-weight: 600;
+}
+
+button.suggested-action {
+  color: #16110c;
+  border-color: rgba(248, 222, 171, 0.92);
+  background-color: rgba(231, 186, 116, 0.96);
+}
+
+button.suggested-action:hover {
+  background-color: rgba(242, 199, 132, 0.98);
+}
+
+button.destructive-action {
+  color: #fff0ee;
+  border-color: rgba(255, 166, 150, 0.42);
+  background-color: rgba(126, 44, 36, 0.92);
+}
+
+button.destructive-action:hover {
+  background-color: rgba(147, 54, 45, 0.96);
+}
+
+infobar.error,
+infobar.error > revealer > box,
+infobar.error > revealer > box > box {
+  color: #ffe5df;
+  background-color: rgba(91, 24, 18, 0.92);
+  border: 1px solid rgba(255, 151, 132, 0.36);
+  border-radius: 18px;
+}
+
+infobar.error label {
+  color: #ffe5df;
+}
+
+popover.background,
+popover.background > contents {
+  color: #f4ead7;
+  background-color: rgba(12, 16, 22, 0.96);
+  border: 1px solid rgba(227, 195, 136, 0.28);
+  border-radius: 18px;
+}
+
+modelbutton,
+menuitem {
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+modelbutton:hover,
+menuitem:hover {
+  background-color: rgba(231, 186, 116, 0.18);
+}
+
+*:disabled {
+  color: rgba(244, 234, 215, 0.48);
+  border-color: rgba(227, 195, 136, 0.12);
+}

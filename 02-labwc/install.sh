@@ -34,6 +34,88 @@ Usage: ./install.sh --phase doctor|detect|packages|render|enable|extras|print-en
 EOF
 }
 
+validate_greeter_choice() {
+  case "$1" in
+    tuigreet|regreet) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+greeter_selection_required_for_phase() {
+  case "$PHASE" in
+    all|packages|enable)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+prompt_for_greeter_selection() {
+  local current_value="${1:-}"
+  local prompt_value=""
+  local default_hint=""
+
+  if [[ -n "$current_value" ]] && validate_greeter_choice "$current_value"; then
+    case "$current_value" in
+      tuigreet) default_hint=" [default: 1]" ;;
+      regreet) default_hint=" [default: 2]" ;;
+    esac
+  fi
+
+  while true; do
+    printf '%s\n' \
+      'Select greetd greeter:' \
+      '  1) tuigreet' \
+      '  2) regreet' >&2
+    IFS= read -r -p "Enter choice 1 or 2${default_hint}: " prompt_value
+
+    if [[ -z "$prompt_value" ]] && [[ -n "$current_value" ]] && validate_greeter_choice "$current_value"; then
+      printf '%s\n' "$current_value"
+      return 0
+    fi
+
+    case "${prompt_value,,}" in
+      1|tuigreet)
+        printf '%s\n' "tuigreet"
+        return 0
+        ;;
+      2|regreet)
+        printf '%s\n' "regreet"
+        return 0
+        ;;
+      *)
+        printf '%s\n' "Invalid choice. Enter 1 for tuigreet or 2 for regreet." >&2
+        ;;
+    esac
+  done
+}
+
+ensure_greeter_selection_in_env() {
+  local current_value selected_value
+
+  greeter_selection_required_for_phase || return 0
+  [[ -f "$ENV_FILE" ]] || die "missing env file: $ENV_FILE"
+
+  current_value="$(read_env_value "LABWC_GREETER")"
+
+  if [[ "$PHASE" == "all" && -t 0 && -t 1 ]]; then
+    selected_value="$(prompt_for_greeter_selection "$current_value")"
+    write_env_value "LABWC_GREETER" "$selected_value"
+    return 0
+  fi
+
+  if [[ -n "$current_value" ]] && validate_greeter_choice "$current_value"; then
+    return 0
+  fi
+
+  [[ -t 0 && -t 1 ]] || die "LABWC_GREETER must be set to 'tuigreet' or 'regreet' in $ENV_FILE for phase '$PHASE'"
+
+  selected_value="$(prompt_for_greeter_selection "")"
+  write_env_value "LABWC_GREETER" "$selected_value"
+}
+
 gpg_prompt_required_for_phase() {
   case "$PHASE" in
     all|enable) return 0 ;;
@@ -321,6 +403,7 @@ phase_nuke() {
 
 main() {
   parse_args "$@"
+  ensure_greeter_selection_in_env
   ensure_gpg_password_in_env
   ensure_wireguard_private_key_in_env
   case "$PHASE" in

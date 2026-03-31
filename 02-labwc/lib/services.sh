@@ -30,6 +30,25 @@ ensure_greeter_runtime_dirs() {
 
 validate_greetd_settings() {
   [[ "${LABWC_GREETD_VT:-}" =~ ^[1-9][0-9]*$ ]] || die "LABWC_GREETD_VT must be a positive integer, found '${LABWC_GREETD_VT:-}'"
+  case "${LABWC_GREETER:-}" in
+    tuigreet|regreet) ;;
+    *) die "LABWC_GREETER must be 'tuigreet' or 'regreet', found '${LABWC_GREETER:-}'" ;;
+  esac
+}
+
+validate_regreet_settings() {
+  [[ "${GITHUB_REGREET_TARBALL:-}" =~ ^https://[^[:space:]]+$ ]] || {
+    die "GITHUB_REGREET_TARBALL must be an https URL, found '${GITHUB_REGREET_TARBALL:-}'"
+  }
+  [[ "${GITHUB_REGREET_TAG:-}" =~ ^[A-Za-z0-9._-]+$ ]] || {
+    die "GITHUB_REGREET_TAG must contain only alnum, dot, underscore, or dash, found '${GITHUB_REGREET_TAG:-}'"
+  }
+  [[ "${GITHUB_REGREET_TARBALL_SHA:-}" =~ ^[0-9a-f]{64}$ ]] || {
+    die "GITHUB_REGREET_TARBALL_SHA must be a 64 character lowercase hex sha256, found '${GITHUB_REGREET_TARBALL_SHA:-}'"
+  }
+  [[ "${GITHUB_REGREET_COMMIT_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || {
+    die "GITHUB_REGREET_COMMIT_SHA must be a 40 character lowercase hex commit sha, found '${GITHUB_REGREET_COMMIT_SHA:-}'"
+  }
 }
 
 render_template_to_file() {
@@ -194,11 +213,120 @@ stage_target_user_gpg_secret_seed() {
   run_cmd chmod 0600 "$seed_path"
 }
 
+regreet_binary_path() {
+  printf '%s\n' "/usr/local/bin/regreet"
+}
+
+regreet_session_wrapper_path() {
+  printf '%s\n' "/usr/local/bin/labwc-regreet-session"
+}
+
+regreet_config_path() {
+  printf '%s\n' "/etc/greetd/regreet.toml"
+}
+
+regreet_css_path() {
+  printf '%s\n' "/etc/greetd/regreet.css"
+}
+
+regreet_labwc_config_dir() {
+  printf '%s\n' "/etc/greetd/labwc"
+}
+
+regreet_state_dir() {
+  printf '%s\n' "/var/lib/regreet"
+}
+
+regreet_log_dir() {
+  printf '%s\n' "/var/log/regreet"
+}
+
+regreet_wallpaper_target_path() {
+  printf '%s\n' "/var/lib/greetd/greeter/.local/share/labwc-session/$(basename "$(regreet_wallpaper_source_path)")"
+}
+
+remove_regreet_support_files() {
+  remove_if_present "$(regreet_binary_path)"
+  remove_if_present "$(regreet_session_wrapper_path)"
+  remove_if_present "$(regreet_config_path)"
+  remove_if_present "$(regreet_css_path)"
+  remove_if_present "$(regreet_labwc_config_dir)"
+  remove_if_present "$(regreet_state_dir)"
+  remove_if_present "$(regreet_log_dir)"
+  remove_if_present "/var/lib/greetd/greeter/.local/share/labwc-session/regreet-labwall2-1920x1080.png"
+}
+
+install_regreet_release() {
+  local tmpdir tarball_path extracted_path actual_sha
+  local -a tar_entries=()
+
+  validate_regreet_settings
+  require_command curl
+  require_command tar
+  require_command sha256sum
+  require_command mktemp
+
+  tmpdir="$(mktemp -d)"
+  trap 'rm -rf -- "$tmpdir"' RETURN
+  tarball_path="$tmpdir/regreet.tar.gz"
+  extracted_path="$tmpdir/regreet"
+
+  log_info "installing regreet ${GITHUB_REGREET_TAG} (${GITHUB_REGREET_COMMIT_SHA})"
+  retry_cmd 3 curl --fail --location --max-time 60 --silent --show-error -o "$tarball_path" "$GITHUB_REGREET_TARBALL"
+  actual_sha="$(sha256sum "$tarball_path" | awk '{print $1}')"
+  [[ "$actual_sha" == "$GITHUB_REGREET_TARBALL_SHA" ]] || {
+    die "regreet tarball sha256 mismatch: expected ${GITHUB_REGREET_TARBALL_SHA}, got ${actual_sha}"
+  }
+
+  mapfile -t tar_entries < <(tar -tf "$tarball_path")
+  ((${#tar_entries[@]} == 1)) || die "regreet tarball must contain exactly one file, found ${#tar_entries[@]}"
+  [[ "${tar_entries[0]}" == "regreet" ]] || die "regreet tarball must contain a top-level 'regreet' file, found '${tar_entries[0]}'"
+
+  run_cmd tar -xf "$tarball_path" -C "$tmpdir"
+  [[ -f "$extracted_path" ]] || die "regreet tarball did not extract an executable file at '$extracted_path'"
+  run_cmd install -D -m 0755 "$extracted_path" "$(regreet_binary_path)"
+  "$(regreet_binary_path)" --version >/dev/null 2>&1 || die "installed regreet binary failed the --version self-test"
+  trap - RETURN
+  run_cmd rm -rf -- "$tmpdir"
+}
+
+install_regreet_runtime_dirs() {
+  run_cmd install -d -m 0755 -o greeter -g greeter "$(regreet_state_dir)" "$(regreet_log_dir)"
+  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.local/share/labwc-session
+}
+
+install_regreet_wallpaper() {
+  local wallpaper_source_path
+  wallpaper_source_path="$(regreet_wallpaper_source_path)"
+  run_cmd install -D -m 0644 -o greeter -g greeter "$wallpaper_source_path" "$(regreet_wallpaper_target_path)"
+}
+
+install_selected_greeter_files() {
+  case "${LABWC_GREETER:-}" in
+    tuigreet)
+      remove_regreet_support_files
+      render_template_to_file "$(config_system_template_path "greetd/config.toml")" "/etc/greetd/config.toml" 0644
+      ;;
+    regreet)
+      install_regreet_release
+      install_regreet_runtime_dirs
+      install_regreet_wallpaper
+      render_template_to_file "$(config_system_template_path "greetd/config-regreet.toml")" "/etc/greetd/config.toml" 0644
+      render_template_to_file "$(config_system_template_path "greetd/regreet.toml")" "$(regreet_config_path)" 0644
+      render_template_to_file "$(config_system_template_path "greetd/regreet.css")" "$(regreet_css_path)" 0644
+      render_template_to_file "$(config_system_template_path "greetd/labwc/environment")" "$(regreet_labwc_config_dir)/environment" 0644
+      render_template_to_file "$(config_system_template_path "greetd/labwc/rc.xml")" "$(regreet_labwc_config_dir)/rc.xml" 0644
+      render_template_to_file "$(config_system_template_path "greetd/labwc/autostart")" "$(regreet_labwc_config_dir)/autostart" 0755
+      render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-regreet-session")" "$(regreet_session_wrapper_path)" 0755
+      ;;
+  esac
+}
+
 install_root_files() {
   validate_greetd_settings
   ensure_greeter_user
   ensure_greeter_runtime_dirs
-  render_template_to_file "$(config_system_template_path "greetd/config.toml")" "/etc/greetd/config.toml" 0644
+  install_selected_greeter_files
   render_template_to_file "$(config_system_template_path "greetd/10-vt.conf")" "/etc/systemd/system/greetd.service.d/10-vt.conf" 0644
   render_template_to_file "$(config_system_template_path "usr/share/wayland-sessions/labwc.desktop")" "/usr/share/wayland-sessions/labwc.desktop" 0644
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-session")" "/usr/local/bin/labwc-session" 0755
@@ -400,8 +528,13 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/labwc-workspace-send"
   remove_if_present "/usr/local/bin/labwc-workspace-state"
   remove_if_present "/usr/local/bin/labwc-workspace-status"
+  remove_if_present "$(regreet_binary_path)"
+  remove_if_present "$(regreet_session_wrapper_path)"
   remove_if_present "/usr/share/wayland-sessions/labwc.desktop"
   remove_if_present "/etc/greetd/config.toml"
+  remove_if_present "$(regreet_config_path)"
+  remove_if_present "$(regreet_css_path)"
+  remove_if_present "$(regreet_labwc_config_dir)"
   remove_if_present "/etc/systemd/system/greetd.service.d/10-vt.conf"
   systemctl disable "$(wireguard_import_service_name)" >/dev/null 2>&1 || true
   systemctl disable labwc-vpn-default-off.service >/dev/null 2>&1 || true
@@ -412,6 +545,8 @@ nuke_all_state() {
   remove_labwc_tweaks_install
   remove_keepsecret_install
   remove_managed_wireguard_profiles
+  remove_if_present "$(regreet_state_dir)"
+  remove_if_present "$(regreet_log_dir)"
   rmdir --ignore-fail-on-non-empty "/etc/systemd/system/greetd.service.d" >/dev/null 2>&1 || true
 
   log_info "removing target user systemd user unit links"
@@ -425,7 +560,7 @@ nuke_all_state() {
   systemctl disable greetd.service >/dev/null 2>&1 || true
   systemctl set-default multi-user.target >/dev/null 2>&1 || true
 
-  log_info "removing tuigreet cache and greeter user"
+  log_info "removing greeter cache and greeter user"
   remove_if_present "/var/lib/greetd/greeter"
   if getent passwd greeter >/dev/null 2>&1; then
     userdel greeter >/dev/null 2>&1 || true

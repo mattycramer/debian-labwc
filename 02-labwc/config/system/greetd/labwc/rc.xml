@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<labwc_config>
+  <core>
+    <reuseOutputMode>yes</reuseOutputMode>
+  </core>
+  <placement>
+    <policy>center</policy>
+  </placement>
+  <windowRules>
+    <windowRule identifier="apps.regreet" serverDecoration="no" skipTaskbar="yes" skipWindowSwitcher="yes" fixedPosition="yes">
+@REGREET_MOVE_TO_OUTPUT_ACTION@
+      <action name="Maximize" direction="both" />
+      <action name="Focus" />
+    </windowRule>
+  </windowRules>
+</labwc_config>

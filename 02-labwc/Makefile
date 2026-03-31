@@ -8,7 +8,7 @@ help:
 	  '  help        Show this message' \
 	  '  doctor      Validate platform assumptions' \
 	  '  detect      Detect user, GPU, and outputs into .env' \
-	  '  install     Run doctor, detect, packages, render, enable, extras' \
+	  '  install     Run doctor, detect, packages, render, enable, extras; prompt for greeter selection' \
 	  '  render      Render configs from .env' \
 	  '  enable      Install root-owned files and enable services' \
 	  '  extras      Build and install optional network-fetched extras' \
