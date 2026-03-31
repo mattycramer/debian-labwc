@@ -292,6 +292,7 @@ render_system_bus_unit() {
   unit_content="$(
     strip_install_section "$source" | sed "s#^ExecStart=.*#ExecStart=${DBUS_BROKER_INSTALL_BIN_DIR}/dbus-broker-launch --scope system#"
   )"
+  backup_existing_path "$DBUS_BROKER_SYSTEM_UNIT_PATH"
   write_root_file "$DBUS_BROKER_SYSTEM_UNIT_PATH" 0644 "$unit_content"
 }
 
@@ -301,6 +302,7 @@ render_user_bus_unit() {
   unit_content="$(
     strip_install_section "$source" | sed "s#^ExecStart=.*#ExecStart=${DBUS_BROKER_INSTALL_BIN_DIR}/dbus-broker-launch --scope user#"
   )"
+  backup_existing_path "$DBUS_BROKER_USER_UNIT_PATH"
   write_root_file "$DBUS_BROKER_USER_UNIT_PATH" 0644 "$unit_content"
 }
 
@@ -371,8 +373,8 @@ remove_unmanaged_artifact() {
 remove_broker_install() {
   local fallback_fragment
 
-  remove_if_present "$DBUS_BROKER_SYSTEM_UNIT_PATH"
-  remove_if_present "$DBUS_BROKER_USER_UNIT_PATH"
+  restore_backed_up_path "$DBUS_BROKER_SYSTEM_UNIT_PATH" || remove_if_present "$DBUS_BROKER_SYSTEM_UNIT_PATH"
+  restore_backed_up_path "$DBUS_BROKER_USER_UNIT_PATH" || remove_if_present "$DBUS_BROKER_USER_UNIT_PATH"
   restore_backed_up_path "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker" || remove_unmanaged_artifact "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker"
   restore_backed_up_path "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-launch" || remove_unmanaged_artifact "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-launch"
   restore_backed_up_path "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-session" || remove_unmanaged_artifact "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-session"

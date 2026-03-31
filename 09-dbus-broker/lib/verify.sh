@@ -68,7 +68,13 @@ verify_user_runtime() {
     return 0
   fi
 
-  [[ "$user_fragment" == "$DBUS_BROKER_USER_UNIT_PATH" ]] || die "user dbus.service fragment mismatch: expected '$DBUS_BROKER_USER_UNIT_PATH', got '$user_fragment'"
+  if [[ "$user_fragment" != "$DBUS_BROKER_USER_UNIT_PATH" ]]; then
+    if [[ "$DBUS_BROKER_RESTART_USER_BUS_IF_ACTIVE" == "yes" ]]; then
+      die "user dbus.service fragment mismatch: expected '$DBUS_BROKER_USER_UNIT_PATH', got '$user_fragment'"
+    fi
+    log_warn "user manager currently points to '$user_fragment'; managed user unit will apply after next user daemon-reload/login"
+    return 0
+  fi
 
   user_main_pid="$(runuser -u "$DBUS_BROKER_TARGET_USER" -- systemctl --user show -p MainPID --value dbus.service 2>/dev/null || true)"
   if [[ "$user_main_pid" =~ ^[0-9]+$ ]] && ((user_main_pid > 1)); then
