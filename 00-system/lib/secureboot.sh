@@ -20,15 +20,16 @@ readonly SYSTEM_SECURE_BOOT_TOOL_DIR="/usr/local/libexec/labwc-secure-boot"
 readonly SYSTEM_SECURE_BOOT_TOOL_PATH="${SYSTEM_SECURE_BOOT_TOOL_DIR}/tool"
 readonly SYSTEM_SECURE_BOOT_TOOL_MODE="0755"
 readonly SYSTEM_CUSTOM_MODULE_SOURCE_ROOT="/usr/local/src/labwc-kmods"
-readonly SYSTEM_CUSTOM_MODULE_BUILD_ROOT="/var/cache/labwc-secure-boot/build"
+readonly SYSTEM_CUSTOM_MODULE_BUILD_ROOT="/var/cache/labwc-kmods/build"
+readonly SYSTEM_BACKPORTS_SUITE="trixie-backports"
 readonly SYSTEM_DKMS_CONF_DIR="/etc/dkms/framework.conf.d"
 readonly SYSTEM_DKMS_CONF_PATH="${SYSTEM_DKMS_CONF_DIR}/90-labwc-secure-boot.conf"
 readonly SYSTEM_DKMS_CONF_MODE="0644"
 readonly SYSTEM_SIGN_MODULE_HELPER="/usr/local/bin/sign-module"
 readonly SYSTEM_SIGN_MODULE_HELPER_MODE="0755"
-readonly SYSTEM_KERNEL_POSTINST_HOOK_PATH="/etc/kernel/postinst.d/zz-labwc-secure-boot"
+readonly SYSTEM_KERNEL_POSTINST_HOOK_PATH="/etc/kernel/postinst.d/zz-sign-custom"
 readonly SYSTEM_KERNEL_HEADER_POSTINST_HOOK_DIR="/etc/kernel/header_postinst.d"
-readonly SYSTEM_KERNEL_HEADER_POSTINST_HOOK_PATH="${SYSTEM_KERNEL_HEADER_POSTINST_HOOK_DIR}/zz-labwc-secure-boot"
+readonly SYSTEM_KERNEL_HEADER_POSTINST_HOOK_PATH="${SYSTEM_KERNEL_HEADER_POSTINST_HOOK_DIR}/10-build-custom"
 readonly SYSTEM_KERNEL_HOOK_MODE="0755"
 readonly SYSTEM_SECURE_BOOT_DIR_MODE="0700"
 readonly SYSTEM_SECURE_BOOT_FILE_MODE="0600"
@@ -57,10 +58,28 @@ secure_boot_apt_update() {
       -o Acquire::http::Timeout=20
 }
 
+ensure_dkms_from_backports() {
+  secure_boot_apt_update
+
+  log_info "installing dkms from ${SYSTEM_BACKPORTS_SUITE}"
+  run_cmd env \
+    DEBIAN_FRONTEND=noninteractive \
+    APT_LISTCHANGES_FRONTEND=none \
+    apt-get install \
+      -y \
+      -V \
+      --no-install-recommends \
+      -o DPkg::Lock::Timeout=60 \
+      -t "$SYSTEM_BACKPORTS_SUITE" \
+      dkms
+}
+
 ensure_secure_boot_packages() {
   local package=""
   local package_list=""
   local -a missing_packages=()
+
+  ensure_dkms_from_backports
 
   for package in "${SYSTEM_SECURE_BOOT_PACKAGES[@]}"; do
     if ! secure_boot_package_installed "$package"; then
@@ -1013,7 +1032,12 @@ cmd_kernel_hook() {
   load_modules_config
   verify_managed_keypair
   sync_dkms_overrides apply
-  if [[ "\$pkg_type" == headers || "\$pkg_type" == manual ]]; then
+  if [[ "\$pkg_type" == headers ]]; then
+    build_custom_modules_for_kernel "\$kernelver"
+    run_depmod_for_changed_kernels
+    return 0
+  fi
+  if [[ "\$pkg_type" == manual ]]; then
     build_custom_modules_for_kernel "\$kernelver"
   fi
   while IFS= read -r module_path; do
@@ -1574,7 +1598,6 @@ verify_managed_secure_boot_permissions() {
   assert_directory_state "$SYSTEM_SECURE_BOOT_DIR" root root "$SYSTEM_SECURE_BOOT_DIR_MODE"
 
   for path in \
-    "$SYSTEM_DKMS_CONF_PATH" \
     "$SYSTEM_SECURE_BOOT_KEY_PATH" \
     "$SYSTEM_SECURE_BOOT_CERT_PATH" \
     "$SYSTEM_SECURE_BOOT_OPENSSL_CONFIG_PATH"; do
@@ -1588,12 +1611,8 @@ verify_managed_secure_boot_permissions() {
   [[ "$(managed_secure_boot_file_state "$SYSTEM_SECURE_BOOT_MODULES_CONFIG_PATH")" == "root:root:${SYSTEM_SECURE_BOOT_CONFIG_MODE#0}" ]] || {
     die "unexpected file state for $SYSTEM_SECURE_BOOT_MODULES_CONFIG_PATH: $(managed_secure_boot_file_state "$SYSTEM_SECURE_BOOT_MODULES_CONFIG_PATH")"
   }
-  [[ "$(managed_secure_boot_file_state "$SYSTEM_CUSTOM_MODULE_SOURCE_ROOT")" == "root:root:755" ]] || {
-    die "unexpected source root state for $SYSTEM_CUSTOM_MODULE_SOURCE_ROOT: $(managed_secure_boot_file_state "$SYSTEM_CUSTOM_MODULE_SOURCE_ROOT")"
-  }
-  [[ "$(managed_secure_boot_file_state "$SYSTEM_CUSTOM_MODULE_BUILD_ROOT")" == "root:root:755" ]] || {
-    die "unexpected build root state for $SYSTEM_CUSTOM_MODULE_BUILD_ROOT: $(managed_secure_boot_file_state "$SYSTEM_CUSTOM_MODULE_BUILD_ROOT")"
-  }
+  assert_directory_state "$SYSTEM_CUSTOM_MODULE_SOURCE_ROOT" root root 0755
+  assert_directory_state "$SYSTEM_CUSTOM_MODULE_BUILD_ROOT" root root 0755
 
   for path in \
     "$SYSTEM_SECURE_BOOT_TOOL_PATH" \
@@ -1606,6 +1625,7 @@ verify_managed_secure_boot_permissions() {
     }
   done
 
+  require_file "$SYSTEM_DKMS_CONF_PATH"
   [[ "$(managed_secure_boot_file_state "$SYSTEM_DKMS_CONF_PATH")" == "root:root:${SYSTEM_DKMS_CONF_MODE#0}" ]] || {
     die "unexpected DKMS config state for $SYSTEM_DKMS_CONF_PATH: $(managed_secure_boot_file_state "$SYSTEM_DKMS_CONF_PATH")"
   }
@@ -1623,6 +1643,27 @@ verify_managed_dkms_signing_config() {
   rm -f -- "$candidate_path"
 }
 
+verify_secure_boot_script_candidate() {
+  local builder_name="$1"
+  local destination_path="$2"
+  local candidate_path=""
+
+  candidate_path="$(mktemp)"
+  "$builder_name" "$candidate_path"
+  cmp -s "$candidate_path" "$destination_path" || {
+    rm -f -- "$candidate_path"
+    die "$destination_path does not match the generated secure boot script state"
+  }
+  rm -f -- "$candidate_path"
+}
+
+verify_secure_boot_tooling_scripts() {
+  verify_secure_boot_script_candidate build_secure_boot_tool_candidate "$SYSTEM_SECURE_BOOT_TOOL_PATH"
+  verify_secure_boot_script_candidate build_sign_module_helper_candidate "$SYSTEM_SIGN_MODULE_HELPER"
+  verify_secure_boot_script_candidate build_kernel_postinst_hook_candidate "$SYSTEM_KERNEL_POSTINST_HOOK_PATH"
+  verify_secure_boot_script_candidate build_kernel_header_postinst_hook_candidate "$SYSTEM_KERNEL_HEADER_POSTINST_HOOK_PATH"
+}
+
 verify_managed_secure_boot_material() {
   managed_secure_boot_material_valid || die "managed Secure Boot key material is missing, malformed, encrypted, or does not match the expected Labwc identity"
 }
@@ -1637,9 +1678,11 @@ verify_managed_secure_boot() {
   local fingerprint=""
 
   require_secure_boot_runtime
+  require_command dkms
   verify_managed_secure_boot_permissions
   verify_managed_secure_boot_material
   verify_managed_dkms_signing_config
+  verify_secure_boot_tooling_scripts
   run_cmd "$SYSTEM_SECURE_BOOT_TOOL_PATH" validate-config
   run_cmd "$SYSTEM_SECURE_BOOT_TOOL_PATH" verify-dkms-overrides
   run_cmd "$SYSTEM_SECURE_BOOT_TOOL_PATH" verify-managed-modules
