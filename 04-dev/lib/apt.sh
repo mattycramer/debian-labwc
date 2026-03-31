@@ -18,6 +18,7 @@ readonly DEV_PACKAGES=(
   yamllint
   valgrind
   linux-perf
+  shellcheck
   pipx
   pkg-config
   htop
