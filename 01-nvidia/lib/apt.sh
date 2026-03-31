@@ -98,6 +98,20 @@ install_debian_prerequisite_packages() {
   install_package_group "Debian prerequisite package set" "${packages[@]}"
 }
 
+install_sid_prerequisite_packages() {
+  local -a apt_args=()
+  local -a packages=()
+
+  mapfile -t packages < <(resolved_sid_prerequisite_packages)
+  if ((${#packages[@]} == 0)); then
+    return 0
+  fi
+
+  mapfile -t apt_args < <(apt_yes_args)
+  log_info "installing sid prerequisite package set"
+  run_mutating_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${packages[@]}"
+}
+
 install_optional_driver_pinning_package() {
   local selected_package=""
   selected_package="$(resolve_driver_pinning_package)" || return 0

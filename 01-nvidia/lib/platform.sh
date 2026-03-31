@@ -159,9 +159,15 @@ resolved_debian_prerequisite_packages() {
     pciutils
   if [[ "$NVIDIA_INSTALL_SWITCHEROO_CONTROL" == "1" ]]; then
     printf '%s\n' \
-      switcheroo-control \
       mesa-utils \
       vulkan-tools
+  fi
+}
+
+resolved_sid_prerequisite_packages() {
+  if [[ "$NVIDIA_INSTALL_SWITCHEROO_CONTROL" == "1" ]]; then
+    printf '%s\n' \
+      switcheroo-control
   fi
 }
 

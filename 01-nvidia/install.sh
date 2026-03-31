@@ -136,6 +136,7 @@ phase_system_doctor() {
   load_env_file
   require_supported_debian
   require_amd64_architecture
+  require_command apt
   require_command apt-get
   require_command apt-cache
   require_command dpkg
@@ -155,6 +156,7 @@ phase_repo() {
   phase_doctor
   require_root
   ensure_debian_components_sources
+  ensure_shared_sid_repository
   apt_update
   ensure_download_tool
   install_cuda_keyring_package
@@ -167,6 +169,7 @@ phase_packages() {
   log_info "phase: packages"
   phase_repo
   install_debian_prerequisite_packages
+  install_sid_prerequisite_packages
   install_nvidia_stack
 }
 

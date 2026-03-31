@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+readonly SID_SUITE="sid"
+readonly SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
+readonly SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
+
 cuda_repo_base_url() {
   printf 'https://developer.download.nvidia.com/compute/cuda/repos/%s/%s\n' "$NVIDIA_REPO_DISTRO" "$NVIDIA_REPO_ARCH_PATH"
 }
@@ -76,6 +80,43 @@ ensure_debian_components_sources() {
     return 0
   fi
   printf '%s\n' "$content" >"$DEBIAN_COMPONENTS_SOURCE_PATH"
+}
+
+render_sid_sources() {
+  cat <<EOF
+Types: deb
+URIs: https://deb.debian.org/debian
+Suites: ${SID_SUITE}
+Components: main
+Architectures: amd64
+Signed-By: ${DEBIAN_ARCHIVE_KEYRING_PATH}
+EOF
+}
+
+render_sid_preferences() {
+  cat <<EOF
+Package: *
+Pin: release n=${SID_SUITE}
+Pin-Priority: 100
+EOF
+}
+
+ensure_shared_sid_repository() {
+  local sources_content=""
+  local preferences_content=""
+
+  sources_content="$(render_sid_sources)"
+  preferences_content="$(render_sid_preferences)"
+
+  run_mutating_cmd install -D -m 0644 /dev/null "$SID_SOURCE_PATH"
+  run_mutating_cmd install -D -m 0644 /dev/null "$SID_PREFERENCES_PATH"
+  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
+    log_info "dry-run: write $SID_SOURCE_PATH"
+    log_info "dry-run: write $SID_PREFERENCES_PATH"
+    return 0
+  fi
+  printf '%s\n' "$sources_content" >"$SID_SOURCE_PATH"
+  printf '%s\n' "$preferences_content" >"$SID_PREFERENCES_PATH"
 }
 
 remove_debian_components_sources() {
