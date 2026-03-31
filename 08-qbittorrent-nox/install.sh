@@ -115,8 +115,6 @@ phase_enable() {
   require_command qbittorrent-nox
   require_apparmor_runtime
   require_torrent_service_account
-  ensure_torrent_mounts_present
-  ensure_torrent_data_directories
   ensure_runtime_directories
   render_all_configs
   enable_qbittorrent_service

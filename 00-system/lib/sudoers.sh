@@ -3,6 +3,11 @@
 readonly SYSTEM_SUDOERS_PATH="/etc/sudoers"
 readonly SYSTEM_SUDOERS_D_PATH="/etc/sudoers.d"
 readonly SYSTEM_SUDOERS_DROPIN_MODE="0440"
+readonly SYSTEM_SUDOERS_HELPER_DIR="/usr/local/libexec/labwc-system"
+readonly SYSTEM_STATUS_MANAGED_MOUNTS_HELPER="${SYSTEM_SUDOERS_HELPER_DIR}/status-managed-mounts"
+readonly SYSTEM_JOURNAL_MANAGED_MOUNTS_HELPER="${SYSTEM_SUDOERS_HELPER_DIR}/journal-managed-mounts"
+readonly SYSTEM_STATUS_QBITTORRENT_HELPER="${SYSTEM_SUDOERS_HELPER_DIR}/status-qbittorrent"
+readonly SYSTEM_JOURNAL_QBITTORRENT_HELPER="${SYSTEM_SUDOERS_HELPER_DIR}/journal-qbittorrent"
 
 resolve_visudo_bin() {
   if [[ -n "${SYSTEM_VISUDO_BIN:-}" ]] && [[ -x "${SYSTEM_VISUDO_BIN:-}" ]]; then
@@ -69,6 +74,119 @@ ensure_sudoers_dropin_dir() {
   run_cmd install -d -m 0755 -o root -g root "$SYSTEM_SUDOERS_D_PATH"
 }
 
+write_root_helper_script() {
+  local destination_path="$1"
+  local content="$2"
+
+  run_cmd install -d -m 0755 -o root -g root "$SYSTEM_SUDOERS_HELPER_DIR"
+  run_cmd install -m 0755 -o root -g root /dev/null "$destination_path"
+  printf '%s\n' "$content" >"$destination_path"
+  run_cmd chown root:root "$destination_path"
+  run_cmd chmod 0755 "$destination_path"
+}
+
+render_status_managed_mounts_helper() {
+  cat <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+(($# == 0)) || {
+  printf 'this helper does not accept arguments\n' >&2
+  exit 64
+}
+
+manifest="/var/lib/local-mounts/managed-units.list"
+declare -a units=()
+
+if [[ -f "$manifest" ]]; then
+  while IFS='|' read -r unit_name unit_state hook; do
+    [[ -n "$unit_name" ]] || continue
+    units+=("$unit_name")
+  done <"$manifest"
+fi
+
+((${#units[@]} > 0)) || {
+  printf 'no managed mount units are installed\n'
+  exit 0
+}
+
+exec /usr/bin/systemctl --no-pager --full status "${units[@]}"
+EOF
+}
+
+render_journal_managed_mounts_helper() {
+  cat <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+(($# == 0)) || {
+  printf 'this helper does not accept arguments\n' >&2
+  exit 64
+}
+
+manifest="/var/lib/local-mounts/managed-units.list"
+declare -a units=()
+declare -a args=()
+
+if [[ -f "$manifest" ]]; then
+  while IFS='|' read -r unit_name unit_state hook; do
+    [[ -n "$unit_name" ]] || continue
+    units+=("$unit_name")
+  done <"$manifest"
+fi
+
+((${#units[@]} > 0)) || {
+  printf 'no managed mount units are installed\n'
+  exit 0
+}
+
+for unit_name in "${units[@]}"; do
+  args+=("-u" "$unit_name")
+done
+
+exec /usr/bin/journalctl --no-pager --no-hostname -n 200 "${args[@]}"
+EOF
+}
+
+render_status_qbittorrent_helper() {
+  cat <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+(($# == 0)) || {
+  printf 'this helper does not accept arguments\n' >&2
+  exit 64
+}
+
+exec /usr/bin/systemctl --no-pager --full status qbittorrent-nox.service
+EOF
+}
+
+render_journal_qbittorrent_helper() {
+  cat <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+(($# == 0)) || {
+  printf 'this helper does not accept arguments\n' >&2
+  exit 64
+}
+
+exec /usr/bin/journalctl --no-pager --no-hostname -n 200 -u qbittorrent-nox.service
+EOF
+}
+
+install_managed_sudoers_helpers() {
+  write_root_helper_script "$SYSTEM_STATUS_MANAGED_MOUNTS_HELPER" "$(render_status_managed_mounts_helper)"
+  write_root_helper_script "$SYSTEM_JOURNAL_MANAGED_MOUNTS_HELPER" "$(render_journal_managed_mounts_helper)"
+  write_root_helper_script "$SYSTEM_STATUS_QBITTORRENT_HELPER" "$(render_status_qbittorrent_helper)"
+  write_root_helper_script "$SYSTEM_JOURNAL_QBITTORRENT_HELPER" "$(render_journal_qbittorrent_helper)"
+}
+
 build_managed_sudoers_candidate() {
   local destination_path="$1"
 
@@ -79,81 +197,20 @@ Defaults:${SYSTEM_TARGET_USER} use_pty
 Defaults:${SYSTEM_TARGET_USER} !setenv
 Defaults:${SYSTEM_TARGET_USER} secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Defaults:${SYSTEM_TARGET_USER} passwd_tries=3
-Defaults:${SYSTEM_TARGET_USER} timestamp_timeout=15
+Defaults:${SYSTEM_TARGET_USER} timestamp_timeout=5
 Defaults:${SYSTEM_TARGET_USER} verifypw=always
 Defaults:${SYSTEM_TARGET_USER} listpw=always
 
 Runas_Alias LOCAL_ADMIN_ROOT = root
 
-Cmnd_Alias LOCAL_PKG_QUERY = \
-    /usr/bin/apt-cache policy, \
-    /usr/bin/apt-cache policy *, \
-    /usr/bin/apt-cache search *, \
-    /usr/bin/apt-cache show *, \
-    /usr/bin/apt list, \
-    /usr/bin/apt list *, \
-    /usr/bin/dpkg -l, \
-    /usr/bin/dpkg -l *, \
-    /usr/bin/dpkg-query -l, \
-    /usr/bin/dpkg-query -W, \
-    /usr/bin/dpkg-query -W *
-Cmnd_Alias LOCAL_PKG_MAINT = \
-    /usr/bin/apt update, \
-    /usr/bin/apt update *, \
-    /usr/bin/apt upgrade, \
-    /usr/bin/apt upgrade *, \
-    /usr/bin/apt full-upgrade, \
-    /usr/bin/apt full-upgrade *, \
-    /usr/bin/apt autoremove, \
-    /usr/bin/apt autoremove *, \
-    /usr/bin/apt autoclean, \
-    /usr/bin/apt clean, \
-    /usr/bin/apt-get update, \
-    /usr/bin/apt-get update *, \
-    /usr/bin/apt-get upgrade, \
-    /usr/bin/apt-get upgrade *, \
-    /usr/bin/apt-get full-upgrade, \
-    /usr/bin/apt-get full-upgrade *, \
-    /usr/bin/apt-get dist-upgrade, \
-    /usr/bin/apt-get dist-upgrade *, \
-    /usr/bin/apt-get autoremove, \
-    /usr/bin/apt-get autoremove *, \
-    /usr/bin/apt-get autoclean, \
-    /usr/bin/apt-get clean
-Cmnd_Alias LOCAL_STORAGE_READ = \
-    /usr/bin/findmnt, \
-    /usr/bin/findmnt *, \
-    /usr/bin/lsblk, \
-    /usr/bin/lsblk *, \
-    /usr/sbin/blkid, \
-    /usr/sbin/blkid *
-Cmnd_Alias LOCAL_DATA_DIRS = \
-    /usr/bin/install -d /data/*, \
-    /usr/bin/install -d * /data/*, \
-    /usr/bin/mkdir -p /data/*, \
-    /usr/bin/chown * /data/*, \
-    /usr/bin/chmod * /data/*, \
-    /usr/bin/find /data/*, \
-    /usr/bin/stat /data/*, \
-    /usr/bin/ls /data/*
-Cmnd_Alias LOCAL_MOUNTS = \
-    /usr/bin/mount /data/mnt/g-drive*, \
-    /usr/bin/umount /data/mnt/g-drive*
-Cmnd_Alias LOCAL_SERVICE_READ = \
-    /usr/bin/systemctl status *, \
-    /usr/bin/systemctl is-active *, \
-    /usr/bin/systemctl is-enabled *, \
-    /usr/bin/journalctl -u *, \
-    /usr/bin/journalctl -xeu *, \
-    /usr/bin/journalctl -n * -u *
+Cmnd_Alias LOCAL_STATUS_READ = \
+    ${SYSTEM_STATUS_MANAGED_MOUNTS_HELPER}, \
+    ${SYSTEM_JOURNAL_MANAGED_MOUNTS_HELPER}, \
+    ${SYSTEM_STATUS_QBITTORRENT_HELPER}, \
+    ${SYSTEM_JOURNAL_QBITTORRENT_HELPER}
 
 ${SYSTEM_TARGET_USER} ALL = (LOCAL_ADMIN_ROOT) NOPASSWD: \
-    LOCAL_PKG_QUERY, \
-    LOCAL_PKG_MAINT, \
-    LOCAL_STORAGE_READ, \
-    LOCAL_DATA_DIRS, \
-    LOCAL_MOUNTS, \
-    LOCAL_SERVICE_READ
+    LOCAL_STATUS_READ
 ${SYSTEM_TARGET_USER} ALL = (ALL:ALL) PASSWD: ALL
 EOF
 }
@@ -232,6 +289,7 @@ apply_managed_sudoers() {
   local candidate_path
 
   ensure_sudoers_dropin_dir
+  install_managed_sudoers_helpers
   candidate_path="$(mktemp)"
   build_managed_sudoers_candidate "$candidate_path"
   validate_sudoers_candidate "$candidate_path"
@@ -256,19 +314,28 @@ apply_managed_sudoers() {
 remove_managed_sudoers() {
   if [[ ! -e "$SYSTEM_SUDOERS_DROPIN_PATH" ]]; then
     log_info "no managed sudoers policy present"
-    return 0
+  else
+    run_cmd rm -f -- "$SYSTEM_SUDOERS_DROPIN_PATH"
+    if ! "$SYSTEM_VISUDO_BIN" -cf "$SYSTEM_SUDOERS_PATH" >/dev/null; then
+      die "live sudoers validation failed after removing $SYSTEM_SUDOERS_DROPIN_PATH"
+    fi
+
+    log_info "removed managed sudoers policy from $SYSTEM_SUDOERS_DROPIN_PATH"
   fi
 
-  run_cmd rm -f -- "$SYSTEM_SUDOERS_DROPIN_PATH"
-  if ! "$SYSTEM_VISUDO_BIN" -cf "$SYSTEM_SUDOERS_PATH" >/dev/null; then
-    die "live sudoers validation failed after removing $SYSTEM_SUDOERS_DROPIN_PATH"
-  fi
+  run_cmd rm -f -- \
+    "$SYSTEM_STATUS_MANAGED_MOUNTS_HELPER" \
+    "$SYSTEM_JOURNAL_MANAGED_MOUNTS_HELPER" \
+    "$SYSTEM_STATUS_QBITTORRENT_HELPER" \
+    "$SYSTEM_JOURNAL_QBITTORRENT_HELPER"
 
-  log_info "removed managed sudoers policy from $SYSTEM_SUDOERS_DROPIN_PATH"
+  if [[ -d "$SYSTEM_SUDOERS_HELPER_DIR" ]] && [[ -z "$(find "$SYSTEM_SUDOERS_HELPER_DIR" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+    run_cmd rmdir -- "$SYSTEM_SUDOERS_HELPER_DIR"
+  fi
 }
 
 verify_managed_sudoers() {
-  local candidate_path actual_state
+  local candidate_path actual_state helper_path
 
   require_file "$SYSTEM_SUDOERS_DROPIN_PATH"
   candidate_path="$(mktemp)"
@@ -283,6 +350,18 @@ verify_managed_sudoers() {
   [[ "$actual_state" == "root:root:${SYSTEM_SUDOERS_DROPIN_MODE#0}" ]] || {
     die "unexpected sudoers drop-in state for $SYSTEM_SUDOERS_DROPIN_PATH: $actual_state"
   }
+
+  for helper_path in \
+    "$SYSTEM_STATUS_MANAGED_MOUNTS_HELPER" \
+    "$SYSTEM_JOURNAL_MANAGED_MOUNTS_HELPER" \
+    "$SYSTEM_STATUS_QBITTORRENT_HELPER" \
+    "$SYSTEM_JOURNAL_QBITTORRENT_HELPER"; do
+    require_file "$helper_path"
+    actual_state="$(stat -c '%U:%G:%a' "$helper_path")"
+    [[ "$actual_state" == "root:root:755" ]] || {
+      die "unexpected helper state for $helper_path: $actual_state"
+    }
+  done
 
   "$SYSTEM_VISUDO_BIN" -cf "$SYSTEM_SUDOERS_PATH" >/dev/null || {
     die "sudoers validation failed for $SYSTEM_SUDOERS_PATH"

@@ -32,15 +32,18 @@ require_directory() {
   [[ -d "$1" ]] || die "missing directory: $1"
 }
 
-require_exact_mountpoint() {
+mountpoint_is_live() {
   local path="$1"
   local target fstype
+
   target="$(findmnt -rn -M "$path" -o TARGET 2>/dev/null || true)"
   fstype="$(findmnt -rn -M "$path" -o FSTYPE 2>/dev/null || true)"
+  [[ "$target" == "$path" && -n "$fstype" && "$fstype" != "autofs" ]]
+}
 
-  # Treat autofs as "not mounted yet" so phases that require the real drive
-  # fail fast until the backing filesystem is actually mounted.
-  if [[ "$target" == "$path" && -n "$fstype" && "$fstype" != "autofs" ]]; then
+require_exact_mountpoint() {
+  local path="$1"
+  if mountpoint_is_live "$path"; then
     return 0
   fi
 

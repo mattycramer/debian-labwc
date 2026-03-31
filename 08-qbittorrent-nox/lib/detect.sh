@@ -24,8 +24,6 @@ capture_mount_metadata() {
   local prefix="$2"
   local target source fstype
 
-  require_exact_mountpoint "$path"
-
   target="$(findmnt -rn -M "$path" -o TARGET)"
   source="$(findmnt -rn -M "$path" -o SOURCE)"
   fstype="$(findmnt -rn -M "$path" -o FSTYPE)"
@@ -96,8 +94,14 @@ detect_install_context() {
   local env_file="$1"
 
   detect_target_user
-  capture_mount_metadata "$QBT_TORRENTS_ROOT" "QBT_TORRENTS_ROOT"
-  write_autogen_block "$env_file"
+  if mountpoint_is_live "$QBT_TORRENTS_ROOT"; then
+    capture_mount_metadata "$QBT_TORRENTS_ROOT" "QBT_TORRENTS_ROOT"
+    log_info "detected mounted torrent root: user=${QBT_TARGET_USER}, source=${QBT_TORRENTS_ROOT_SOURCE}, fstype=${QBT_TORRENTS_ROOT_FSTYPE}"
+  else
+    QBT_TORRENTS_ROOT_SOURCE=""
+    QBT_TORRENTS_ROOT_FSTYPE=""
+    log_warn "torrent root is not mounted; keeping detection state but deferring runtime mount checks until the drive is connected"
+  fi
 
-  log_info "detected mounted torrent root: user=${QBT_TARGET_USER}, source=${QBT_TORRENTS_ROOT_SOURCE}, fstype=${QBT_TORRENTS_ROOT_FSTYPE}"
+  write_autogen_block "$env_file"
 }

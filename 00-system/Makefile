@@ -8,9 +8,9 @@ help:
 	  '  NOTE:        Run make as a non-root user; do not use sudo make' \
 	  '  help         Show this message' \
 	  '  doctor       Validate platform assumptions and resolve the invoking user' \
-	  '  mounts       Install four device-gated top-level g-drive automount/mount units from mounts.conf' \
+	  '  mounts       Install four device-gated top-level g-drive mount/watch units from mounts.conf' \
 	  '  permissions  Create the hardened torrent account, add the invoking user to torrent, and repair required path ownership/modes' \
-	  '  sudoers      Install the hardened invoking-user policy under /etc/sudoers.d' \
+	  '  sudoers      Install the hardened invoking-user policy and read-only helper wrappers under /etc/sudoers.d' \
 	  '  install      Run doctor, mounts, permissions, sudoers, and verify' \
 	  '  verify       Check generated mount units, sudoers, and required path permissions' \
 	  '  print-env    Print resolved target user/path state' \

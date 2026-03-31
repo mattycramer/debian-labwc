@@ -8,10 +8,6 @@ readonly QBT_CONFIG_PATH="${QBT_CONFIG_DIR}/qBittorrent.conf"
 readonly QBT_DATA_DIR="${QBT_RUNTIME_ROOT}/.local/share/data/qBittorrent"
 readonly QBT_SERVICE_NAME="qbittorrent-nox.service"
 readonly QBT_SERVICE_PATH="/etc/systemd/system/${QBT_SERVICE_NAME}"
-readonly QBT_DEVICE_WATCH_SERVICE_NAME="qbittorrent-nox-device-watch.service"
-readonly QBT_DEVICE_WATCH_SERVICE_PATH="/etc/systemd/system/${QBT_DEVICE_WATCH_SERVICE_NAME}"
-readonly QBT_DEVICE_WATCH_PATH_NAME="qbittorrent-nox-device-watch.path"
-readonly QBT_DEVICE_WATCH_PATH_PATH="/etc/systemd/system/${QBT_DEVICE_WATCH_PATH_NAME}"
 readonly QBT_APPARMOR_PROFILE_NAME="usr.bin.qbittorrent-nox"
 readonly QBT_APPARMOR_PROFILE_PATH="/etc/apparmor.d/${QBT_APPARMOR_PROFILE_NAME}"
 readonly QBT_HELPER_DIR="/usr/local/libexec/labwc-qbittorrent"
@@ -20,8 +16,6 @@ readonly QBT_TORRENTS_ROOT="/data/mnt/g-drive/torrents"
 readonly QBT_TORRENTS_COMPLETE="${QBT_TORRENTS_ROOT}/complete"
 readonly QBT_TORRENTS_TEMP="${QBT_TORRENTS_ROOT}/temp"
 readonly QBT_TORRENTS_ROOT_MOUNT_UNIT="data-mnt-g\\x2ddrive-torrents.mount"
-readonly QBT_TORRENTS_ROOT_AUTOMOUNT_UNIT="data-mnt-g\\x2ddrive-torrents.automount"
-readonly QBT_TORRENTS_DEVICE_WATCH_PATH="/dev/disk/by-label/torrents"
 
 torrent_nologin_shell() {
   command -v nologin
@@ -93,6 +87,10 @@ require_torrent_service_account() {
 
 ensure_torrent_mounts_present() {
   require_exact_mountpoint "$QBT_TORRENTS_ROOT"
+}
+
+torrent_root_is_mounted() {
+  mountpoint_is_live "$QBT_TORRENTS_ROOT"
 }
 
 set_torrent_path_state() {
@@ -219,6 +217,8 @@ if [[ "\$(findmnt -rn -M \"$QBT_TORRENTS_ROOT\" -o TARGET 2>/dev/null || true)" 
 fi
 
 for path in "$QBT_TORRENTS_COMPLETE" "$QBT_TORRENTS_TEMP"; do
+  mkdir -p "\$path"
+  chmod 2770 "\$path"
   if [[ ! -d "\$path" ]]; then
     printf 'required qBittorrent data directory is missing: %s\\n' "\$path" >&2
     exit 1
@@ -340,6 +340,7 @@ Wants=network-online.target
 After=network-online.target nss-lookup.target local-fs.target ${QBT_TORRENTS_ROOT_MOUNT_UNIT}
 BindsTo=${QBT_TORRENTS_ROOT_MOUNT_UNIT}
 RequiresMountsFor=${QBT_TORRENTS_ROOT}
+PartOf=${QBT_TORRENTS_ROOT_MOUNT_UNIT}
 
 [Service]
 Type=exec
@@ -390,46 +391,13 @@ KeyringMode=private
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=qbittorrent-nox
+
+[Install]
+WantedBy=${QBT_TORRENTS_ROOT_MOUNT_UNIT}
 EOF
 )"
 
   write_root_file "$QBT_SERVICE_PATH" 0644 "$content"
-}
-
-render_device_watch_service() {
-  local content
-  content="$(cat <<EOF
-[Unit]
-Description=Start qBittorrent when the torrents device appears
-Documentation=man:systemd.path(5) man:systemd.service(5)
-ConditionPathExists=${QBT_TORRENTS_DEVICE_WATCH_PATH}
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/systemctl start ${QBT_TORRENTS_ROOT_AUTOMOUNT_UNIT} ${QBT_SERVICE_NAME}
-EOF
-)"
-
-  write_root_file "$QBT_DEVICE_WATCH_SERVICE_PATH" 0644 "$content"
-}
-
-render_device_watch_path() {
-  local content
-  content="$(cat <<EOF
-[Unit]
-Description=Watch the torrents device path and start qBittorrent on hot-plug
-Documentation=man:systemd.path(5)
-
-[Path]
-PathExists=${QBT_TORRENTS_DEVICE_WATCH_PATH}
-Unit=${QBT_DEVICE_WATCH_SERVICE_NAME}
-
-[Install]
-WantedBy=multi-user.target
-EOF
-)"
-
-  write_root_file "$QBT_DEVICE_WATCH_PATH_PATH" 0644 "$content"
 }
 
 render_apparmor_profile() {
@@ -483,8 +451,6 @@ render_all_configs() {
   render_mount_check_script
   render_qbittorrent_config
   render_systemd_service
-  render_device_watch_service
-  render_device_watch_path
   render_apparmor_profile
 }
 
@@ -499,10 +465,7 @@ load_qbittorrent_apparmor_profile() {
 
 validate_qbittorrent_unit_files() {
   if command -v systemd-analyze >/dev/null 2>&1; then
-    run_cmd systemd-analyze verify \
-      "$QBT_SERVICE_PATH" \
-      "$QBT_DEVICE_WATCH_SERVICE_PATH" \
-      "$QBT_DEVICE_WATCH_PATH_PATH"
+    run_cmd systemd-analyze verify "$QBT_SERVICE_PATH"
   fi
 }
 
@@ -510,9 +473,15 @@ enable_qbittorrent_service() {
   load_qbittorrent_apparmor_profile
   run_cmd systemctl daemon-reload
   validate_qbittorrent_unit_files
-  run_cmd systemctl enable --now "$QBT_DEVICE_WATCH_PATH_NAME"
+  run_cmd systemctl enable "$QBT_SERVICE_NAME"
   run_cmd systemctl reset-failed "$QBT_SERVICE_NAME" >/dev/null 2>&1 || true
-  run_cmd systemctl start "$QBT_TORRENTS_ROOT_AUTOMOUNT_UNIT" "$QBT_SERVICE_NAME"
+  if torrent_root_is_mounted; then
+    ensure_torrent_data_directories
+    run_cmd systemctl start "$QBT_TORRENTS_ROOT_MOUNT_UNIT" "$QBT_SERVICE_NAME"
+  else
+    run_cmd systemctl stop "$QBT_SERVICE_NAME" >/dev/null 2>&1 || true
+    log_info "torrent root is not mounted; ${QBT_SERVICE_NAME} is enabled and will start when ${QBT_TORRENTS_ROOT_MOUNT_UNIT} activates"
+  fi
 }
 
 print_env_redacted() {
@@ -526,13 +495,7 @@ print_env_redacted() {
 
 remove_qbittorrent_install() {
   if systemctl list-unit-files "$QBT_SERVICE_NAME" >/dev/null 2>&1; then
-    run_cmd systemctl stop "$QBT_SERVICE_NAME" >/dev/null 2>&1 || true
-  fi
-  if systemctl list-unit-files "$QBT_DEVICE_WATCH_PATH_NAME" >/dev/null 2>&1; then
-    run_cmd systemctl disable --now "$QBT_DEVICE_WATCH_PATH_NAME" >/dev/null 2>&1 || true
-  fi
-  if systemctl list-unit-files "$QBT_DEVICE_WATCH_SERVICE_NAME" >/dev/null 2>&1; then
-    run_cmd systemctl stop "$QBT_DEVICE_WATCH_SERVICE_NAME" >/dev/null 2>&1 || true
+    run_cmd systemctl disable --now "$QBT_SERVICE_NAME" >/dev/null 2>&1 || true
   fi
 
   if [[ -f "$QBT_APPARMOR_PROFILE_PATH" ]] && command -v apparmor_parser >/dev/null 2>&1; then
@@ -541,8 +504,6 @@ remove_qbittorrent_install() {
 
   run_cmd rm -f -- \
     "$QBT_SERVICE_PATH" \
-    "$QBT_DEVICE_WATCH_SERVICE_PATH" \
-    "$QBT_DEVICE_WATCH_PATH_PATH" \
     "$QBT_APPARMOR_PROFILE_PATH" \
     "$QBT_MOUNT_CHECK_PATH"
   run_cmd rmdir --ignore-fail-on-non-empty "$QBT_HELPER_DIR" 2>/dev/null || true

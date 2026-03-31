@@ -80,6 +80,8 @@ run_preflight_checks() {
   require_command groupadd
   require_command id
   require_command install
+  require_command journalctl
+  require_command lsblk
   require_command mktemp
   require_command nologin
   require_command readlink
