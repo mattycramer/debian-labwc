@@ -54,14 +54,14 @@ render_debian_components_sources() {
 Types: deb
 URIs: https://deb.debian.org/debian
 Suites: ${HOST_DEBIAN_CODENAME} ${NVIDIA_DEBIAN_UPDATES_SUITE}
-Components: contrib non-free non-free-firmware
+Components: contrib
 Architectures: amd64
 Signed-By: ${DEBIAN_ARCHIVE_KEYRING_PATH}
 
 Types: deb
 URIs: https://security.debian.org/debian-security
 Suites: ${NVIDIA_DEBIAN_SECURITY_SUITE}
-Components: contrib non-free non-free-firmware
+Components: contrib
 Architectures: amd64
 Signed-By: ${DEBIAN_ARCHIVE_KEYRING_PATH}
 EOF

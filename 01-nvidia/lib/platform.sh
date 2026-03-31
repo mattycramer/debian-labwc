@@ -78,7 +78,7 @@ validate_config() {
   require_value_in_set "NVIDIA_KERNEL_MODULE_FLAVOR" "$NVIDIA_KERNEL_MODULE_FLAVOR" proprietary open
   require_boolean_setting "NVIDIA_INSTALL_SWITCHEROO_CONTROL" "$NVIDIA_INSTALL_SWITCHEROO_CONTROL"
   require_boolean_setting "NVIDIA_ENABLE_DRM_MODESET" "$NVIDIA_ENABLE_DRM_MODESET"
-  if [[ -n "$NVIDIA_DRIVER_PIN_PACKAGE" ]]; then
+  if [[ -n "$NVIDIA_DRIVER_PIN_PACKAGE" && "$NVIDIA_DRIVER_PIN_PACKAGE" != "auto" ]]; then
     require_regex_match "NVIDIA_DRIVER_PIN_PACKAGE" "$NVIDIA_DRIVER_PIN_PACKAGE" '^nvidia-driver-pinning-[A-Za-z0-9][A-Za-z0-9._-]*$'
   fi
   require_regex_match "CUDA_TOOLKIT_PACKAGE" "$CUDA_TOOLKIT_PACKAGE" '^cuda-toolkit(-[0-9]+){0,2}$'
@@ -95,6 +95,7 @@ resolve_platform_config() {
   NVIDIA_CURRENT_KERNEL_HEADERS_PACKAGE="linux-headers-$(uname -r)"
   NVIDIA_DEBIAN_UPDATES_SUITE="${HOST_DEBIAN_CODENAME}-updates"
   NVIDIA_DEBIAN_SECURITY_SUITE="${HOST_DEBIAN_CODENAME}-security"
+  NVIDIA_DRIVER_META_PACKAGE=""
 
   if gpu_vendor_present "$NVIDIA_VENDOR_HEX"; then
     NVIDIA_HAS_NVIDIA_GPU="yes"
@@ -105,6 +106,18 @@ resolve_platform_config() {
   if intel_media_driver_installed; then
     NVIDIA_HAS_INTEL_MEDIA_DRIVER="yes"
   fi
+
+  case "$NVIDIA_KERNEL_MODULE_FLAVOR" in
+    proprietary)
+      NVIDIA_DRIVER_META_PACKAGE="cuda-drivers"
+      ;;
+    open)
+      NVIDIA_DRIVER_META_PACKAGE="nvidia-open"
+      ;;
+    *)
+      die "unsupported NVIDIA_KERNEL_MODULE_FLAVOR '$NVIDIA_KERNEL_MODULE_FLAVOR'"
+      ;;
+  esac
 }
 
 log_platform_summary() {
@@ -121,6 +134,7 @@ NVIDIA_INSTALL=${NVIDIA_INSTALL}
 NVIDIA_UPSTREAM_DISTRO=${NVIDIA_UPSTREAM_DISTRO}
 NVIDIA_REPO_DISTRO=${NVIDIA_REPO_DISTRO}
 NVIDIA_KERNEL_MODULE_FLAVOR=${NVIDIA_KERNEL_MODULE_FLAVOR}
+NVIDIA_DRIVER_META_PACKAGE=${NVIDIA_DRIVER_META_PACKAGE}
 NVIDIA_DRIVER_PIN_PACKAGE=${NVIDIA_DRIVER_PIN_PACKAGE}
 CUDA_TOOLKIT_PACKAGE=${CUDA_TOOLKIT_PACKAGE}
 NVIDIA_INSTALL_SWITCHEROO_CONTROL=${NVIDIA_INSTALL_SWITCHEROO_CONTROL}
@@ -152,17 +166,7 @@ resolved_debian_prerequisite_packages() {
 }
 
 resolved_nvidia_driver_packages() {
-  case "$NVIDIA_KERNEL_MODULE_FLAVOR" in
-    proprietary)
-      printf '%s\n' nvidia-driver nvidia-kernel-dkms
-      ;;
-    open)
-      printf '%s\n' nvidia-driver nvidia-kernel-open-dkms
-      ;;
-    *)
-      die "unsupported NVIDIA_KERNEL_MODULE_FLAVOR '$NVIDIA_KERNEL_MODULE_FLAVOR'"
-      ;;
-  esac
+  printf '%s\n' "$NVIDIA_DRIVER_META_PACKAGE"
 }
 
 resolved_cuda_toolkit_packages() {
@@ -172,7 +176,7 @@ resolved_cuda_toolkit_packages() {
 resolved_nvidia_anchor_packages() {
   resolved_nvidia_driver_packages
   resolved_cuda_toolkit_packages
-  if [[ -n "$NVIDIA_DRIVER_PIN_PACKAGE" ]]; then
+  if [[ -n "$NVIDIA_DRIVER_PIN_PACKAGE" && "$NVIDIA_DRIVER_PIN_PACKAGE" != "auto" ]]; then
     printf '%s\n' "$NVIDIA_DRIVER_PIN_PACKAGE"
   fi
   printf '%s\n' cuda-keyring
@@ -181,9 +185,14 @@ resolved_nvidia_anchor_packages() {
 resolved_nvidia_removal_patterns() {
   printf '%s\n' \
     cuda-keyring \
+    cuda-drivers \
+    'cuda-drivers-*' \
     cuda-toolkit \
     'cuda-toolkit-*' \
+    nvidia-open \
+    'nvidia-open-*' \
     nvidia-driver \
+    nvidia-driver-cuda \
     nvidia-kernel-dkms \
     nvidia-kernel-open-dkms \
     'nvidia-driver-pinning-*'

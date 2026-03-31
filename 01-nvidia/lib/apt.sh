@@ -31,6 +31,45 @@ package_installed() {
   dpkg-query -W -f='${Status}\n' "$1" 2>/dev/null | grep -Fx 'install ok installed' >/dev/null
 }
 
+package_available() {
+  apt-cache show "$1" >/dev/null 2>&1
+}
+
+apt_candidate_version() {
+  local package_name="$1"
+  apt-cache policy "$package_name" | awk '/Candidate:/ { print $2; exit }'
+}
+
+resolve_driver_pinning_package() {
+  local candidate_version=""
+  local driver_version=""
+  local selected_package=""
+  local major_branch=""
+
+  case "$NVIDIA_DRIVER_PIN_PACKAGE" in
+    "")
+      return 1
+      ;;
+    auto)
+      candidate_version="$(apt_candidate_version "$NVIDIA_DRIVER_META_PACKAGE")"
+      [[ -n "$candidate_version" && "$candidate_version" != "(none)" ]] || die "unable to determine the candidate version for $NVIDIA_DRIVER_META_PACKAGE"
+      driver_version="${candidate_version%%-*}"
+      selected_package="nvidia-driver-pinning-${driver_version}"
+      if ! package_available "$selected_package"; then
+        major_branch="${driver_version%%.*}"
+        selected_package="nvidia-driver-pinning-${major_branch}"
+        package_available "$selected_package" || die "unable to resolve a matching NVIDIA driver pinning package for $NVIDIA_DRIVER_META_PACKAGE candidate version $candidate_version"
+      fi
+      ;;
+    *)
+      selected_package="$NVIDIA_DRIVER_PIN_PACKAGE"
+      package_available "$selected_package" || die "requested pinning package '$selected_package' is not available from the configured repositories"
+      ;;
+  esac
+
+  printf '%s\n' "$selected_package"
+}
+
 install_package_group() {
   local label="$1"
   shift
@@ -47,9 +86,9 @@ install_package_group() {
 verify_nvidia_upstream_repository() {
   local driver_policy=""
   local toolkit_policy=""
-  driver_policy="$(apt-cache policy nvidia-driver)"
+  driver_policy="$(apt-cache policy "$NVIDIA_DRIVER_META_PACKAGE")"
   toolkit_policy="$(apt-cache policy "$CUDA_TOOLKIT_PACKAGE")"
-  grep -F 'developer.download.nvidia.com' <<<"$driver_policy" >/dev/null || die "nvidia-driver is not visible from the NVIDIA upstream repo"
+  grep -F 'developer.download.nvidia.com' <<<"$driver_policy" >/dev/null || die "$NVIDIA_DRIVER_META_PACKAGE is not visible from the NVIDIA upstream repo"
   grep -F 'developer.download.nvidia.com' <<<"$toolkit_policy" >/dev/null || die "$CUDA_TOOLKIT_PACKAGE is not visible from the NVIDIA upstream repo"
 }
 
@@ -60,8 +99,9 @@ install_debian_prerequisite_packages() {
 }
 
 install_optional_driver_pinning_package() {
-  [[ -n "$NVIDIA_DRIVER_PIN_PACKAGE" ]] || return 0
-  install_package_group "NVIDIA driver pinning package" "$NVIDIA_DRIVER_PIN_PACKAGE"
+  local selected_package=""
+  selected_package="$(resolve_driver_pinning_package)" || return 0
+  install_package_group "NVIDIA driver pinning package" "$selected_package"
 }
 
 install_nvidia_stack() {
