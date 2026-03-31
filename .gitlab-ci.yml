@@ -12,6 +12,12 @@ stages:
 include:
   - project: '${GL_CICD_SHARED_PROJ}'
     ref: main
+    file: '/release/common.yml'
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
+    file: '/github/common.yml'
+  - project: '${GL_CICD_SHARED_PROJ}'
+    ref: main
     file: '/github/validate.yml'
   - project: '${GL_CICD_SHARED_PROJ}'
     ref: main
