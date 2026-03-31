@@ -6,12 +6,12 @@ help:
 	@printf '%s\n' \
 	  '08-qbittorrent-nox targets:' \
 	  '  doctor    Validate host prerequisites for the hardened qBittorrent-nox module' \
-	  '  detect    Confirm the mounted torrent filesystems and capture the invoking user into .env' \
+	  '  detect    Confirm the mounted torrent root and capture the invoking user into .env' \
 	  '  install   Run doctor, detect, packages, render, enable, and verify' \
 	  '  packages  Install qBittorrent-nox and AppArmor tooling' \
-	  '  render    Render the managed qBittorrent config, mount-check helper, systemd unit, and AppArmor profile' \
+	  '  render    Render the managed qBittorrent config, root-mount guard, systemd unit, and AppArmor profile' \
 	  '  enable    Use the existing hardened torrent account, load AppArmor, and enable the service' \
-	  '  verify    Verify package state, mount enforcement, service hardening, and AppArmor enforcement' \
+	  '  verify    Verify package state, root-mount enforcement, service hardening, and AppArmor enforcement' \
 	  '  nuke      Disable the managed service and remove managed config, helper, AppArmor, and state files' \
 	  '  print-env Show the effective managed environment values with secrets redacted'
 

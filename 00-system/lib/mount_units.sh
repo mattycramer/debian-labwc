@@ -147,9 +147,23 @@ automount_unit_name_from_target() {
   systemd-escape --path --suffix=automount "$1"
 }
 
+device_unit_name_from_device_path() {
+  systemd-escape --path --suffix=device "$1"
+}
+
 ownership_service_name_from_mount_unit() {
   local mount_unit="$1"
   printf '%s-ownership.service' "${mount_unit%.mount}"
+}
+
+activation_service_name_from_automount_unit() {
+  local automount_unit="$1"
+  printf '%s-activate.service' "${automount_unit%.automount}"
+}
+
+device_watch_path_name_from_automount_unit() {
+  local automount_unit="$1"
+  printf '%s-watch.path' "${automount_unit%.automount}"
 }
 
 current_mount_fstype() {
@@ -169,11 +183,11 @@ generate_mount_unit_file() {
   local fs_type="$3"
   local options="$4"
   local timeout="$5"
-  local parent_mount_unit="$6"
-  local destination_path="$7"
-  local device_path requires_path
+  local destination_path="$6"
+  local device_path device_unit requires_path
 
   device_path="$(resolve_mount_device_path "$source")"
+  device_unit="$(device_unit_name_from_device_path "$device_path")"
   requires_path="$(dirname -- "$where")"
 
   cat >"$destination_path" <<EOF
@@ -182,6 +196,8 @@ generate_mount_unit_file() {
 Description=Local mount for $where
 Documentation=man:systemd.mount(5)
 ConditionPathExists=$device_path
+BindsTo=$device_unit
+After=$device_unit
 RequiresMountsFor=$requires_path
 
 [Mount]
@@ -191,36 +207,81 @@ Type=$fs_type
 Options=$options
 TimeoutSec=$timeout
 EOF
-
-  if [[ -n "$parent_mount_unit" ]]; then
-    cat >>"$destination_path" <<EOF
-
-[Install]
-WantedBy=$parent_mount_unit
-EOF
-  fi
 }
 
 generate_automount_unit_file() {
   local where="$1"
-  local idle_timeout="${2:-}"
-  local destination_path="$3"
+  local source="$2"
+  local idle_timeout="${3:-}"
+  local destination_path="$4"
+  local device_path device_unit
 
   [[ -n "$idle_timeout" ]] || idle_timeout="$SYSTEM_AUTOMOUNT_IDLE_TIMEOUT"
+  device_path="$(resolve_mount_device_path "$source")"
+  device_unit="$(device_unit_name_from_device_path "$device_path")"
 
   cat >"$destination_path" <<EOF
 # Managed locally. Do not edit manually.
 [Unit]
 Description=Local automount for $where
 Documentation=man:systemd.automount(5)
+ConditionPathExists=$device_path
+BindsTo=$device_unit
+After=$device_unit
 
 [Automount]
 Where=$where
 DirectoryMode=0755
 TimeoutIdleSec=$idle_timeout
+EOF
+}
+
+generate_activation_service_file() {
+  local where="$1"
+  local source="$2"
+  local automount_unit="$3"
+  local destination_path="$4"
+  local device_path device_unit
+
+  device_path="$(resolve_mount_device_path "$source")"
+  device_unit="$(device_unit_name_from_device_path "$device_path")"
+
+  cat >"$destination_path" <<EOF
+# Managed locally. Do not edit manually.
+[Unit]
+Description=Activate the automount for $where when the device is present
+Documentation=man:systemd.path(5) man:systemd.service(5)
+ConditionPathExists=$device_path
+BindsTo=$device_unit
+After=$device_unit
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl start $automount_unit
+EOF
+}
+
+generate_device_watch_path_file() {
+  local where="$1"
+  local source="$2"
+  local activation_service="$3"
+  local destination_path="$4"
+  local device_path
+
+  device_path="$(resolve_mount_device_path "$source")"
+
+  cat >"$destination_path" <<EOF
+# Managed locally. Do not edit manually.
+[Unit]
+Description=Watch $device_path and activate the automount for $where
+Documentation=man:systemd.path(5)
+
+[Path]
+PathExists=$device_path
+Unit=$activation_service
 
 [Install]
-WantedBy=local-fs.target
+WantedBy=multi-user.target
 EOF
 }
 
@@ -270,8 +331,8 @@ build_mount_unit_candidates() {
   local manifest_path="$2"
   local line_no=0
   local source where fs_type options timeout owner_token group_token mode automount_idle_timeout extra
-  local unit_name parent_path parent_unit candidate_path automount_unit ownership_unit
-  local parent_dir idx
+  local unit_name candidate_path automount_unit ownership_unit activation_service device_watch_path existing_target
+  local idx
   local -a sources=()
   local -a targets=()
   local -a fs_types=()
@@ -283,8 +344,6 @@ build_mount_unit_candidates() {
   local -a automount_idle_timeouts=()
   local -A seen_units=()
   local -A seen_targets=()
-  local -A target_exists=()
-  local -A mount_unit_by_target=()
 
   : >"$manifest_path"
   while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do
@@ -300,12 +359,16 @@ build_mount_unit_candidates() {
     validate_mount_entry "$source" "$where" "$fs_type" "$options" "$timeout" "$owner_token" "$group_token" "$mode" "$automount_idle_timeout"
     unit_name="$(mount_unit_name_from_target "$where")"
 
+    for existing_target in "${targets[@]}"; do
+      if [[ "$where" == "$existing_target/"* || "$existing_target" == "$where/"* ]]; then
+        die "nested managed mount targets are not supported: $where conflicts with $existing_target"
+      fi
+    done
+
     [[ -z "${seen_units[$unit_name]:-}" ]] || die "duplicate mount unit target in $MOUNTS_CONFIG_FILE: $where"
     [[ -z "${seen_targets[$where]:-}" ]] || die "duplicate mount path in $MOUNTS_CONFIG_FILE: $where"
     seen_units["$unit_name"]=1
     seen_targets["$where"]=1
-    target_exists["$where"]=1
-    mount_unit_by_target["$where"]="$unit_name"
 
     sources+=("$source")
     targets+=("$where")
@@ -330,36 +393,32 @@ build_mount_unit_candidates() {
     group_token="${group_tokens[$idx]}"
     mode="${modes[$idx]}"
     automount_idle_timeout="${automount_idle_timeouts[$idx]}"
-    unit_name="${mount_unit_by_target[$where]}"
+    unit_name="$(mount_unit_name_from_target "$where")"
 
-    parent_path=""
-    parent_dir="$(dirname -- "$where")"
-    while [[ "$parent_dir" != "/" && "$parent_dir" != "." ]]; do
-      if [[ -n "${target_exists[$parent_dir]:-}" ]]; then
-        parent_path="$parent_dir"
-        break
-      fi
-      parent_dir="$(dirname -- "$parent_dir")"
-    done
+    candidate_path="$destination_dir/$unit_name"
+    generate_mount_unit_file "$source" "$where" "$fs_type" "$options" "$timeout" "$candidate_path"
+    printf '%s|static|\n' "$unit_name" >>"$manifest_path"
 
-    parent_unit=""
-    if [[ -n "$parent_path" ]]; then
-      parent_unit="${mount_unit_by_target[$parent_path]}"
-      candidate_path="$destination_dir/$unit_name"
-      generate_mount_unit_file "$source" "$where" "$fs_type" "$options" "$timeout" "$parent_unit" "$candidate_path"
-      printf '%s|enabled|\n' "$unit_name" >>"$manifest_path"
-    else
-      candidate_path="$destination_dir/$unit_name"
-      generate_mount_unit_file "$source" "$where" "$fs_type" "$options" "$timeout" "" "$candidate_path"
-      printf '%s|static|\n' "$unit_name" >>"$manifest_path"
+    automount_unit="$(automount_unit_name_from_target "$where")"
+    [[ -z "${seen_units[$automount_unit]:-}" ]] || die "duplicate automount unit target in $MOUNTS_CONFIG_FILE: $where"
+    seen_units["$automount_unit"]=1
+    candidate_path="$destination_dir/$automount_unit"
+    generate_automount_unit_file "$where" "$source" "$automount_idle_timeout" "$candidate_path"
+    printf '%s|static|\n' "$automount_unit" >>"$manifest_path"
 
-      automount_unit="$(automount_unit_name_from_target "$where")"
-      [[ -z "${seen_units[$automount_unit]:-}" ]] || die "duplicate automount unit target in $MOUNTS_CONFIG_FILE: $where"
-      seen_units["$automount_unit"]=1
-      candidate_path="$destination_dir/$automount_unit"
-      generate_automount_unit_file "$where" "$automount_idle_timeout" "$candidate_path"
-      printf '%s|automount|\n' "$automount_unit" >>"$manifest_path"
-    fi
+    activation_service="$(activation_service_name_from_automount_unit "$automount_unit")"
+    [[ -z "${seen_units[$activation_service]:-}" ]] || die "duplicate activation service target in $MOUNTS_CONFIG_FILE: $where"
+    seen_units["$activation_service"]=1
+    candidate_path="$destination_dir/$activation_service"
+    generate_activation_service_file "$where" "$source" "$automount_unit" "$candidate_path"
+    printf '%s|static|\n' "$activation_service" >>"$manifest_path"
+
+    device_watch_path="$(device_watch_path_name_from_automount_unit "$automount_unit")"
+    [[ -z "${seen_units[$device_watch_path]:-}" ]] || die "duplicate device-watch path target in $MOUNTS_CONFIG_FILE: $where"
+    seen_units["$device_watch_path"]=1
+    candidate_path="$destination_dir/$device_watch_path"
+    generate_device_watch_path_file "$where" "$source" "$activation_service" "$candidate_path"
+    printf '%s|path|%s\n' "$device_watch_path" "$activation_service" >>"$manifest_path"
 
     ownership_unit="$(ownership_service_name_from_mount_unit "$unit_name")"
     [[ -z "${seen_units[$ownership_unit]:-}" ]] || die "duplicate ownership service target in $MOUNTS_CONFIG_FILE: $where"
@@ -405,7 +464,9 @@ read_managed_mount_manifest() {
 
 validate_mount_unit_candidates() {
   local candidate_dir="$1"
-  mapfile -t candidate_units < <(find "$candidate_dir" -maxdepth 1 -type f \( -name '*.mount' -o -name '*.automount' -o -name '*.service' \) | sort)
+  local -a candidate_units=()
+
+  mapfile -t candidate_units < <(find "$candidate_dir" -maxdepth 1 -type f \( -name '*.mount' -o -name '*.automount' -o -name '*.service' -o -name '*.path' \) | sort)
   ((${#candidate_units[@]} > 0)) || die "no mount unit candidates were generated"
   run_cmd systemd-analyze verify "${candidate_units[@]}"
 }
@@ -437,7 +498,9 @@ apply_managed_mount_units() {
     [[ -n "$unit_name" ]] || continue
     [[ -n "${desired_units[$unit_name]:-}" ]] && continue
     run_cmd systemctl stop "$unit_name" >/dev/null 2>&1 || true
-    run_cmd systemctl disable "$unit_name" >/dev/null 2>&1 || true
+    if [[ "$state" == "path" || "$state" == "ownership" ]]; then
+      run_cmd systemctl disable "$unit_name" >/dev/null 2>&1 || true
+    fi
     run_cmd rm -f -- "$SYSTEMD_UNIT_DIR/$unit_name"
   done < <(read_managed_mount_manifest)
 
@@ -457,11 +520,14 @@ apply_managed_mount_units() {
   while IFS='|' read -r unit_name state hook; do
     [[ -n "$unit_name" ]] || continue
     case "$state" in
-      automount)
+      path)
         run_cmd systemctl enable "$unit_name" >/dev/null
         run_cmd systemctl start "$unit_name"
+        if [[ -n "$hook" ]]; then
+          run_cmd systemctl start "$hook" >/dev/null 2>&1 || true
+        fi
         ;;
-      enabled|ownership)
+      ownership)
         run_cmd systemctl enable "$unit_name" >/dev/null
         ;;
       static)
@@ -491,7 +557,9 @@ remove_managed_mount_units() {
   while IFS='|' read -r unit_name state hook; do
     [[ -n "$unit_name" ]] || continue
     run_cmd systemctl stop "$unit_name" >/dev/null 2>&1 || true
-    run_cmd systemctl disable "$unit_name" >/dev/null 2>&1 || true
+    if [[ "$state" == "path" || "$state" == "ownership" ]]; then
+      run_cmd systemctl disable "$unit_name" >/dev/null 2>&1 || true
+    fi
     run_cmd rm -f -- "$SYSTEMD_UNIT_DIR/$unit_name"
     removed=1
   done < <(read_managed_mount_manifest)
@@ -527,11 +595,11 @@ verify_managed_mount_units() {
     require_file "$installed_path"
     cmp -s "$candidate_path" "$installed_path" || die "$installed_path does not match the generated mount-unit state"
     case "$state" in
-      automount)
+      path)
         run_cmd systemctl is-enabled "$unit_name" >/dev/null
         run_cmd systemctl is-active "$unit_name" >/dev/null
         ;;
-      enabled|ownership)
+      ownership)
         run_cmd systemctl is-enabled "$unit_name" >/dev/null
         ;;
       static)

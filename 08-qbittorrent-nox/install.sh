@@ -65,6 +65,8 @@ phase_doctor() {
   require_command apt
   require_command apt-cache
   require_command awk
+  require_command chmod
+  require_command chown
   require_command findmnt
   require_command getent
   require_command grep
@@ -114,6 +116,7 @@ phase_enable() {
   require_apparmor_runtime
   require_torrent_service_account
   ensure_torrent_mounts_present
+  ensure_torrent_data_directories
   ensure_runtime_directories
   render_all_configs
   enable_qbittorrent_service

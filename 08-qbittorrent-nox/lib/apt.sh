@@ -33,16 +33,16 @@ apt_yes_args() {
 
 apt_update() {
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
-    apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
+    apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20 -o DPkg::Lock::Timeout=60
 }
 
 install_qbittorrent_packages() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
-    apt install --no-install-recommends "${apt_args[@]}" "${QBT_PACKAGES[@]}"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
-    apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${QBT_SID_PACKAGES[@]}"
+  retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
+    apt install --no-install-recommends -o DPkg::Lock::Timeout=60 "${apt_args[@]}" "${QBT_PACKAGES[@]}"
+  retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
+    apt -t "$SID_SUITE" install --no-install-recommends -o DPkg::Lock::Timeout=60 "${apt_args[@]}" "${QBT_SID_PACKAGES[@]}"
 }
 
 package_is_installed() {

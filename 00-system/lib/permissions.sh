@@ -8,6 +8,7 @@ readonly SYSTEM_DATA_PATH_SPECS=(
   "/data/cicd|root|root|0755"
   "/data/codex|invoke|invoke|0750"
   "/data/mnt|root|root|0755"
+  "/data/mnt/g-drive|root|root|0755"
   "/data/services|invoke|invoke|0700"
   "/data/testing|invoke|invoke|0700"
   "/data/usr|root|root|0755"

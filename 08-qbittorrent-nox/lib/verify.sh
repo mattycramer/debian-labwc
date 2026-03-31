@@ -54,15 +54,13 @@ verify_detection_state() {
   [[ -n "${QBT_TARGET_USER:-}" ]] || die "QBT_TARGET_USER is empty; run the detect phase"
   [[ -n "${QBT_TARGET_HOME:-}" ]] || die "QBT_TARGET_HOME is empty; run the detect phase"
   [[ -n "${QBT_TORRENTS_ROOT_SOURCE:-}" ]] || die "QBT_TORRENTS_ROOT_SOURCE is empty; run the detect phase"
-  [[ -n "${QBT_TORRENTS_COMPLETE_SOURCE:-}" ]] || die "QBT_TORRENTS_COMPLETE_SOURCE is empty; run the detect phase"
-  [[ -n "${QBT_TORRENTS_TEMP_SOURCE:-}" ]] || die "QBT_TORRENTS_TEMP_SOURCE is empty; run the detect phase"
+  [[ -n "${QBT_TORRENTS_ROOT_FSTYPE:-}" ]] || die "QBT_TORRENTS_ROOT_FSTYPE is empty; run the detect phase"
 }
 
 verify_mounts() {
   ensure_torrent_mounts_present
   [[ "$(findmnt -rn -M "$QBT_TORRENTS_ROOT" -o SOURCE)" == "$QBT_TORRENTS_ROOT_SOURCE" ]] || die "torrent root mount source drifted from detected state"
-  [[ "$(findmnt -rn -M "$QBT_TORRENTS_COMPLETE" -o SOURCE)" == "$QBT_TORRENTS_COMPLETE_SOURCE" ]] || die "torrent complete mount source drifted from detected state"
-  [[ "$(findmnt -rn -M "$QBT_TORRENTS_TEMP" -o SOURCE)" == "$QBT_TORRENTS_TEMP_SOURCE" ]] || die "torrent temp mount source drifted from detected state"
+  [[ "$(findmnt -rn -M "$QBT_TORRENTS_ROOT" -o FSTYPE)" == "$QBT_TORRENTS_ROOT_FSTYPE" ]] || die "torrent root mount filesystem drifted from detected state"
 }
 
 verify_service_account() {
@@ -95,6 +93,8 @@ verify_runtime_paths() {
   require_directory "$QBT_RUNTIME_ROOT"
   require_directory "$QBT_CONFIG_DIR"
   require_directory "$QBT_DATA_DIR"
+  require_directory "$QBT_TORRENTS_COMPLETE"
+  require_directory "$QBT_TORRENTS_TEMP"
   require_file "$QBT_CONFIG_PATH"
   require_file "$QBT_MOUNT_CHECK_PATH"
   require_file "$QBT_SERVICE_PATH"
@@ -136,9 +136,9 @@ verify_service_unit() {
   grep -F "User=${QBT_SERVICE_USER}" "$QBT_SERVICE_PATH" >/dev/null || die "systemd unit is missing the torrent service user"
   grep -F "Group=${QBT_SERVICE_GROUP}" "$QBT_SERVICE_PATH" >/dev/null || die "systemd unit is missing the torrent service group"
   grep -F "ExecStartPre=${QBT_MOUNT_CHECK_PATH}" "$QBT_SERVICE_PATH" >/dev/null || die "systemd unit is missing the exact mount guard"
-  grep -F "ConditionPathIsMountPoint=${QBT_TORRENTS_ROOT}" "$QBT_SERVICE_PATH" >/dev/null || die "systemd unit is missing the torrent root mount condition"
-  grep -F "ConditionPathIsMountPoint=${QBT_TORRENTS_COMPLETE}" "$QBT_SERVICE_PATH" >/dev/null || die "systemd unit is missing the complete mount condition"
-  grep -F "ConditionPathIsMountPoint=${QBT_TORRENTS_TEMP}" "$QBT_SERVICE_PATH" >/dev/null || die "systemd unit is missing the temp mount condition"
+  grep -F "BindsTo=${QBT_TORRENTS_ROOT_MOUNT_UNIT}" "$QBT_SERVICE_PATH" >/dev/null || die "systemd unit is missing the torrent root mount binding"
+  grep -F "RequiresMountsFor=${QBT_TORRENTS_ROOT}" "$QBT_SERVICE_PATH" >/dev/null || die "systemd unit is missing the torrent root mount requirement"
+  grep -F "ReadWritePaths=${QBT_TORRENTS_ROOT}" "$QBT_SERVICE_PATH" >/dev/null || die "systemd unit is missing the narrowed torrent write path"
   grep -F 'ProtectSystem=strict' "$QBT_SERVICE_PATH" >/dev/null || die "systemd unit is missing ProtectSystem=strict"
   grep -F 'ProtectHome=yes' "$QBT_SERVICE_PATH" >/dev/null || die "systemd unit is missing ProtectHome=yes"
   grep -F 'NoNewPrivileges=yes' "$QBT_SERVICE_PATH" >/dev/null || die "systemd unit is missing NoNewPrivileges=yes"
@@ -150,7 +150,6 @@ verify_service_unit() {
   grep -F 'SystemCallFilter=@system-service' "$QBT_SERVICE_PATH" >/dev/null || die "systemd unit is missing the base system-call allowlist"
   grep -F 'SystemCallFilter=~@privileged @mount @module @raw-io @reboot @swap' "$QBT_SERVICE_PATH" >/dev/null || die "systemd unit is missing the system-call denylist"
 
-  systemctl is-enabled "$QBT_SERVICE_NAME" >/dev/null 2>&1 || die "$QBT_SERVICE_NAME is not enabled"
   systemctl is-active "$QBT_SERVICE_NAME" >/dev/null 2>&1 || die "$QBT_SERVICE_NAME is not active"
 
   if command -v systemd-analyze >/dev/null 2>&1; then
@@ -160,7 +159,7 @@ verify_service_unit() {
 
 verify_device_watch_units() {
   grep -F "ConditionPathExists=${QBT_TORRENTS_DEVICE_WATCH_PATH}" "$QBT_DEVICE_WATCH_SERVICE_PATH" >/dev/null || die "device-watch service is missing the torrents device path condition"
-  grep -F "ExecStart=/usr/bin/systemctl start ${QBT_SERVICE_NAME}" "$QBT_DEVICE_WATCH_SERVICE_PATH" >/dev/null || die "device-watch service is missing the qBittorrent start action"
+  grep -F "ExecStart=/usr/bin/systemctl start ${QBT_TORRENTS_ROOT_AUTOMOUNT_UNIT} ${QBT_SERVICE_NAME}" "$QBT_DEVICE_WATCH_SERVICE_PATH" >/dev/null || die "device-watch service is missing the combined automount/service activation"
   grep -F "PathExists=${QBT_TORRENTS_DEVICE_WATCH_PATH}" "$QBT_DEVICE_WATCH_PATH_PATH" >/dev/null || die "device-watch path unit is missing the torrents device path watch"
   grep -F "Unit=${QBT_DEVICE_WATCH_SERVICE_NAME}" "$QBT_DEVICE_WATCH_PATH_PATH" >/dev/null || die "device-watch path unit is missing the activator unit binding"
 

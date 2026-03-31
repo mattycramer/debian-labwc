@@ -32,7 +32,7 @@ capture_mount_metadata() {
 
   [[ "$target" == "$path" ]] || die "unexpected findmnt target for '$path': '$target'"
   [[ -n "$source" ]] || die "could not determine the mounted source for '$path'"
-  [[ -n "$fstype" ]] || die "could not determine the mounted filesystem type for '$path'"
+  [[ "$fstype" == "btrfs" ]] || die "expected a btrfs mount at '$path', found '${fstype:-unknown}'"
 
   printf -v "${prefix}_SOURCE" '%s' "$source"
   printf -v "${prefix}_FSTYPE" '%s' "$fstype"
@@ -56,10 +56,6 @@ QBT_TARGET_USER="$QBT_TARGET_USER"
 QBT_TARGET_HOME="$QBT_TARGET_HOME"
 QBT_TORRENTS_ROOT_SOURCE="$QBT_TORRENTS_ROOT_SOURCE"
 QBT_TORRENTS_ROOT_FSTYPE="$QBT_TORRENTS_ROOT_FSTYPE"
-QBT_TORRENTS_COMPLETE_SOURCE="$QBT_TORRENTS_COMPLETE_SOURCE"
-QBT_TORRENTS_COMPLETE_FSTYPE="$QBT_TORRENTS_COMPLETE_FSTYPE"
-QBT_TORRENTS_TEMP_SOURCE="$QBT_TORRENTS_TEMP_SOURCE"
-QBT_TORRENTS_TEMP_FSTYPE="$QBT_TORRENTS_TEMP_FSTYPE"
 $AUTOGEN_END
 EOF
 
@@ -100,10 +96,8 @@ detect_install_context() {
   local env_file="$1"
 
   detect_target_user
-  capture_mount_metadata "/data/mnt/g-drive/torrents" "QBT_TORRENTS_ROOT"
-  capture_mount_metadata "/data/mnt/g-drive/torrents/complete" "QBT_TORRENTS_COMPLETE"
-  capture_mount_metadata "/data/mnt/g-drive/torrents/temp" "QBT_TORRENTS_TEMP"
+  capture_mount_metadata "$QBT_TORRENTS_ROOT" "QBT_TORRENTS_ROOT"
   write_autogen_block "$env_file"
 
-  log_info "detected mounted torrent targets: user=${QBT_TARGET_USER}, root=${QBT_TORRENTS_ROOT_SOURCE}, complete=${QBT_TORRENTS_COMPLETE_SOURCE}, temp=${QBT_TORRENTS_TEMP_SOURCE}"
+  log_info "detected mounted torrent root: user=${QBT_TARGET_USER}, source=${QBT_TORRENTS_ROOT_SOURCE}, fstype=${QBT_TORRENTS_ROOT_FSTYPE}"
 }

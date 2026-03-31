@@ -34,9 +34,21 @@ require_directory() {
 
 require_exact_mountpoint() {
   local path="$1"
-  local target
+  local target fstype
   target="$(findmnt -rn -M "$path" -o TARGET 2>/dev/null || true)"
-  [[ "$target" == "$path" ]] || die "required mountpoint is not mounted exactly at '$path'"
+  fstype="$(findmnt -rn -M "$path" -o FSTYPE 2>/dev/null || true)"
+
+  # Treat autofs as "not mounted yet" so phases that require the real drive
+  # fail fast until the backing filesystem is actually mounted.
+  if [[ "$target" == "$path" && -n "$fstype" && "$fstype" != "autofs" ]]; then
+    return 0
+  fi
+
+  if [[ "$path" == "/data/mnt/g-drive/torrents" ]]; then
+    die "No mountpoint detected. Mount Drive to /data/mnt/g-drive/torrents and try again."
+  fi
+
+  die "required mountpoint is not mounted exactly at '$path'"
 }
 
 require_port_number() {
