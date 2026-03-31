@@ -53,6 +53,18 @@ active_managed_profile() {
   return 1
 }
 
+active_regular_connection() {
+  local active_name active_type
+  while IFS=: read -r active_name active_type; do
+    [[ "$active_type" == "wireguard" ]] && continue
+    [[ "$active_type" == "loopback" ]] && continue
+    [[ -n "$active_name" ]] || continue
+    printf '%s\n' "$active_name"
+    return 0
+  done < <(nmcli -t -f NAME,TYPE connection show --active 2>/dev/null || true)
+  return 1
+}
+
 refresh_waybar() {
   pkill -RTMIN+"$WAYBAR_SIGNAL" -x waybar >/dev/null 2>&1 || true
 }
@@ -76,6 +88,38 @@ disconnect_managed_profiles() {
     [[ -n "$profile_name" ]] || continue
     nmcli connection down id "$profile_name" >/dev/null 2>&1 || true
   done < <(profile_specs)
+}
+
+restore_regular_networking() {
+  local device_name device_type device_state device_connection
+
+  nmcli networking on >/dev/null 2>&1 || true
+
+  if active_regular_connection >/dev/null 2>&1; then
+    return 0
+  fi
+
+  while IFS=: read -r device_name device_type device_state device_connection; do
+    [[ -n "$device_name" ]] || continue
+    case "$device_type" in
+      ethernet|wifi)
+        ;;
+      *)
+        continue
+        ;;
+    esac
+    case "$device_state" in
+      connected*|connecting)
+        return 0
+        ;;
+      disconnected)
+        nmcli device connect "$device_name" >/dev/null 2>&1 || true
+        if active_regular_connection >/dev/null 2>&1; then
+          return 0
+        fi
+        ;;
+    esac
+  done < <(nmcli -t -f DEVICE,TYPE,STATE,CONNECTION device status 2>/dev/null || true)
 }
 
 next_profile() {
@@ -116,6 +160,7 @@ cycle_profile() {
 
 turn_off_profile() {
   disconnect_managed_profiles
+  restore_regular_networking
   refresh_waybar
 }
 

@@ -1,6 +1,6 @@
 SHELL := /usr/bin/env bash
 
-.PHONY: help doctor detect install render enable reconfigure print-env nuke
+.PHONY: help doctor detect install render enable extras reconfigure print-env nuke
 
 help:
 	@printf '%s\n' \
@@ -11,6 +11,7 @@ help:
 	  '  install     Run doctor, detect, packages, render, enable' \
 	  '  render      Render configs from .env' \
 	  '  enable      Install root-owned files and enable services' \
+	  '  extras      Build and install optional network-fetched extras' \
 	  '  reconfigure Run detect, render, enable' \
 	  '  print-env   Print effective env values' \
 	  '  nuke        Remove generated state and disable installed wiring'
@@ -29,6 +30,9 @@ render:
 
 enable:
 	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase enable; else sudo bash ./install.sh --phase enable; fi
+
+extras:
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase extras; else sudo bash ./install.sh --phase extras; fi
 
 reconfigure:
 	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase detect; else sudo bash ./install.sh --phase detect; fi

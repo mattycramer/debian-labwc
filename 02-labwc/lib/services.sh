@@ -59,6 +59,10 @@ wireguard_import_dir() {
   printf '%s\n' "/var/lib/labwc-session/wireguard"
 }
 
+wireguard_import_service_name() {
+  printf '%s\n' "labwc-wireguard-import.service"
+}
+
 render_wireguard_profile_file() {
   local profile_name="$1"
   local destination="$2"
@@ -72,37 +76,46 @@ render_wireguard_profile_file() {
   run_cmd chmod 0600 "$destination"
 }
 
-configure_wireguard_profiles() {
+stage_wireguard_profiles() {
   local import_dir profile_name profile_label profile_flag rendered_path
   import_dir="$(wireguard_import_dir)"
 
   run_cmd install -d -m 0700 "$import_dir"
-  if ! systemctl is-active --quiet NetworkManager.service >/dev/null 2>&1; then
-    run_cmd systemctl start NetworkManager.service
-  fi
-  systemctl is-active --quiet NetworkManager.service >/dev/null 2>&1 || die "NetworkManager.service is not active; cannot import WireGuard profiles"
+  run_cmd find "$import_dir" -maxdepth 1 -type f -name '*.conf' -delete
 
   while IFS='|' read -r profile_name profile_label profile_flag; do
     [[ -n "$profile_name" ]] || continue
     rendered_path="${import_dir}/${profile_name}.conf"
     render_wireguard_profile_file "$profile_name" "$rendered_path"
-    nmcli connection delete id "$profile_name" >/dev/null 2>&1 || true
-    run_cmd nmcli connection import type wireguard file "$rendered_path"
-    run_cmd nmcli connection modify "$profile_name" \
-      connection.autoconnect no \
-      wireguard.peer-routes yes \
-      wireguard.ip4-auto-default-route yes \
-      wireguard.ip6-auto-default-route yes
   done < <(wireguard_profile_specs)
-
-  run_cmd nmcli connection reload
 }
 
 refresh_user_font_cache() {
+  local cache_home="$LABWC_TARGET_HOME/.cache"
+  local cache_dir="${cache_home}/fontconfig"
+  local user_fonts_dir="$LABWC_TARGET_HOME/.local/share/fonts"
+  local legacy_fonts_dir="$LABWC_TARGET_HOME/.fonts"
+  local -a font_dirs=()
+
+  if [[ -d "$user_fonts_dir" ]]; then
+    font_dirs+=("$user_fonts_dir")
+  fi
+  if [[ -d "$legacy_fonts_dir" ]]; then
+    font_dirs+=("$legacy_fonts_dir")
+  fi
+
+  run_cmd install -d -m 0700 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$cache_home" "$cache_dir"
+
+  if ((${#font_dirs[@]} == 0)); then
+    log_info "no user font directories present; skipping user font-cache refresh"
+    return 0
+  fi
+
   run_cmd runuser -u "$LABWC_TARGET_USER" -- env \
     HOME="$LABWC_TARGET_HOME" \
     XDG_CONFIG_HOME="$LABWC_TARGET_HOME/.config" \
-    fc-cache -fv
+    XDG_CACHE_HOME="$cache_home" \
+    fc-cache -f "${font_dirs[@]}"
 }
 
 remove_managed_wireguard_profiles() {
@@ -167,6 +180,7 @@ install_root_files() {
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-module-menu")" "/usr/local/bin/labwc-module-menu" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-network-settings")" "/usr/local/bin/labwc-network-settings" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-vpnctl")" "/usr/local/bin/labwc-vpnctl" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-wireguard-import")" "/usr/local/bin/labwc-wireguard-import" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-player-status")" "/usr/local/bin/labwc-player-status" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/thunar-open-archive")" "/usr/local/bin/thunar-open-archive" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/thunar-create-archive")" "/usr/local/bin/thunar-create-archive" 0755
@@ -178,6 +192,8 @@ install_root_files() {
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-workspace-send")" "/usr/local/bin/labwc-workspace-send" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-workspace-state")" "/usr/local/bin/labwc-workspace-state" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-workspace-status")" "/usr/local/bin/labwc-workspace-status" 0755
+  render_template_to_file "$(config_system_template_path "etc/systemd/system/labwc-wireguard-import.service")" "/etc/systemd/system/labwc-wireguard-import.service" 0644
+  render_template_to_file "$(config_system_template_path "etc/systemd/system/labwc-vpn-default-off.service")" "/etc/systemd/system/labwc-vpn-default-off.service" 0644
 }
 
 resolve_user_unit_path() {
@@ -255,6 +271,8 @@ enable_system_services_only() {
   run_cmd systemctl enable greetd.service
   run_cmd systemctl enable seatd.service
   run_cmd systemctl enable NetworkManager.service
+  run_cmd systemctl enable "$(wireguard_import_service_name)"
+  run_cmd systemctl enable labwc-vpn-default-off.service
   if ! systemctl is-active --quiet NetworkManager.service >/dev/null 2>&1; then
     run_cmd systemctl start NetworkManager.service
   fi
@@ -267,7 +285,7 @@ enable_system_services_only() {
 enable_all_services() {
   install_root_files
   enable_system_services_only
-  configure_wireguard_profiles
+  stage_wireguard_profiles
   enable_user_services
   refresh_user_font_cache
 }
@@ -335,6 +353,7 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/labwc-module-menu"
   remove_if_present "/usr/local/bin/labwc-network-settings"
   remove_if_present "/usr/local/bin/labwc-vpnctl"
+  remove_if_present "/usr/local/bin/labwc-wireguard-import"
   remove_if_present "/usr/local/bin/labwc-player-status"
   remove_if_present "/usr/local/bin/thunar-open-archive"
   remove_if_present "/usr/local/bin/thunar-create-archive"
@@ -349,6 +368,10 @@ nuke_all_state() {
   remove_if_present "/usr/share/wayland-sessions/labwc.desktop"
   remove_if_present "/etc/greetd/config.toml"
   remove_if_present "/etc/systemd/system/greetd.service.d/10-vt.conf"
+  systemctl disable "$(wireguard_import_service_name)" >/dev/null 2>&1 || true
+  systemctl disable labwc-vpn-default-off.service >/dev/null 2>&1 || true
+  remove_if_present "/etc/systemd/system/labwc-wireguard-import.service"
+  remove_if_present "/etc/systemd/system/labwc-vpn-default-off.service"
   remove_if_present "$SID_SOURCE_PATH"
   remove_if_present "$SID_PREFERENCES_PATH"
   remove_labwc_tweaks_install

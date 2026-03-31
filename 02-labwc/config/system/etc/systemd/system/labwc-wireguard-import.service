@@ -1,0 +1,13 @@
+[Unit]
+Description=Import staged labwc WireGuard profiles on first boot
+Documentation=man:nmcli(1)
+After=NetworkManager.service
+Wants=NetworkManager.service
+ConditionPathExists=/var/lib/labwc-session/wireguard
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/labwc-wireguard-import
+
+[Install]
+WantedBy=multi-user.target

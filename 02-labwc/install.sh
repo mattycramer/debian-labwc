@@ -30,7 +30,7 @@ source "$SCRIPT_DIR/lib/tweaks.sh"
 source "$SCRIPT_DIR/lib/keepsecret.sh"
 usage() {
   cat <<'EOF'
-Usage: ./install.sh --phase doctor|detect|packages|render|enable|print-env|nuke|all [--yes]
+Usage: ./install.sh --phase doctor|detect|packages|render|enable|extras|print-env|nuke|all [--yes]
 EOF
 }
 
@@ -294,7 +294,13 @@ phase_enable() {
   load_env_file
   bootstrap_target_user_gpg_key
   enable_all_services "$ENV_FILE"
+}
+
+phase_extras() {
+  log_info "phase: extras"
+  phase_doctor
   phase_build_doctor
+  load_env_file
   install_labwc_tweaks
   install_keepsecret
 }
@@ -322,6 +328,7 @@ main() {
     packages) phase_packages ;;
     render) phase_render ;;
     enable) phase_enable ;;
+    extras) phase_extras ;;
     print-env) phase_print_env ;;
     nuke) phase_nuke ;;
     all)

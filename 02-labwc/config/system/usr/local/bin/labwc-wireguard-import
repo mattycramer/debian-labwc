@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+readonly IMPORT_DIR="/var/lib/labwc-session/wireguard"
+readonly SERVICE_NAME="labwc-wireguard-import.service"
+
+if [[ ! -d "$IMPORT_DIR" ]]; then
+  exit 0
+fi
+
+systemctl is-active --quiet NetworkManager.service || {
+  printf 'NetworkManager.service is not active; cannot import staged WireGuard profiles\n' >&2
+  exit 1
+}
+
+shopt -s nullglob
+profiles=("$IMPORT_DIR"/*.conf)
+shopt -u nullglob
+
+((${#profiles[@]} > 0)) || exit 0
+
+for profile_path in "${profiles[@]}"; do
+  profile_name="$(basename "${profile_path%.conf}")"
+  nmcli connection delete id "$profile_name" >/dev/null 2>&1 || true
+  nmcli connection import type wireguard file "$profile_path" >/dev/null
+  nmcli connection modify "$profile_name" \
+    connection.autoconnect no \
+    connection.autoconnect-retries 0 \
+    wireguard.peer-routes yes \
+    wireguard.ip4-auto-default-route yes \
+    wireguard.ip6-auto-default-route yes >/dev/null
+  nmcli connection down id "$profile_name" >/dev/null 2>&1 || true
+done
+
+systemctl disable "$SERVICE_NAME" >/dev/null 2>&1 || true

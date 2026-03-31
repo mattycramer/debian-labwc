@@ -1,0 +1,12 @@
+[Unit]
+Description=Force labwc managed VPN profiles off on boot
+Documentation=man:nmcli(1)
+After=NetworkManager.service labwc-wireguard-import.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/labwc-vpnctl off
+
+[Install]
+WantedBy=multi-user.target
