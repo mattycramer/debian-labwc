@@ -21,13 +21,15 @@ source "$SCRIPT_DIR/lib/mount_units.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/permissions.sh"
 # shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/secureboot.sh"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/sudoers.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/verify.sh"
 
 usage() {
   cat <<'EOF'
-Usage: ./install.sh --phase doctor|mounts|permissions|sudoers|verify|print-env|nuke|all
+Usage: ./install.sh --phase doctor|mounts|permissions|secureboot|sudoers|verify|print-env|nuke|all
 EOF
 }
 
@@ -72,7 +74,11 @@ run_preflight_checks() {
   require_command chown
   require_command cmp
   require_command cp
+  require_command apt
+  require_command apt-cache
+  require_command apt-get
   require_command dpkg
+  require_command dpkg-query
   require_command find
   require_command findmnt
   require_command getent
@@ -83,6 +89,7 @@ run_preflight_checks() {
   require_command journalctl
   require_command lsblk
   require_command mktemp
+  require_command modinfo
   require_command nologin
   require_command readlink
   require_command sed
@@ -120,6 +127,12 @@ phase_permissions() {
   apply_home_permissions
 }
 
+phase_secureboot() {
+  log_info "phase: secureboot"
+  phase_doctor
+  apply_managed_secure_boot
+}
+
 phase_sudoers() {
   log_info "phase: sudoers"
   phase_doctor
@@ -143,6 +156,7 @@ phase_print_env() {
 phase_nuke() {
   log_info "phase: nuke"
   run_preflight_checks 0
+  remove_managed_secure_boot
   remove_managed_mount_units
   remove_managed_sudoers
   log_warn "directory ownership and permissions are intentionally left in place"
@@ -155,6 +169,7 @@ main() {
     doctor) phase_doctor ;;
     mounts) phase_mounts ;;
     permissions) phase_permissions ;;
+    secureboot) phase_secureboot ;;
     sudoers) phase_sudoers ;;
     verify) phase_verify ;;
     print-env) phase_print_env ;;
@@ -163,6 +178,7 @@ main() {
       phase_doctor
       phase_permissions
       phase_mounts
+      phase_secureboot
       phase_sudoers
       phase_verify
       ;;

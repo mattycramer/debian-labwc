@@ -1,6 +1,6 @@
 SHELL := /usr/bin/env bash
 
-.PHONY: help guard-non-root doctor mounts permissions sudoers install verify print-env nuke
+.PHONY: help guard-non-root doctor mounts permissions secureboot sudoers install verify print-env nuke
 
 help:
 	@printf '%s\n' \
@@ -10,11 +10,12 @@ help:
 	  '  doctor       Validate platform assumptions and resolve the invoking user' \
 	  '  mounts       Install four device-gated top-level g-drive mount/watch units from mounts.conf' \
 	  '  permissions  Create the hardened torrent account, add the invoking user to torrent, and repair required path ownership/modes' \
+	  '  secureboot   Install Secure Boot dependencies, manage the Labwc MOK, install the DKMS framework drop-in, zz- kernel hooks, the custom module source root, and the sign-module helper' \
 	  '  sudoers      Install the hardened invoking-user policy and read-only helper wrappers under /etc/sudoers.d' \
-	  '  install      Run doctor, mounts, permissions, sudoers, and verify' \
-	  '  verify       Check generated mount units, sudoers, and required path permissions' \
+	  '  install      Run doctor, permissions, mounts, secureboot, sudoers, and verify' \
+	  '  verify       Check generated mount units, Secure Boot state, sudoers, and required path permissions' \
 	  '  print-env    Print resolved target user/path state' \
-	  '  nuke         Remove generated mount units and sudoers policy; directory permissions stay in place'
+	  '  nuke         Remove generated Secure Boot state, scoped module hooks/helpers, mount units, and sudoers policy; directory permissions stay in place'
 
 guard-non-root:
 	@if [ "$$(id -u)" -eq 0 ]; then \
@@ -30,6 +31,9 @@ mounts: guard-non-root
 
 permissions: guard-non-root
 	@SYSTEM_MAKE_WRAPPER=1 sudo --preserve-env=SYSTEM_MAKE_WRAPPER bash ./install.sh --phase permissions
+
+secureboot: guard-non-root
+	@SYSTEM_MAKE_WRAPPER=1 sudo --preserve-env=SYSTEM_MAKE_WRAPPER bash ./install.sh --phase secureboot
 
 sudoers: guard-non-root
 	@SYSTEM_MAKE_WRAPPER=1 sudo --preserve-env=SYSTEM_MAKE_WRAPPER bash ./install.sh --phase sudoers

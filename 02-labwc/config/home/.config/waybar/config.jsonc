@@ -4,7 +4,7 @@
   "height": 42,
   "spacing": 4,
   "modules-left": ["custom/launcher", "custom/workspace-1", "custom/workspace-2", "custom/workspace-3", "custom/workspace-4"],
-  "modules-right": ["wlr/taskbar", "custom/gpulaunch", "custom/updates", "network", "custom/vpn", "pulseaudio", "battery", "backlight", "cpu", "memory", "disk", "custom/player", "clock", "tray", "custom/power"],
+  "modules-right": ["wlr/taskbar", "custom/gpulaunch", "custom/updates", "custom/vpn", "network", "pulseaudio", "battery", "backlight", "cpu", "memory", "disk", "custom/player", "clock", "tray", "custom/power"],
   "custom/launcher": {
     "format": "Apps",
     "tooltip": false,
