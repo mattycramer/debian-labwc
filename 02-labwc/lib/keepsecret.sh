@@ -69,8 +69,8 @@ clone_keepsecret_source() {
 
   prepare_keepsecret_work_root
   run_cmd runuser -u "$LABWC_TARGET_USER" -- sh -c "rm -rf -- '$source_dir' '$build_dir'"
-  retry_cmd 3 runuser -u "$LABWC_TARGET_USER" -- env HOME="$LABWC_TARGET_HOME" \
-    timeout 180 git clone --depth 1 "$KEEPSECRET_GIT_URL" "$source_dir"
+  retry_cmd 6 runuser -u "$LABWC_TARGET_USER" -- env HOME="$LABWC_TARGET_HOME" \
+    timeout 300 git -c http.version=HTTP/1.1 clone --depth 1 "$KEEPSECRET_GIT_URL" "$source_dir"
 }
 
 install_keepsecret() {

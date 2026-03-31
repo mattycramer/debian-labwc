@@ -337,6 +337,7 @@ main() {
       phase_packages
       phase_render
       phase_enable
+      phase_extras
       ;;
     *)
       die "unsupported phase: $PHASE"

@@ -90,6 +90,10 @@ stage_wireguard_profiles() {
   done < <(wireguard_profile_specs)
 }
 
+refresh_system_font_cache() {
+  run_cmd fc-cache -s
+}
+
 refresh_user_font_cache() {
   local cache_home="$LABWC_TARGET_HOME/.cache"
   local cache_dir="${cache_home}/fontconfig"
@@ -107,7 +111,7 @@ refresh_user_font_cache() {
   run_cmd install -d -m 0700 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$cache_home" "$cache_dir"
 
   if ((${#font_dirs[@]} == 0)); then
-    log_info "no user font directories present; skipping user font-cache refresh"
+    log_info "no user font directories present; system font packages are already handled, skipping user-only font-cache refresh"
     return 0
   fi
 
@@ -287,6 +291,7 @@ enable_all_services() {
   enable_system_services_only
   stage_wireguard_profiles
   enable_user_services
+  refresh_system_font_cache
   refresh_user_font_cache
 }
 

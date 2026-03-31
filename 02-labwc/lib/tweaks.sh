@@ -38,7 +38,8 @@ download_labwc_tweaks_source() {
   archive_path="$(labwc_tweaks_archive_path)"
   prepare_labwc_tweaks_cache
   run_cmd runuser -u "$LABWC_TARGET_USER" -- sh -c "rm -f -- '$archive_path'"
-  run_cmd runuser -u "$LABWC_TARGET_USER" -- env HOME="$LABWC_TARGET_HOME" curl --fail --location --retry 3 --retry-delay 1 --connect-timeout 20 --max-time 180 --silent --show-error -o "$archive_path" "$LABWC_TWEAKS_TARBALL_URL"
+  retry_cmd 6 runuser -u "$LABWC_TARGET_USER" -- env HOME="$LABWC_TARGET_HOME" \
+    curl --ipv4 --fail --location --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 --max-time 300 --silent --show-error -o "$archive_path" "$LABWC_TWEAKS_TARBALL_URL"
 }
 
 labwc_tweaks_package_installed() {
