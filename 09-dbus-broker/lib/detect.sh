@@ -29,7 +29,7 @@ detect_current_unit_fragments() {
     DBUS_BROKER_CURRENT_USER_FRAGMENT="${user_fragment:-unresolved}"
   else
     DBUS_BROKER_USER_MANAGER_REACHABLE="no"
-    DBUS_BROKER_CURRENT_USER_FRAGMENT="unavailable"
+    DBUS_BROKER_CURRENT_USER_FRAGMENT="user-manager-unavailable"
   fi
 }
 
@@ -41,7 +41,7 @@ write_autogen_block() {
   block_file="$(mktemp "$(dirname "$env_file")/.env.block.XXXXXX")"
 
   cleanup_detect_temp_files() {
-    rm -f -- "$temp_file" "$block_file"
+    rm -f -- "${temp_file:-}" "${block_file:-}"
   }
   trap cleanup_detect_temp_files RETURN
 
@@ -95,4 +95,7 @@ detect_install_context() {
   write_autogen_block "$env_file"
   log_info "detected target user='$DBUS_BROKER_TARGET_USER' home='$DBUS_BROKER_TARGET_HOME'"
   log_info "current dbus.service fragments: system='${DBUS_BROKER_CURRENT_SYSTEM_FRAGMENT}', user='${DBUS_BROKER_CURRENT_USER_FRAGMENT}'"
+  if [[ "$DBUS_BROKER_USER_MANAGER_REACHABLE" != "yes" ]]; then
+    log_warn "user systemd manager is not active/reachable yet; this is expected in early TTY boot before graphical login"
+  fi
 }
