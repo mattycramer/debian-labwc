@@ -290,6 +290,7 @@ phase_enable() {
   require_command gpgconf
   require_command nmcli
   require_command fc-cache
+  require_command fc-match
   require_command pinentry-gtk-2
   load_env_file
   bootstrap_target_user_gpg_key

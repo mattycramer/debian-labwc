@@ -122,6 +122,35 @@ refresh_user_font_cache() {
     fc-cache -f "${font_dirs[@]}"
 }
 
+user_fontconfig_match() {
+  local cache_home="$LABWC_TARGET_HOME/.cache"
+  local pattern="$1"
+
+  run_cmd runuser -u "$LABWC_TARGET_USER" -- env \
+    HOME="$LABWC_TARGET_HOME" \
+    XDG_CONFIG_HOME="$LABWC_TARGET_HOME/.config" \
+    XDG_CACHE_HOME="$cache_home" \
+    fc-match -f '%{family}\n' "$pattern"
+}
+
+validate_user_fontconfig() {
+  local sans_match serif_match mono_match emoji_match
+
+  sans_match="$(user_fontconfig_match 'sans-serif')"
+  serif_match="$(user_fontconfig_match 'serif')"
+  mono_match="$(user_fontconfig_match 'monospace')"
+  emoji_match="$(user_fontconfig_match 'emoji')"
+
+  [[ "$sans_match" == *"Noto Sans"* ]] || die "user fontconfig did not resolve sans-serif to Noto Sans: ${sans_match:-empty}"
+  [[ "$serif_match" == *"Noto Serif"* ]] || die "user fontconfig did not resolve serif to Noto Serif: ${serif_match:-empty}"
+  [[ "$mono_match" == *"Noto Sans Mono"* ]] || die "user fontconfig did not resolve monospace to Noto Sans Mono: ${mono_match:-empty}"
+  [[ "$emoji_match" == *"Noto Color Emoji"* || "$emoji_match" == *"Symbola"* ]] || {
+    die "user fontconfig did not resolve emoji to Noto Color Emoji or Symbola: ${emoji_match:-empty}"
+  }
+
+  log_info "validated target-user fontconfig aliases via fc-match"
+}
+
 remove_managed_wireguard_profiles() {
   local profile_name profile_label profile_flag
   while IFS='|' read -r profile_name profile_label profile_flag; do
@@ -293,6 +322,7 @@ enable_all_services() {
   enable_user_services
   refresh_system_font_cache
   refresh_user_font_cache
+  validate_user_fontconfig
 }
 
 remove_if_present() {
