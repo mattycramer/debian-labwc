@@ -13,7 +13,6 @@ readonly NORMAL_BOOTSTRAP_PACKAGES=(
 readonly NORMAL_TOOLS_PACKAGES=(
   code
   mullvad-browser-alpha
-  mullvad-vpn
 )
 
 readonly SID_TOOLS_PACKAGES=(

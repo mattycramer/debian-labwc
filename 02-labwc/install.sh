@@ -41,6 +41,22 @@ gpg_prompt_required_for_phase() {
   esac
 }
 
+wireguard_configs_present() {
+  [[ -d "$SCRIPT_DIR/config/wireguard" ]] || return 1
+  compgen -G "$SCRIPT_DIR/config/wireguard/*.conf" >/dev/null
+}
+
+wireguard_prompt_required_for_phase() {
+  case "$PHASE" in
+    all|enable)
+      wireguard_configs_present
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 read_env_value() {
   local key="$1"
   python3 - "$ENV_FILE" "$key" <<'PY'
@@ -132,6 +148,62 @@ ensure_gpg_password_in_env() {
   write_env_value "KWALLET_SESSION_GPG_PASSWD" "$prompt_value"
 }
 
+validate_wireguard_private_key() {
+  local key="$1"
+  python3 - "$key" <<'PY'
+import base64
+import sys
+
+key = sys.argv[1].strip()
+
+try:
+    raw = base64.b64decode(key, validate=True)
+except Exception as exc:  # noqa: BLE001
+    raise SystemExit(f"invalid WireGuard private key encoding: {exc}")
+
+if len(raw) != 32:
+    raise SystemExit("WireGuard private key must decode to exactly 32 bytes")
+PY
+}
+
+ensure_wireguard_private_key_in_env() {
+  local current_value prompt_value confirm_value
+
+  wireguard_prompt_required_for_phase || return 0
+  [[ -f "$ENV_FILE" ]] || die "missing env file: $ENV_FILE"
+
+  current_value="$(read_env_value "WIREGUARD_PRIV_KEY")"
+  if [[ -n "$current_value" ]]; then
+    validate_wireguard_private_key "$current_value" || die "WIREGUARD_PRIV_KEY in $ENV_FILE is invalid"
+    return 0
+  fi
+  [[ -t 0 && -t 1 ]] || die "WIREGUARD_PRIV_KEY is empty in $ENV_FILE and no interactive terminal is available for prompting"
+
+  while true; do
+    IFS= read -r -s -p "Enter WireGuard private key: " prompt_value
+    printf '\n'
+    IFS= read -r -s -p "Confirm WireGuard private key: " confirm_value
+    printf '\n'
+
+    [[ -n "$prompt_value" ]] || {
+      printf '%s\n' "WireGuard private key cannot be empty." >&2
+      continue
+    }
+    [[ "$prompt_value" == "$confirm_value" ]] || {
+      printf '%s\n' "WireGuard private key confirmation did not match." >&2
+      continue
+    }
+    [[ "$prompt_value" != *$'\n'* && "$prompt_value" != *$'\r'* ]] || die "WireGuard private key must not contain newlines"
+    if ! validate_wireguard_private_key "$prompt_value" >/dev/null 2>&1; then
+      printf '%s\n' "WireGuard private key is not a valid 32-byte base64 key." >&2
+      continue
+    fi
+    break
+  done
+
+  write_env_value "WIREGUARD_PRIV_KEY" "$prompt_value"
+}
+
 parse_args() {
   while (($#)); do
     case "$1" in
@@ -216,6 +288,8 @@ phase_enable() {
   require_command runuser
   require_command gpg
   require_command gpgconf
+  require_command nmcli
+  require_command fc-cache
   require_command pinentry-gtk-2
   load_env_file
   bootstrap_target_user_gpg_key
@@ -241,6 +315,7 @@ phase_nuke() {
 main() {
   parse_args "$@"
   ensure_gpg_password_in_env
+  ensure_wireguard_private_key_in_env
   case "$PHASE" in
     doctor) phase_doctor ;;
     detect) phase_detect ;;

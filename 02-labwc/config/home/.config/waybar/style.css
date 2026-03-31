@@ -14,7 +14,7 @@
 @define-color mauve #c4b5fd;
 
 * {
-  font-family: "Noto Sans", "Font Awesome 6 Free", "Material Design Icons";
+  font-family: "Noto Sans", "Noto Color Emoji", "Symbola", "Font Awesome 6 Free", "Material Design Icons";
   font-size: 13px;
   min-height: 0;
   font-feature-settings: "tnum";
@@ -33,6 +33,7 @@ window#waybar {
 #custom-workspace-4,
 #custom-gpulaunch,
 #custom-updates,
+#custom-vpn,
 #taskbar,
 #clock,
 #network,
@@ -126,6 +127,10 @@ window#waybar {
   font-weight: 600;
 }
 
+#custom-vpn {
+  font-weight: 700;
+}
+
 #custom-gpulaunch {
   background: rgba(27, 53, 27, 0.84);
   border-color: rgba(140, 200, 75, 0.34);
@@ -147,6 +152,14 @@ window#waybar {
 }
 
 #custom-updates.up-to-date {
+  color: @mint;
+}
+
+#custom-vpn.off {
+  color: @amber;
+}
+
+#custom-vpn.active {
   color: @mint;
 }
 
@@ -200,6 +213,7 @@ window#waybar {
 #custom-workspace-4:hover,
 #custom-gpulaunch:hover,
 #custom-updates:hover,
+#custom-vpn:hover,
 #clock:hover,
 #network:hover,
 #pulseaudio:hover,

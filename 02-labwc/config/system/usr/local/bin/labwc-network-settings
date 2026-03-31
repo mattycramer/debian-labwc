@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+run_gui() {
+  command -v "$1" >/dev/null 2>&1 || return 1
+  nohup "$@" >/dev/null 2>&1 &
+}
+
+run_terminal() {
+  local title="$1"
+  local command_string="$2"
+  if command -v foot >/dev/null 2>&1; then
+    nohup foot -T "$title" -e bash -lc "$command_string" >/dev/null 2>&1 &
+    return 0
+  fi
+  if command -v kitty >/dev/null 2>&1; then
+    nohup kitty --title "$title" bash -lc "$command_string" >/dev/null 2>&1 &
+    return 0
+  fi
+  return 1
+}
+
+if command -v nmtui >/dev/null 2>&1; then
+  run_terminal "Network" 'exec nmtui' || exec nmtui
+  exit 0
+fi
+
+exit 0

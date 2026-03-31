@@ -4,7 +4,7 @@
   "height": 42,
   "spacing": 4,
   "modules-left": ["custom/launcher", "custom/workspace-1", "custom/workspace-2", "custom/workspace-3", "custom/workspace-4"],
-  "modules-right": ["wlr/taskbar", "custom/gpulaunch", "custom/updates", "network", "pulseaudio", "battery", "backlight", "cpu", "memory", "disk", "custom/player", "clock", "tray", "custom/power"],
+  "modules-right": ["wlr/taskbar", "custom/gpulaunch", "custom/updates", "network", "custom/vpn", "pulseaudio", "battery", "backlight", "cpu", "memory", "disk", "custom/player", "clock", "tray", "custom/power"],
   "custom/launcher": {
     "format": "Apps",
     "tooltip": false,
@@ -108,8 +108,17 @@
     "tooltip-format-wifi": "{essid}\n{signalStrength}%  {ipaddr}\n↑ {bandwidthUpBytes}  ↓ {bandwidthDownBytes}",
     "tooltip-format-ethernet": "{ifname}\n{ipaddr}\n↑ {bandwidthUpBytes}  ↓ {bandwidthDownBytes}",
     "tooltip-format-disconnected": "Network disconnected",
-    "on-click": "/usr/local/bin/labwc-module-menu network quick",
+    "on-click": "/usr/local/bin/labwc-network-settings",
     "on-click-right": "/usr/local/bin/labwc-module-menu network menu"
+  },
+  "custom/vpn": {
+    "exec": "/usr/local/bin/labwc-vpnctl status",
+    "return-type": "json",
+    "interval": 5,
+    "signal": 11,
+    "format": "{text}",
+    "on-click": "/usr/local/bin/labwc-vpnctl cycle",
+    "on-click-right": "/usr/local/bin/labwc-vpnctl off"
   },
   "pulseaudio": {
     "format": "Vol  {volume}%",

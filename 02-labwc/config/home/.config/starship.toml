@@ -1,10 +1,10 @@
-add_newline = true
+add_newline = false
 command_timeout = 1000
 scan_timeout = 20
 palette = "labwc"
 format = """
-$username$hostname$directory$git_branch$git_status$git_state$cmd_duration
-$character
+$custom.absolute_path$git_branch$git_status$git_state$cmd_duration
+$username$hostname$custom.prompt_path$character
 """
 
 [palettes.labwc]
@@ -23,49 +23,65 @@ panel = "#0f1720"
 show_always = true
 style_user = "bold amber"
 style_root = "bold red"
-format = "[$user@]($style)"
+format = "[$user]($style)"
 
 [hostname]
 ssh_only = false
 style = "bold cyan"
-format = "[$hostname]($style) "
+format = "[@$hostname]($style)"
 
 [character]
-success_symbol = "[>](bold mint)"
-error_symbol = "[>](bold red)"
-vimcmd_symbol = "[<](bold amber)"
-vimcmd_replace_one_symbol = "[<](bold rose)"
-vimcmd_replace_symbol = "[<](bold rose)"
-vimcmd_visual_symbol = "[<](bold mauve)"
+success_symbol = "[>](bold mint) "
+error_symbol = "[>](bold red) "
+vimcmd_symbol = "[>](bold amber) "
+vimcmd_replace_one_symbol = "[>](bold rose) "
+vimcmd_replace_symbol = "[>](bold rose) "
+vimcmd_visual_symbol = "[>](bold mauve) "
 
 [directory]
 style = "bold mint"
 format = "[$path]($style) "
 home_symbol = "~"
-truncation_length = 3
+truncation_length = 0
 truncate_to_repo = false
 read_only = " ro"
 
-[directory.substitutions]
-"Documents" = "docs"
-"Downloads" = "dl"
-"Pictures" = "img"
-"Projects" = "proj"
+[custom.absolute_path]
+command = "printf '%s' \"$PWD\""
+when = "true"
+shell = ["bash", "--noprofile", "--norc"]
+style = "bold mint"
+format = "[[$output]]($style) "
+
+[custom.prompt_path]
+command = """
+if [[ \"$PWD\" == \"$HOME\" ]]; then
+  printf '~'
+elif [[ \"$PWD\" == \"$HOME\"/* ]]; then
+  printf '~/%s' \"${PWD#\"$HOME\"/}\"
+else
+  printf '%s' \"$PWD\"
+fi
+"""
+when = "true"
+shell = ["bash", "--noprofile", "--norc"]
+style = "bold mint"
+format = "[:$output]($style)"
 
 [git_branch]
 symbol = "git "
 style = "bold mauve"
-format = "[${symbol}$branch]($style) "
+format = "[[${symbol}$branch]]($style) "
 
 [git_status]
 style = "bold rose"
-format = "[$all_status$ahead_behind]($style) "
+format = "[[$all_status$ahead_behind]]($style) "
 
 [git_state]
 style = "bold rose"
-format = "[$state($progress_current/$progress_total)]($style) "
+format = "[[$state($progress_current/$progress_total)]]($style) "
 
 [cmd_duration]
 min_time = 1200
 style = "bold muted"
-format = "[$duration]($style) "
+format = "[[$duration]]($style) "

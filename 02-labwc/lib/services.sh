@@ -43,6 +43,77 @@ render_template_to_file() {
   run_cmd chmod "$mode" "$destination"
 }
 
+wireguard_profile_specs() {
+  cat <<'EOF'
+sego005-semm001|Sweden|🇸🇪
+dkcp401-dkcp102|Denmark|🇩🇰
+noos102-noos003|Norway|🇳🇴
+fihe101-fihe003|Finland|🇫🇮
+defr003-defr002|Germany|🇩🇪
+gbgl001-gbgl002|UK|🇬🇧
+uswa001-uswa002|USA|🇺🇸
+EOF
+}
+
+wireguard_import_dir() {
+  printf '%s\n' "/var/lib/labwc-session/wireguard"
+}
+
+render_wireguard_profile_file() {
+  local profile_name="$1"
+  local destination="$2"
+  local source_path="$SCRIPT_DIR/config/wireguard/${profile_name}.conf"
+  local content=""
+
+  [[ -f "$source_path" ]] || die "missing WireGuard profile template: $source_path"
+  content="$(render_template_content "$source_path")"
+  run_cmd install -D -m 0600 /dev/null "$destination"
+  printf '%s' "$content" >"$destination"
+  run_cmd chmod 0600 "$destination"
+}
+
+configure_wireguard_profiles() {
+  local import_dir profile_name profile_label profile_flag rendered_path
+  import_dir="$(wireguard_import_dir)"
+
+  run_cmd install -d -m 0700 "$import_dir"
+  if ! systemctl is-active --quiet NetworkManager.service >/dev/null 2>&1; then
+    run_cmd systemctl start NetworkManager.service
+  fi
+  systemctl is-active --quiet NetworkManager.service >/dev/null 2>&1 || die "NetworkManager.service is not active; cannot import WireGuard profiles"
+
+  while IFS='|' read -r profile_name profile_label profile_flag; do
+    [[ -n "$profile_name" ]] || continue
+    rendered_path="${import_dir}/${profile_name}.conf"
+    render_wireguard_profile_file "$profile_name" "$rendered_path"
+    nmcli connection delete id "$profile_name" >/dev/null 2>&1 || true
+    run_cmd nmcli connection import type wireguard file "$rendered_path"
+    run_cmd nmcli connection modify "$profile_name" \
+      connection.autoconnect no \
+      wireguard.peer-routes yes \
+      wireguard.ip4-auto-default-route yes \
+      wireguard.ip6-auto-default-route yes
+  done < <(wireguard_profile_specs)
+
+  run_cmd nmcli connection reload
+}
+
+refresh_user_font_cache() {
+  run_cmd runuser -u "$LABWC_TARGET_USER" -- env \
+    HOME="$LABWC_TARGET_HOME" \
+    XDG_CONFIG_HOME="$LABWC_TARGET_HOME/.config" \
+    fc-cache -fv
+}
+
+remove_managed_wireguard_profiles() {
+  local profile_name profile_label profile_flag
+  while IFS='|' read -r profile_name profile_label profile_flag; do
+    [[ -n "$profile_name" ]] || continue
+    nmcli connection delete id "$profile_name" >/dev/null 2>&1 || true
+  done < <(wireguard_profile_specs)
+  remove_if_present "$(wireguard_import_dir)"
+}
+
 bootstrap_target_user_gpg_key() {
   local gpg_passphrase="${KWALLET_SESSION_GPG_PASSWD:-}"
   if [[ -z "$gpg_passphrase" ]]; then
@@ -94,7 +165,11 @@ install_root_files() {
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-lock")" "/usr/local/bin/labwc-lock" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-launcher-menu")" "/usr/local/bin/labwc-launcher-menu" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-module-menu")" "/usr/local/bin/labwc-module-menu" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-network-settings")" "/usr/local/bin/labwc-network-settings" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-vpnctl")" "/usr/local/bin/labwc-vpnctl" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-player-status")" "/usr/local/bin/labwc-player-status" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/thunar-open-archive")" "/usr/local/bin/thunar-open-archive" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/thunar-create-archive")" "/usr/local/bin/thunar-create-archive" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/thunar-extract-here")" "/usr/local/bin/thunar-extract-here" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/thunar-open-terminal-here")" "/usr/local/bin/thunar-open-terminal-here" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-unlock-gpg-key")" "/usr/local/bin/labwc-unlock-gpg-key" 0755
@@ -180,6 +255,9 @@ enable_system_services_only() {
   run_cmd systemctl enable greetd.service
   run_cmd systemctl enable seatd.service
   run_cmd systemctl enable NetworkManager.service
+  if ! systemctl is-active --quiet NetworkManager.service >/dev/null 2>&1; then
+    run_cmd systemctl start NetworkManager.service
+  fi
   run_cmd systemctl enable switcheroo-control.service
   run_cmd systemctl enable udisks2.service
   run_cmd systemctl enable upower.service
@@ -189,7 +267,9 @@ enable_system_services_only() {
 enable_all_services() {
   install_root_files
   enable_system_services_only
+  configure_wireguard_profiles
   enable_user_services
+  refresh_user_font_cache
 }
 
 remove_if_present() {
@@ -222,6 +302,7 @@ nuke_all_state() {
   remove_if_present "$LABWC_TARGET_HOME/.config/kitty"
   remove_if_present "$LABWC_TARGET_HOME/.config/gammastep"
   remove_if_present "$LABWC_TARGET_HOME/.config/xdg-desktop-portal"
+  remove_if_present "$LABWC_TARGET_HOME/.config/fontconfig"
   remove_if_present "$LABWC_TARGET_HOME/.config/xfce4/helpers.rc"
   remove_if_present "$LABWC_TARGET_HOME/.config/mimeapps.list"
   remove_if_present "$LABWC_TARGET_HOME/.config/kwalletrc"
@@ -252,7 +333,11 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/labwc-lock"
   remove_if_present "/usr/local/bin/labwc-launcher-menu"
   remove_if_present "/usr/local/bin/labwc-module-menu"
+  remove_if_present "/usr/local/bin/labwc-network-settings"
+  remove_if_present "/usr/local/bin/labwc-vpnctl"
   remove_if_present "/usr/local/bin/labwc-player-status"
+  remove_if_present "/usr/local/bin/thunar-open-archive"
+  remove_if_present "/usr/local/bin/thunar-create-archive"
   remove_if_present "/usr/local/bin/thunar-extract-here"
   remove_if_present "/usr/local/bin/thunar-open-terminal-here"
   remove_if_present "/usr/local/bin/labwc-unlock-gpg-key"
@@ -268,6 +353,7 @@ nuke_all_state() {
   remove_if_present "$SID_PREFERENCES_PATH"
   remove_labwc_tweaks_install
   remove_keepsecret_install
+  remove_managed_wireguard_profiles
   rmdir --ignore-fail-on-non-empty "/etc/systemd/system/greetd.service.d" >/dev/null 2>&1 || true
 
   log_info "removing target user systemd user unit links"

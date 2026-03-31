@@ -76,7 +76,7 @@ case "$selection" in
   "Geeqie") run_gui geeqie ;;
   "Mullvad VPN") run_gui mullvad-vpn ;;
   "Bitwarden") run_gui bitwarden ;;
-  "Network") run_terminal "Network" 'exec nmtui' ;;
+  "Network") run_gui /usr/local/bin/labwc-network-settings ;;
   "Power") exec /usr/local/bin/labwc-power-menu ;;
   *) exit 0 ;;
 esac

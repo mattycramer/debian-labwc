@@ -79,10 +79,14 @@ readonly SID_PACKAGES=(
   upower
   power-profiles-daemon
   network-manager
+  network-manager-tui
   fonts-font-awesome
   fonts-noto
   fonts-noto-core
   fonts-noto-mono
+  fontconfig
+  fonts-noto-color-emoji
+  fonts-symbola
   nwg-look
   papirus-icon-theme
   qt6ct
@@ -93,8 +97,18 @@ readonly SID_PACKAGES=(
   fonts-material-design-icons-iconfont
   fonts-weather-icons
   adwaita-icon-theme
-  file-roller
+  xarchiver
   libarchive-tools
+  7zip
+  zip
+  unzip
+  unar
+  unrar-free
+  lz4
+  lzip
+  lrzip
+  xz-utils
+  zstd
   geeqie
   mousepad
   zathura

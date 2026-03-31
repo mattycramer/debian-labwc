@@ -42,6 +42,22 @@ verify_unit_content() {
   systemd-analyze verify "$DBUS_BROKER_SYSTEM_UNIT_PATH" "$DBUS_BROKER_USER_UNIT_PATH"
 }
 
+verify_session_service_alias() {
+  local alias_path="$1"
+  local source_path="$2"
+  [[ -f "$source_path" ]] || return 0
+  [[ -L "$alias_path" ]] || die "missing D-Bus compatibility alias: $alias_path"
+  [[ "$(readlink -f "$alias_path")" == "$(readlink -f "$source_path")" ]] || die "D-Bus compatibility alias '$alias_path' does not point at '$source_path'"
+}
+
+verify_session_service_aliases() {
+  verify_session_service_alias "$(dbus_service_alias_path "org.freedesktop.Notifications.service")" "/usr/share/dbus-1/services/fr.emersion.mako.service"
+  verify_session_service_alias "$(dbus_service_alias_path "org.freedesktop.FileManager1.service")" "/usr/share/dbus-1/services/org.xfce.Thunar.FileManager1"
+  verify_session_service_alias "$(dbus_service_alias_path "org.freedesktop.thumbnails.Cache1.service")" "/usr/share/dbus-1/services/org.xfce.Tumbler.Cache1.service"
+  verify_session_service_alias "$(dbus_service_alias_path "org.freedesktop.thumbnails.Manager1.service")" "/usr/share/dbus-1/services/org.xfce.Tumbler.Manager1.service"
+  verify_session_service_alias "$(dbus_service_alias_path "org.freedesktop.thumbnails.Thumbnailer1.service")" "/usr/share/dbus-1/services/org.xfce.Tumbler.Thumbnailer1.service"
+}
+
 verify_system_runtime() {
   local fragment_path main_pid exe_path
   fragment_path="$(systemctl show -p FragmentPath --value dbus.service)"
@@ -52,26 +68,28 @@ verify_system_runtime() {
   ((main_pid > 1)) || die "system dbus.service is not running (MainPID=$main_pid)"
 
   exe_path="$(readlink -f "/proc/$main_pid/exe" 2>/dev/null || true)"
-  [[ "$exe_path" == "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-launch" ]] || die "system dbus.service runtime is '$exe_path' not managed dbus-broker-launch"
-
-  ps -o comm= --ppid "$main_pid" | grep -Fx "dbus-broker" >/dev/null || die "dbus-broker worker process is not attached under dbus-broker-launch"
+  case "$exe_path" in
+    "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-launch")
+      ps -o comm= --ppid "$main_pid" | grep -Fx "dbus-broker" >/dev/null || die "dbus-broker worker process is not attached under dbus-broker-launch"
+      ;;
+    */dbus-daemon)
+      log_warn "system dbus.service is still running dbus-daemon; managed dbus-broker will apply after reboot or the next controlled dbus.service restart"
+      ;;
+    *)
+      die "system dbus.service runtime is '$exe_path' not dbus-broker-launch or dbus-daemon"
+      ;;
+  esac
 }
 
 verify_user_runtime() {
   local user_fragment user_main_pid user_exe
   user_fragment="$(runuser -u "$DBUS_BROKER_TARGET_USER" -- systemctl --user show -p FragmentPath --value dbus.service 2>/dev/null || true)"
   if [[ -z "$user_fragment" ]]; then
-    if [[ "$DBUS_BROKER_RESTART_USER_BUS_IF_ACTIVE" == "yes" ]]; then
-      die "user manager is not reachable for '$DBUS_BROKER_TARGET_USER' while DBUS_BROKER_RESTART_USER_BUS_IF_ACTIVE=yes"
-    fi
     log_warn "could not query user dbus.service fragment for '$DBUS_BROKER_TARGET_USER'; verify after next login"
     return 0
   fi
 
   if [[ "$user_fragment" != "$DBUS_BROKER_USER_UNIT_PATH" ]]; then
-    if [[ "$DBUS_BROKER_RESTART_USER_BUS_IF_ACTIVE" == "yes" ]]; then
-      die "user dbus.service fragment mismatch: expected '$DBUS_BROKER_USER_UNIT_PATH', got '$user_fragment'"
-    fi
     log_warn "user manager currently points to '$user_fragment'; managed user unit will apply after next user daemon-reload/login"
     return 0
   fi
@@ -79,13 +97,19 @@ verify_user_runtime() {
   user_main_pid="$(runuser -u "$DBUS_BROKER_TARGET_USER" -- systemctl --user show -p MainPID --value dbus.service 2>/dev/null || true)"
   if [[ "$user_main_pid" =~ ^[0-9]+$ ]] && ((user_main_pid > 1)); then
     user_exe="$(readlink -f "/proc/$user_main_pid/exe" 2>/dev/null || true)"
-    [[ "$user_exe" == "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-launch" ]] || die "user dbus.service runtime is '$user_exe' not managed dbus-broker-launch"
+    case "$user_exe" in
+      "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-launch")
+        ;;
+      */dbus-daemon)
+        log_warn "user dbus.service for '$DBUS_BROKER_TARGET_USER' is still running dbus-daemon; managed dbus-broker will apply on next login or controlled user-bus restart"
+        ;;
+      *)
+        die "user dbus.service runtime is '$user_exe' not dbus-broker-launch or dbus-daemon"
+        ;;
+    esac
     return 0
   fi
 
-  if [[ "$DBUS_BROKER_RESTART_USER_BUS_IF_ACTIVE" == "yes" ]]; then
-    die "user dbus.service is not active after requested restart (MainPID=${user_main_pid:-unknown})"
-  fi
   log_warn "user dbus.service is currently inactive for '$DBUS_BROKER_TARGET_USER'; override will apply at next login"
 }
 
@@ -102,6 +126,7 @@ verify_install() {
   verify_launcher_binary_contract
   verify_provenance_file
   verify_unit_content
+  verify_session_service_aliases
   verify_system_runtime
   verify_user_runtime
   verify_labwc_session_compatibility

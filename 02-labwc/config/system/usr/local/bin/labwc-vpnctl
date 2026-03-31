@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+ACTION="${1:-status}"
+readonly WAYBAR_SIGNAL=11
+
+profile_specs() {
+  cat <<'EOF'
+sego005-semm001|Sweden|🇸🇪
+dkcp401-dkcp102|Denmark|🇩🇰
+noos102-noos003|Norway|🇳🇴
+fihe101-fihe003|Finland|🇫🇮
+defr003-defr002|Germany|🇩🇪
+gbgl001-gbgl002|UK|🇬🇧
+uswa001-uswa002|USA|🇺🇸
+EOF
+}
+
+profile_label() {
+  local target="$1"
+  while IFS='|' read -r profile_name profile_country profile_flag; do
+    [[ "$profile_name" == "$target" ]] || continue
+    printf '%s\n' "$profile_country"
+    return 0
+  done < <(profile_specs)
+  return 1
+}
+
+profile_flag() {
+  local target="$1"
+  while IFS='|' read -r profile_name profile_country profile_flag; do
+    [[ "$profile_name" == "$target" ]] || continue
+    printf '%s\n' "$profile_flag"
+    return 0
+  done < <(profile_specs)
+  return 1
+}
+
+is_managed_profile() {
+  local target="$1"
+  profile_label "$target" >/dev/null 2>&1
+}
+
+active_managed_profile() {
+  local active_name active_type
+  while IFS=: read -r active_name active_type; do
+    [[ "$active_type" == "wireguard" ]] || continue
+    is_managed_profile "$active_name" || continue
+    printf '%s\n' "$active_name"
+    return 0
+  done < <(nmcli -t -f NAME,TYPE connection show --active 2>/dev/null || true)
+  return 1
+}
+
+refresh_waybar() {
+  pkill -RTMIN+"$WAYBAR_SIGNAL" -x waybar >/dev/null 2>&1 || true
+}
+
+print_status_json() {
+  local active_profile="$1"
+  if [[ -z "$active_profile" ]]; then
+    printf '%s\n' '{"text":"VPN Off","class":"off","tooltip":"VPN disconnected"}'
+    return 0
+  fi
+
+  local country flag
+  country="$(profile_label "$active_profile")"
+  flag="$(profile_flag "$active_profile")"
+  printf '{"text":"VPN %s","class":"active","tooltip":"VPN %s active"}\n' "$flag" "$country"
+}
+
+disconnect_managed_profiles() {
+  local profile_name profile_country profile_flag
+  while IFS='|' read -r profile_name profile_country profile_flag; do
+    [[ -n "$profile_name" ]] || continue
+    nmcli connection down id "$profile_name" >/dev/null 2>&1 || true
+  done < <(profile_specs)
+}
+
+next_profile() {
+  local current_profile="$1"
+  local profile_name profile_country profile_flag
+  local first_profile=""
+  local return_next="no"
+
+  while IFS='|' read -r profile_name profile_country profile_flag; do
+    [[ -n "$profile_name" ]] || continue
+    [[ -n "$first_profile" ]] || first_profile="$profile_name"
+    if [[ "$return_next" == "yes" ]]; then
+      printf '%s\n' "$profile_name"
+      return 0
+    fi
+    if [[ "$profile_name" == "$current_profile" ]]; then
+      return_next="yes"
+    fi
+  done < <(profile_specs)
+
+  printf '%s\n' "$first_profile"
+}
+
+connect_profile() {
+  local target_profile="$1"
+  disconnect_managed_profiles
+  nmcli --wait 20 connection up id "$target_profile" >/dev/null
+  refresh_waybar
+}
+
+cycle_profile() {
+  local current_profile next_target
+  current_profile="$(active_managed_profile || true)"
+  next_target="$(next_profile "$current_profile")"
+  [[ -n "$next_target" ]] || exit 1
+  connect_profile "$next_target"
+}
+
+turn_off_profile() {
+  disconnect_managed_profiles
+  refresh_waybar
+}
+
+case "$ACTION" in
+  status)
+    print_status_json "$(active_managed_profile || true)"
+    ;;
+  cycle)
+    cycle_profile
+    ;;
+  off)
+    turn_off_profile
+    ;;
+  *)
+    exit 1
+    ;;
+esac

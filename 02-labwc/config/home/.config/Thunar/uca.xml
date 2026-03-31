@@ -2,14 +2,41 @@
 <actions>
   <action>
     <icon>package-x-generic</icon>
+    <name>Open in _Xarchiver</name>
+    <submenu></submenu>
+    <unique-id>1700000000000000-1</unique-id>
+    <command>/usr/local/bin/thunar-open-archive %f</command>
+    <description>Open the selected archive in Xarchiver</description>
+    <patterns>*.7z;*.apk;*.ar;*.cab;*.cpio;*.deb;*.gz;*.iso;*.lz;*.lz4;*.lzma;*.rar;*.rpm;*.tar;*.tar.bz2;*.tar.gz;*.tar.lz;*.tar.lz4;*.tar.lzma;*.tar.xz;*.tar.zst;*.tbz;*.tbz2;*.tgz;*.txz;*.tzst;*.xz;*.zip;*.zst</patterns>
+    <other-files/>
+    <range>1-1</range>
+  </action>
+  <action>
+    <icon>package-x-generic</icon>
     <name>_Extract Here</name>
     <submenu></submenu>
     <unique-id>1700000000000001-1</unique-id>
     <command>/usr/local/bin/thunar-extract-here %f</command>
-    <description>Extract the selected archive into a new folder named after the archive</description>
+    <description>Extract the selected archive into a new folder beside it</description>
     <patterns>*.7z;*.apk;*.ar;*.cab;*.cpio;*.deb;*.gz;*.iso;*.lz;*.lz4;*.lzma;*.rar;*.rpm;*.tar;*.tar.bz2;*.tar.gz;*.tar.lz;*.tar.lz4;*.tar.lzma;*.tar.xz;*.tar.zst;*.tbz;*.tbz2;*.tgz;*.txz;*.tzst;*.xz;*.zip;*.zst</patterns>
     <other-files/>
     <range>1-1</range>
+  </action>
+  <action>
+    <icon>folder-new</icon>
+    <name>Create _tar.zst Archive</name>
+    <submenu></submenu>
+    <unique-id>1700000000000003-1</unique-id>
+    <command>/usr/local/bin/thunar-create-archive %F</command>
+    <description>Create a compressed tar.zst archive from the current selection</description>
+    <patterns>*</patterns>
+    <directories/>
+    <other-files/>
+    <audio-files/>
+    <image-files/>
+    <text-files/>
+    <video-files/>
+    <range>1-99</range>
   </action>
   <action>
     <icon>utilities-terminal</icon>

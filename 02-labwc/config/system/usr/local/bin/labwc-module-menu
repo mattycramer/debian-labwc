@@ -34,6 +34,14 @@ run_terminal() {
   fi
 }
 
+open_network_settings() {
+  if command -v /usr/local/bin/labwc-network-settings >/dev/null 2>&1; then
+    nohup /usr/local/bin/labwc-network-settings >/dev/null 2>&1 &
+    return 0
+  fi
+  run_terminal "Network" 'exec nmtui'
+}
+
 wifi_state() {
   nmcli -t -f WIFI general 2>/dev/null | tr '[:upper:]' '[:lower:]' || printf 'unknown'
 }
@@ -87,11 +95,11 @@ show_profile_menu() {
 
 case "$category:$action" in
   network:quick)
-    run_terminal "Network" 'exec nmtui'
+    open_network_settings
     ;;
   network:menu)
     entries=(
-      "Open network manager"
+      "Open network settings"
       "Toggle Wi-Fi ($(wifi_state))"
       "Toggle networking ($(networking_state))"
       "Rescan Wi-Fi"
@@ -102,7 +110,7 @@ case "$category:$action" in
     fi
     selection="$(choose "Network" "${entries[@]}")"
     case "$selection" in
-      "Open network manager") run_terminal "Network" 'exec nmtui' ;;
+      "Open network settings") open_network_settings ;;
       "Toggle Wi-Fi ("*) toggle_wifi ;;
       "Toggle networking ("*) toggle_networking ;;
       "Rescan Wi-Fi") nmcli device wifi rescan ;;

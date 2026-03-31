@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+archive_path="${1:-}"
+[[ -n "$archive_path" ]] || exit 1
+[[ -f "$archive_path" ]] || exit 1
+command -v xarchiver >/dev/null 2>&1 || exit 1
+
+archive_path="$(readlink -f -- "$archive_path")"
+nohup xarchiver "$archive_path" >/dev/null 2>&1 &

@@ -65,6 +65,7 @@ render_template_content() {
     TEMPLATE_KANSHI_EXTERNAL_CLAUSE="$kanshi_external_clause" \
     TEMPLATE_GREETD_VT="${LABWC_GREETD_VT:-}" \
     TEMPLATE_SESSION_WRAPPER="/usr/local/bin/labwc-session" \
+    TEMPLATE_WIREGUARD_PRIV_KEY="${WIREGUARD_PRIV_KEY:-}" \
     TEMPLATE_INTERNAL_OUTPUT="${LABWC_INTERNAL_OUTPUT:-}" \
     TEMPLATE_EXTERNAL_OUTPUT="${LABWC_EXTERNAL_OUTPUT:-}" \
     TEMPLATE_INTERNAL_MODE="${LABWC_INTERNAL_MODE:-}" \
@@ -106,6 +107,7 @@ replacements = {
     "@KANSHI_EXTERNAL_CLAUSE@": os.environ.get("TEMPLATE_KANSHI_EXTERNAL_CLAUSE", ""),
     "@GREETD_VT@": os.environ.get("TEMPLATE_GREETD_VT", ""),
     "@SESSION_WRAPPER@": os.environ.get("TEMPLATE_SESSION_WRAPPER", ""),
+    "@WIREGUARD_PRIV_KEY@": os.environ.get("TEMPLATE_WIREGUARD_PRIV_KEY", ""),
     "@INTERNAL_OUTPUT@": os.environ.get("TEMPLATE_INTERNAL_OUTPUT", ""),
     "@EXTERNAL_OUTPUT@": os.environ.get("TEMPLATE_EXTERNAL_OUTPUT", ""),
     "@INTERNAL_MODE@": os.environ.get("TEMPLATE_INTERNAL_MODE", ""),

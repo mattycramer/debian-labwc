@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+die() {
+  printf 'thunar-create-archive: %s\n' "$1" >&2
+  exit 1
+}
+
+archive_stem_for_selection() {
+  local first_name="$1"
+  local count="$2"
+
+  if (( count == 1 )); then
+    printf '%s\n' "$first_name"
+    return 0
+  fi
+
+  printf 'selection-%s\n' "$(date -u '+%Y%m%d-%H%M%S')"
+}
+
+compress_with_bsdtar() {
+  local archive_path="$1"
+  local base_dir="$2"
+  shift 2
+  command -v bsdtar >/dev/null 2>&1 || return 1
+  bsdtar -acf "$archive_path" -C "$base_dir" -- "$@"
+}
+
+compress_with_tar() {
+  local archive_path="$1"
+  local base_dir="$2"
+  shift 2
+  command -v tar >/dev/null 2>&1 || return 1
+  tar --zstd -cf "$archive_path" -C "$base_dir" -- "$@"
+}
+
+declare -a selection_paths=()
+declare -a archive_members=()
+
+while (($#)); do
+  [[ -n "${1:-}" ]] || {
+    shift
+    continue
+  }
+  selection_paths+=("$(readlink -f -- "$1")")
+  shift
+done
+
+((${#selection_paths[@]} > 0)) || die "missing selection"
+
+base_dir="$(dirname -- "${selection_paths[0]}")"
+for selection_path in "${selection_paths[@]}"; do
+  [[ -e "$selection_path" ]] || die "selection not found: $selection_path"
+  [[ "$(dirname -- "$selection_path")" == "$base_dir" ]] || die "all selected paths must be in the same directory"
+  archive_members+=("$(basename -- "$selection_path")")
+done
+
+archive_stem="$(archive_stem_for_selection "${archive_members[0]}" "${#archive_members[@]}")"
+archive_path="${base_dir}/${archive_stem}.tar.zst"
+suffix=1
+while [[ -e "$archive_path" ]]; do
+  archive_path="${base_dir}/${archive_stem}-${suffix}.tar.zst"
+  suffix=$((suffix + 1))
+done
+
+compress_with_bsdtar "$archive_path" "$base_dir" "${archive_members[@]}" || \
+  compress_with_tar "$archive_path" "$base_dir" "${archive_members[@]}" || \
+  die "missing tar implementation with zstd support"

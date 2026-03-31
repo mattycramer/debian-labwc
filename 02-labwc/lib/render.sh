@@ -142,6 +142,10 @@ render_mimeapps() {
   render_home_template_file ".config/mimeapps.list"
 }
 
+render_fontconfig() {
+  render_home_template_file ".config/fontconfig/fonts.conf"
+}
+
 render_thunar_config() {
   render_home_template_file ".config/Thunar/thunarrc"
   render_home_template_file ".config/Thunar/uca.xml"
@@ -353,6 +357,7 @@ render_all_configs() {
     "$config_root/foot" \
     "$config_root/gammastep" \
     "$config_root/xdg-desktop-portal" \
+    "$config_root/fontconfig" \
     "$config_root/labwc-session" \
     "$config_root/systemd/user/gpg-agent.service.d" \
     "$config_root/systemd/user/xdg-desktop-portal.service.d" \
@@ -366,6 +371,7 @@ render_all_configs() {
   render_thunar_config
   render_xfce_helpers
   render_mimeapps
+  render_fontconfig
   render_xdg_terminal_exec
   render_tmux_config
   render_fzf_config

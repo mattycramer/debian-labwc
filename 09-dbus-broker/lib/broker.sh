@@ -5,6 +5,8 @@ if ! declare -F retry_cmd >/dev/null 2>&1; then
   source "$SCRIPT_DIR/lib/apt.sh"
 fi
 
+readonly DBUS_BROKER_SESSION_SERVICE_ALIAS_DIR="/usr/local/share/dbus-1/services"
+
 init_broker_runtime_paths() {
   local tarball_name
   tarball_name="$(basename -- "$DBUS_BROKER_TARBALL_URL")"
@@ -133,6 +135,34 @@ install_managed_file() {
   local destination="$3"
   backup_existing_path "$destination"
   run_cmd install -m "$mode" "$source" "$destination"
+}
+
+dbus_service_alias_path() {
+  printf '%s/%s\n' "$DBUS_BROKER_SESSION_SERVICE_ALIAS_DIR" "$1"
+}
+
+install_session_service_alias() {
+  local alias_name="$1"
+  local source_path="$2"
+  local alias_path
+
+  [[ -f "$source_path" ]] || {
+    log_warn "skipping optional D-Bus service alias '$alias_name' because source is missing: $source_path"
+    return 0
+  }
+
+  alias_path="$(dbus_service_alias_path "$alias_name")"
+  backup_existing_path "$alias_path"
+  run_cmd install -d -m 0755 "$DBUS_BROKER_SESSION_SERVICE_ALIAS_DIR"
+  run_cmd ln -sfn "$source_path" "$alias_path"
+}
+
+install_session_service_aliases() {
+  install_session_service_alias "org.freedesktop.Notifications.service" "/usr/share/dbus-1/services/fr.emersion.mako.service"
+  install_session_service_alias "org.freedesktop.FileManager1.service" "/usr/share/dbus-1/services/org.xfce.Thunar.FileManager1"
+  install_session_service_alias "org.freedesktop.thumbnails.Cache1.service" "/usr/share/dbus-1/services/org.xfce.Tumbler.Cache1.service"
+  install_session_service_alias "org.freedesktop.thumbnails.Manager1.service" "/usr/share/dbus-1/services/org.xfce.Tumbler.Manager1.service"
+  install_session_service_alias "org.freedesktop.thumbnails.Thumbnailer1.service" "/usr/share/dbus-1/services/org.xfce.Tumbler.Thumbnailer1.service"
 }
 
 verify_release_tag_commit() {
@@ -309,29 +339,14 @@ render_user_bus_unit() {
 render_managed_units() {
   render_system_bus_unit
   render_user_bus_unit
+  install_session_service_aliases
 }
 
-restart_user_bus_if_requested() {
-  local user_main_pid user_exe
-  [[ "$DBUS_BROKER_RESTART_USER_BUS_IF_ACTIVE" == "yes" ]] || {
-    log_warn "user dbus.service override is installed; restart is deferred until next login (DBUS_BROKER_RESTART_USER_BUS_IF_ACTIVE=no)"
-    return 0
-  }
-
-  if ! user_main_pid="$(runuser -u "$DBUS_BROKER_TARGET_USER" -- systemctl --user show -p MainPID --value dbus.service 2>/dev/null)"; then
-    die "DBUS_BROKER_RESTART_USER_BUS_IF_ACTIVE=yes but user manager is not reachable for '$DBUS_BROKER_TARGET_USER'"
-  fi
-
-  if [[ "$user_main_pid" =~ ^[0-9]+$ ]] && ((user_main_pid > 1)); then
-    run_cmd runuser -u "$DBUS_BROKER_TARGET_USER" -- systemctl --user daemon-reload
-    run_cmd runuser -u "$DBUS_BROKER_TARGET_USER" -- systemctl --user restart dbus.service
-    user_main_pid="$(runuser -u "$DBUS_BROKER_TARGET_USER" -- systemctl --user show -p MainPID --value dbus.service)"
-    user_exe="$(readlink -f "/proc/$user_main_pid/exe" 2>/dev/null || true)"
-    [[ "$user_exe" == "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-launch" ]] || die "user bus runtime is not using managed dbus-broker-launch after restart"
+reload_user_manager_if_reachable() {
+  if runuser -u "$DBUS_BROKER_TARGET_USER" -- systemctl --user daemon-reload >/dev/null 2>&1; then
     return 0
   fi
-
-  log_warn "user manager is reachable but dbus.service is currently inactive for '$DBUS_BROKER_TARGET_USER'; override will apply on next login"
+  log_warn "user systemd manager is not reachable for '$DBUS_BROKER_TARGET_USER'; managed user dbus.service will apply on next login"
 }
 
 enable_broker_runtime() {
@@ -342,11 +357,10 @@ enable_broker_runtime() {
   require_file "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker"
 
   run_cmd systemctl daemon-reload
+  reload_user_manager_if_reachable
   system_fragment="$(systemctl show -p FragmentPath --value dbus.service 2>/dev/null || true)"
   [[ "$system_fragment" == "$DBUS_BROKER_SYSTEM_UNIT_PATH" ]] || die "system dbus.service fragment is not the managed override: '$system_fragment'"
-  run_cmd systemctl start dbus.socket
-  run_cmd systemctl restart dbus.service
-  restart_user_bus_if_requested
+  log_info "managed dbus.service overrides are staged; reboot or a later controlled dbus.service restart will activate dbus-broker"
 }
 
 remove_if_present() {
@@ -372,6 +386,7 @@ remove_unmanaged_artifact() {
 
 remove_broker_install() {
   local fallback_fragment
+  local alias_path
 
   restore_backed_up_path "$DBUS_BROKER_SYSTEM_UNIT_PATH" || remove_if_present "$DBUS_BROKER_SYSTEM_UNIT_PATH"
   restore_backed_up_path "$DBUS_BROKER_USER_UNIT_PATH" || remove_if_present "$DBUS_BROKER_USER_UNIT_PATH"
@@ -385,6 +400,15 @@ remove_broker_install() {
   restore_backed_up_path "$DBUS_BROKER_RELEASE_PROVENANCE_PATH" || remove_unmanaged_artifact "$DBUS_BROKER_RELEASE_PROVENANCE_PATH"
   restore_backed_up_path "$DBUS_BROKER_INSTALL_CATALOG_DIR/dbus-broker.catalog" || remove_unmanaged_artifact "$DBUS_BROKER_INSTALL_CATALOG_DIR/dbus-broker.catalog"
   restore_backed_up_path "$DBUS_BROKER_INSTALL_CATALOG_DIR/dbus-broker-launch.catalog" || remove_unmanaged_artifact "$DBUS_BROKER_INSTALL_CATALOG_DIR/dbus-broker-launch.catalog"
+  while IFS= read -r alias_path; do
+    [[ -n "$alias_path" ]] || continue
+    restore_backed_up_path "$alias_path" || remove_unmanaged_artifact "$alias_path"
+  done < <(printf '%s\n' \
+    "$(dbus_service_alias_path "org.freedesktop.Notifications.service")" \
+    "$(dbus_service_alias_path "org.freedesktop.FileManager1.service")" \
+    "$(dbus_service_alias_path "org.freedesktop.thumbnails.Cache1.service")" \
+    "$(dbus_service_alias_path "org.freedesktop.thumbnails.Manager1.service")" \
+    "$(dbus_service_alias_path "org.freedesktop.thumbnails.Thumbnailer1.service")")
   remove_if_present "$DBUS_BROKER_CACHE_TARBALL"
   remove_if_present "$DBUS_BROKER_EXTRACT_DIR"
   remove_if_present "$DBUS_BROKER_BACKUP_DIR"
