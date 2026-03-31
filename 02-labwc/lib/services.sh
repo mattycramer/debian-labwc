@@ -111,7 +111,7 @@ refresh_user_font_cache() {
   run_cmd install -d -m 0700 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$cache_home" "$cache_dir"
 
   if ((${#font_dirs[@]} == 0)); then
-    log_info "no user font directories present; system font packages are already handled, skipping user-only font-cache refresh"
+    log_info "rendered $LABWC_TARGET_HOME/.config/fontconfig/fonts.conf; no user font directories under $user_fonts_dir or $legacy_fonts_dir, so only the system font cache was refreshed"
     return 0
   fi
 

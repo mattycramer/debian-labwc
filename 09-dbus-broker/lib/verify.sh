@@ -58,8 +58,25 @@ verify_session_service_aliases() {
   verify_session_service_alias "$(dbus_service_alias_path "org.freedesktop.thumbnails.Thumbnailer1.service")" "/usr/share/dbus-1/services/org.xfce.Tumbler.Thumbnailer1.service"
 }
 
+read_proc_exe_path() {
+  local pid="$1"
+  local exe_path
+
+  exe_path="$(readlink "/proc/$pid/exe" 2>/dev/null || true)"
+  if [[ -z "$exe_path" ]]; then
+    exe_path="$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)"
+  fi
+
+  printf '%s\n' "$exe_path"
+}
+
+normalize_runtime_exe_path() {
+  local exe_path="$1"
+  printf '%s\n' "${exe_path% (deleted)}"
+}
+
 verify_system_runtime() {
-  local fragment_path main_pid exe_path
+  local fragment_path main_pid exe_path normalized_exe_path
   fragment_path="$(systemctl show -p FragmentPath --value dbus.service)"
   [[ "$fragment_path" == "$DBUS_BROKER_SYSTEM_UNIT_PATH" ]] || die "system dbus.service fragment mismatch: expected '$DBUS_BROKER_SYSTEM_UNIT_PATH', got '${fragment_path:-unknown}'"
 
@@ -67,8 +84,9 @@ verify_system_runtime() {
   [[ "$main_pid" =~ ^[0-9]+$ ]] || die "system dbus.service MainPID is not numeric: '$main_pid'"
   ((main_pid > 1)) || die "system dbus.service is not running (MainPID=$main_pid)"
 
-  exe_path="$(readlink -f "/proc/$main_pid/exe" 2>/dev/null || true)"
-  case "$exe_path" in
+  exe_path="$(read_proc_exe_path "$main_pid")"
+  normalized_exe_path="$(normalize_runtime_exe_path "$exe_path")"
+  case "$normalized_exe_path" in
     "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-launch")
       ps -o comm= --ppid "$main_pid" | grep -Fx "dbus-broker" >/dev/null || die "dbus-broker worker process is not attached under dbus-broker-launch"
       ;;
@@ -82,7 +100,7 @@ verify_system_runtime() {
 }
 
 verify_user_runtime() {
-  local user_fragment user_main_pid user_exe
+  local user_fragment user_main_pid user_exe normalized_user_exe
   user_fragment="$(runuser -u "$DBUS_BROKER_TARGET_USER" -- systemctl --user show -p FragmentPath --value dbus.service 2>/dev/null || true)"
   if [[ -z "$user_fragment" ]]; then
     log_warn "could not query user dbus.service fragment for '$DBUS_BROKER_TARGET_USER'; verify after next login"
@@ -96,8 +114,9 @@ verify_user_runtime() {
 
   user_main_pid="$(runuser -u "$DBUS_BROKER_TARGET_USER" -- systemctl --user show -p MainPID --value dbus.service 2>/dev/null || true)"
   if [[ "$user_main_pid" =~ ^[0-9]+$ ]] && ((user_main_pid > 1)); then
-    user_exe="$(readlink -f "/proc/$user_main_pid/exe" 2>/dev/null || true)"
-    case "$user_exe" in
+    user_exe="$(read_proc_exe_path "$user_main_pid")"
+    normalized_user_exe="$(normalize_runtime_exe_path "$user_exe")"
+    case "$normalized_user_exe" in
       "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-launch")
         ;;
       */dbus-daemon)
