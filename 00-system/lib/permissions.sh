@@ -61,7 +61,18 @@ repair_tree_ownership() {
   local path="$1"
 
   [[ -e "$path" ]] || return 0
-  run_cmd find -P "$path" -exec chown -h "$SYSTEM_TARGET_USER:$SYSTEM_TARGET_GROUP" {} +
+  run_cmd find -P -xdev "$path" -exec chown -h "$SYSTEM_TARGET_USER:$SYSTEM_TARGET_GROUP" {} +
+}
+
+permissions_path_is_nested_under_any() {
+  local path="$1"
+  local root
+  shift || true
+
+  for root in "$@"; do
+    [[ "$path" == "$root" || "$path" == "$root/"* ]] && return 0
+  done
+  return 1
 }
 
 apply_system_path_permissions() {
@@ -77,6 +88,7 @@ apply_system_path_permissions() {
 
 apply_home_permissions() {
   local spec relative_path mode scope path
+  local -a repaired_tree_roots=()
 
   ensure_directory_state "$SYSTEM_TARGET_HOME" "$SYSTEM_TARGET_USER" "$SYSTEM_TARGET_GROUP" "$SYSTEM_HOME_MODE"
 
@@ -85,7 +97,11 @@ apply_home_permissions() {
     path="$SYSTEM_TARGET_HOME/$relative_path"
     ensure_directory_state "$path" "$SYSTEM_TARGET_USER" "$SYSTEM_TARGET_GROUP" "$mode"
     if [[ "$scope" == "tree" ]]; then
+      if permissions_path_is_nested_under_any "$path" "${repaired_tree_roots[@]}"; then
+        continue
+      fi
       repair_tree_ownership "$path"
+      repaired_tree_roots+=("$path")
     fi
   done
 }

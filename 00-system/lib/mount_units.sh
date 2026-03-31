@@ -524,7 +524,8 @@ apply_managed_mount_units() {
         run_cmd systemctl enable "$unit_name" >/dev/null
         run_cmd systemctl start "$unit_name"
         if [[ -n "$hook" ]]; then
-          run_cmd systemctl start "$hook" >/dev/null 2>&1 || true
+          # Avoid blocking the installer when the backing device is absent.
+          run_cmd systemctl start --no-block "$hook" >/dev/null 2>&1 || true
         fi
         ;;
       ownership)

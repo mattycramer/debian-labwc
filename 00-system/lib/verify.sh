@@ -22,8 +22,19 @@ assert_tree_has_no_root_owned_entries() {
   local first_match
 
   [[ -e "$path" ]] || return 0
-  first_match="$(find -P "$path" \( -user root -o -group root \) -print -quit)"
+  first_match="$(find -P -xdev "$path" \( -user root -o -group root \) -print -quit)"
   [[ -z "$first_match" ]] || die "root-owned content remains under $path: $first_match"
+}
+
+verify_path_is_nested_under_any() {
+  local path="$1"
+  local root
+  shift || true
+
+  for root in "$@"; do
+    [[ "$path" == "$root" || "$path" == "$root/"* ]] && return 0
+  done
+  return 1
 }
 
 verify_system_path_permissions() {
@@ -39,6 +50,7 @@ verify_system_path_permissions() {
 
 verify_home_permissions() {
   local spec relative_path mode scope path
+  local -a verified_tree_roots=()
 
   assert_directory_state "$SYSTEM_TARGET_HOME" "$SYSTEM_TARGET_USER" "$SYSTEM_TARGET_GROUP" "$SYSTEM_HOME_MODE"
 
@@ -47,7 +59,11 @@ verify_home_permissions() {
     path="$SYSTEM_TARGET_HOME/$relative_path"
     assert_directory_state "$path" "$SYSTEM_TARGET_USER" "$SYSTEM_TARGET_GROUP" "$mode"
     if [[ "$scope" == "tree" ]]; then
+      if verify_path_is_nested_under_any "$path" "${verified_tree_roots[@]}"; then
+        continue
+      fi
       assert_tree_has_no_root_owned_entries "$path"
+      verified_tree_roots+=("$path")
     fi
   done
 }
