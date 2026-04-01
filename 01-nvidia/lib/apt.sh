@@ -84,12 +84,18 @@ install_package_group() {
 }
 
 verify_nvidia_upstream_repository() {
-  local driver_policy=""
-  local toolkit_policy=""
-  driver_policy="$(apt-cache policy "$NVIDIA_DRIVER_META_PACKAGE")"
-  toolkit_policy="$(apt-cache policy "$CUDA_TOOLKIT_PACKAGE")"
-  grep -F 'developer.download.nvidia.com' <<<"$driver_policy" >/dev/null || die "$NVIDIA_DRIVER_META_PACKAGE is not visible from the NVIDIA upstream repo"
-  grep -F 'developer.download.nvidia.com' <<<"$toolkit_policy" >/dev/null || die "$CUDA_TOOLKIT_PACKAGE is not visible from the NVIDIA upstream repo"
+  local package_name=""
+  local selected_package=""
+
+  while IFS= read -r package_name; do
+    [[ -n "$package_name" ]] || continue
+    verify_package_visible_from_origin "$package_name" "developer.download.nvidia.com"
+  done < <(resolved_nvidia_upstream_packages)
+
+  selected_package="$(resolve_driver_pinning_package)" || true
+  if [[ -n "$selected_package" ]]; then
+    verify_package_visible_from_origin "$selected_package" "developer.download.nvidia.com"
+  fi
 }
 
 install_debian_prerequisite_packages() {
@@ -98,18 +104,14 @@ install_debian_prerequisite_packages() {
   install_package_group "Debian prerequisite package set" "${packages[@]}"
 }
 
-install_sid_prerequisite_packages() {
-  local -a apt_args=()
-  local -a packages=()
+verify_package_visible_from_origin() {
+  local package_name="$1"
+  local origin="$2"
+  local policy=""
 
-  mapfile -t packages < <(resolved_sid_prerequisite_packages)
-  if ((${#packages[@]} == 0)); then
-    return 0
-  fi
-
-  mapfile -t apt_args < <(apt_yes_args)
-  log_info "installing sid prerequisite package set"
-  run_mutating_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${packages[@]}"
+  policy="$(apt-cache policy "$package_name" 2>/dev/null || true)"
+  [[ -n "$policy" ]] || die "apt-cache policy returned no output for '$package_name'"
+  grep -F "$origin" <<<"$policy" >/dev/null || die "$package_name is not visible from $origin"
 }
 
 install_optional_driver_pinning_package() {

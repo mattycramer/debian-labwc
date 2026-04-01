@@ -1,5 +1,49 @@
 #!/usr/bin/env bash
 
+readonly SYSTEM_DKMS_CONF_PATH="/etc/dkms/framework.conf.d/90-labwc-secure-boot.conf"
+readonly SYSTEM_SIGN_MODULE_HELPER="/usr/local/bin/sign-module"
+
+secure_boot_state() {
+  local output=""
+
+  if ! command -v mokutil >/dev/null 2>&1; then
+    if [[ -d /sys/firmware/efi ]]; then
+      printf '%s\n' "unknown"
+    else
+      printf '%s\n' "unavailable"
+    fi
+    return 0
+  fi
+
+  output="$(mokutil --sb-state 2>/dev/null || true)"
+  case "${output,,}" in
+    *secureboot\ enabled*)
+      printf '%s\n' "enabled"
+      ;;
+    *secureboot\ disabled*)
+      printf '%s\n' "disabled"
+      ;;
+    *)
+      printf '%s\n' "unknown"
+      ;;
+  esac
+}
+
+verify_secure_boot_prerequisites() {
+  local state=""
+
+  state="$(secure_boot_state)"
+  case "$state" in
+    enabled)
+      require_file "$SYSTEM_DKMS_CONF_PATH"
+      [[ -x "$SYSTEM_SIGN_MODULE_HELPER" ]] || die "Secure Boot is enabled but '$SYSTEM_SIGN_MODULE_HELPER' is missing or not executable; run 00-system secureboot first"
+      ;;
+    unknown)
+      log_warn "could not determine Secure Boot state; if UEFI Secure Boot is enabled, run 00-system secureboot before rebooting into the NVIDIA driver stack"
+      ;;
+  esac
+}
+
 locate_nvcc() {
   local candidate=""
   if command -v nvcc >/dev/null 2>&1; then
@@ -52,11 +96,20 @@ verify_module_config() {
 }
 
 verify_ihd_preservation() {
+  local disallowed_setting=""
+
   if [[ "$NVIDIA_HAS_INTEL_MEDIA_DRIVER" == "yes" ]]; then
     package_installed intel-media-va-driver || die "intel-media-va-driver was present before install and should still be installed"
   fi
   if [[ -f "$NVIDIA_MODULE_CONFIG_PATH" ]]; then
-    ! grep -F 'LIBVA_DRIVER_NAME=nvidia' "$NVIDIA_MODULE_CONFIG_PATH" >/dev/null || die "managed NVIDIA config must not override LIBVA_DRIVER_NAME"
+    for disallowed_setting in \
+      'LIBVA_DRIVER_NAME=' \
+      'DRI_PRIME=' \
+      '__NV_PRIME_RENDER_OFFLOAD=' \
+      '__GLX_VENDOR_LIBRARY_NAME=' \
+      'GBM_BACKEND='; do
+      ! grep -F "$disallowed_setting" "$NVIDIA_MODULE_CONFIG_PATH" >/dev/null || die "managed NVIDIA config must not set $disallowed_setting globally"
+    done
   fi
 }
 
@@ -64,6 +117,32 @@ verify_cuda_toolkit() {
   local nvcc_path=""
   nvcc_path="$(locate_nvcc)" || die "nvcc was not found after installing $CUDA_TOOLKIT_PACKAGE"
   "$nvcc_path" --version >/dev/null 2>&1 || die "nvcc is present but failed to execute"
+}
+
+active_nvidia_drm_modeset() {
+  local value=""
+
+  [[ -r /sys/module/nvidia_drm/parameters/modeset ]] || return 1
+  value="$(< /sys/module/nvidia_drm/parameters/modeset)"
+  printf '%s\n' "${value//$'\n'/}"
+}
+
+verify_nvidia_drm_modeset_runtime() {
+  local value=""
+
+  [[ "$NVIDIA_ENABLE_DRM_MODESET" == "1" ]] || return 0
+  value="$(active_nvidia_drm_modeset || true)"
+  if [[ -z "$value" ]]; then
+    log_warn "nvidia_drm is not loaded yet; reboot the system and rerun 'make verify' to confirm active DRM KMS state"
+    return 0
+  fi
+
+  case "${value^^}" in
+    Y|1) ;;
+    *)
+      die "nvidia_drm is loaded but DRM KMS modeset is not active (expected Y/1, got '$value')"
+      ;;
+  esac
 }
 
 verify_nvidia_runtime() {
@@ -156,6 +235,7 @@ verify_installation() {
   verify_module_config
   verify_ihd_preservation
   verify_cuda_toolkit
+  verify_nvidia_drm_modeset_runtime
   verify_switcheroo_setup
   verify_nvidia_runtime
 }

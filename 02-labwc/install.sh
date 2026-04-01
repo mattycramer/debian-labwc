@@ -356,6 +356,7 @@ phase_build_doctor() {
   require_command runuser
   require_command curl
   require_command tar
+  require_command sha256sum
   require_command cmake
   require_command ctest
   require_command gcc

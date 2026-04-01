@@ -148,6 +148,7 @@ phase_system_doctor() {
   require_command sed
   require_command uname
   require_file "$DEBIAN_ARCHIVE_KEYRING_PATH"
+  verify_secure_boot_prerequisites
   log_platform_summary
 }
 
@@ -155,8 +156,7 @@ phase_repo() {
   log_info "phase: repo"
   phase_doctor
   require_root
-  ensure_debian_components_sources
-  ensure_shared_sid_repository
+  require_debian_contrib_configured
   apt_update
   ensure_download_tool
   install_cuda_keyring_package
@@ -169,7 +169,6 @@ phase_packages() {
   log_info "phase: packages"
   phase_repo
   install_debian_prerequisite_packages
-  install_sid_prerequisite_packages
   install_nvidia_stack
 }
 
@@ -199,7 +198,6 @@ phase_nuke() {
   require_root
   remove_nvidia_stack
   remove_nvidia_module_config
-  remove_debian_components_sources
   remove_cuda_keyring_package
   apt_update
   refresh_initramfs

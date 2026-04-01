@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 readonly DEBIAN_ARCHIVE_KEYRING_PATH="/usr/share/keyrings/debian-archive-keyring.gpg"
-readonly DEBIAN_COMPONENTS_SOURCE_PATH="/etc/apt/sources.list.d/labwc-nvidia-debian.sources"
 readonly NVIDIA_VENDOR_HEX="0x10de"
 readonly INTEL_VENDOR_HEX="0x8086"
 
@@ -159,16 +158,30 @@ resolved_debian_prerequisite_packages() {
     pciutils
   if [[ "$NVIDIA_INSTALL_SWITCHEROO_CONTROL" == "1" ]]; then
     printf '%s\n' \
+      switcheroo-control \
       mesa-utils \
       vulkan-tools
   fi
 }
 
-resolved_sid_prerequisite_packages() {
-  if [[ "$NVIDIA_INSTALL_SWITCHEROO_CONTROL" == "1" ]]; then
-    printf '%s\n' \
-      switcheroo-control
-  fi
+resolved_nvidia_upstream_packages() {
+  printf '%s\n' \
+    "$NVIDIA_DRIVER_META_PACKAGE" \
+    "$CUDA_TOOLKIT_PACKAGE" \
+    nvidia-driver \
+    nvidia-driver-cuda
+
+  case "$NVIDIA_KERNEL_MODULE_FLAVOR" in
+    proprietary)
+      printf '%s\n' nvidia-kernel-dkms
+      ;;
+    open)
+      printf '%s\n' nvidia-kernel-open-dkms
+      ;;
+    *)
+      die "unsupported NVIDIA_KERNEL_MODULE_FLAVOR '$NVIDIA_KERNEL_MODULE_FLAVOR'"
+      ;;
+  esac
 }
 
 resolved_nvidia_driver_packages() {

@@ -37,11 +37,11 @@ validate_greetd_settings() {
 }
 
 validate_regreet_settings() {
-  [[ "${GITHUB_REGREET_TARBALL:-}" =~ ^https://[^[:space:]]+$ ]] || {
-    die "GITHUB_REGREET_TARBALL must be an https URL, found '${GITHUB_REGREET_TARBALL:-}'"
-  }
   [[ "${GITHUB_REGREET_TAG:-}" =~ ^[A-Za-z0-9._-]+$ ]] || {
     die "GITHUB_REGREET_TAG must contain only alnum, dot, underscore, or dash, found '${GITHUB_REGREET_TAG:-}'"
+  }
+  [[ "${GITHUB_REGREET_TARBALL:-}" =~ ^https://github\.com/[^/]+/[^/]+/releases/download/${GITHUB_REGREET_TAG}/[^/?#]+\.tar\.gz$ ]] || {
+    die "GITHUB_REGREET_TARBALL must be a GitHub release tarball for tag '${GITHUB_REGREET_TAG}', found '${GITHUB_REGREET_TARBALL:-}'"
   }
   [[ "${GITHUB_REGREET_TARBALL_SHA:-}" =~ ^[0-9a-f]{64}$ ]] || {
     die "GITHUB_REGREET_TARBALL_SHA must be a 64 character lowercase hex sha256, found '${GITHUB_REGREET_TARBALL_SHA:-}'"
@@ -253,11 +253,14 @@ remove_regreet_support_files() {
   remove_if_present "$(regreet_labwc_config_dir)"
   remove_if_present "$(regreet_state_dir)"
   remove_if_present "$(regreet_log_dir)"
-  remove_if_present "/var/lib/greetd/greeter/.local/share/labwc-session/regreet-labwall2-1920x1080.png"
+  while IFS= read -r wallpaper_path; do
+    [[ -n "$wallpaper_path" ]] || continue
+    remove_if_present "$wallpaper_path"
+  done < <(find /var/lib/greetd/greeter/.local/share/labwc-session -maxdepth 1 -type f -name 'regreet-*' 2>/dev/null | LC_ALL=C sort)
 }
 
 install_regreet_release() {
-  local tmpdir tarball_path extracted_path actual_sha
+  local tmpdir tarball_path extracted_path actual_sha tar_listing
   local -a tar_entries=()
 
   validate_regreet_settings
@@ -281,9 +284,13 @@ install_regreet_release() {
   mapfile -t tar_entries < <(tar -tf "$tarball_path")
   ((${#tar_entries[@]} == 1)) || die "regreet tarball must contain exactly one file, found ${#tar_entries[@]}"
   [[ "${tar_entries[0]}" == "regreet" ]] || die "regreet tarball must contain a top-level 'regreet' file, found '${tar_entries[0]}'"
+  tar_listing="$(tar -tvf "$tarball_path")"
+  [[ "${tar_listing:0:1}" == "-" ]] || die "regreet tarball entry must be a regular file, found '${tar_listing%% *}'"
 
   run_cmd tar -xf "$tarball_path" -C "$tmpdir"
+  [[ ! -L "$extracted_path" ]] || die "regreet tarball extracted a symlink, expected a regular file"
   [[ -f "$extracted_path" ]] || die "regreet tarball did not extract an executable file at '$extracted_path'"
+  [[ -x "$extracted_path" ]] || die "regreet tarball did not extract an executable binary at '$extracted_path'"
   run_cmd install -D -m 0755 "$extracted_path" "$(regreet_binary_path)"
   "$(regreet_binary_path)" --version >/dev/null 2>&1 || die "installed regreet binary failed the --version self-test"
   trap - RETURN

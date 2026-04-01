@@ -33,13 +33,30 @@ prepare_labwc_tweaks_cache() {
     "$cache_root"
 }
 
+validate_labwc_tweaks_settings() {
+  [[ -n "${LABWC_TWEAKS_VERSION:-}" ]] || die "LABWC_TWEAKS_VERSION is required"
+  [[ "${LABWC_TWEAKS_TAG:-}" =~ ^[A-Za-z0-9._-]+$ ]] || {
+    die "LABWC_TWEAKS_TAG must contain only alnum, dot, underscore, or dash, found '${LABWC_TWEAKS_TAG:-}'"
+  }
+  [[ "${LABWC_TWEAKS_TARBALL_URL:-}" =~ ^https://github\.com/[^/]+/[^/]+/archive/refs/tags/${LABWC_TWEAKS_TAG}\.tar\.gz$ ]] || {
+    die "LABWC_TWEAKS_TARBALL_URL must be a GitHub tag tarball for '${LABWC_TWEAKS_TAG}', found '${LABWC_TWEAKS_TARBALL_URL:-}'"
+  }
+  [[ "${LABWC_TWEAKS_TARBALL_SHA:-}" =~ ^[0-9a-f]{64}$ ]] || {
+    die "LABWC_TWEAKS_TARBALL_SHA must be a 64 character lowercase hex sha256, found '${LABWC_TWEAKS_TARBALL_SHA:-}'"
+  }
+}
+
 download_labwc_tweaks_source() {
-  local archive_path
+  local archive_path actual_sha
   archive_path="$(labwc_tweaks_archive_path)"
   prepare_labwc_tweaks_cache
   run_cmd runuser -u "$LABWC_TARGET_USER" -- sh -c "rm -f -- '$archive_path'"
   retry_cmd 6 runuser -u "$LABWC_TARGET_USER" -- env HOME="$LABWC_TARGET_HOME" \
     curl --ipv4 --fail --location --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 --max-time 300 --silent --show-error -o "$archive_path" "$LABWC_TWEAKS_TARBALL_URL"
+  actual_sha="$(sha256sum "$archive_path" | awk '{print $1}')"
+  [[ "$actual_sha" == "$LABWC_TWEAKS_TARBALL_SHA" ]] || {
+    die "labwc-tweaks tarball sha256 mismatch: expected ${LABWC_TWEAKS_TARBALL_SHA}, got ${actual_sha}"
+  }
 }
 
 labwc_tweaks_package_installed() {
@@ -72,10 +89,8 @@ install_labwc_tweaks() {
   source_dir="$(labwc_tweaks_source_dir)"
   build_dir="$(labwc_tweaks_build_dir)"
 
-  [[ -n "${LABWC_TWEAKS_VERSION:-}" ]] || die "LABWC_TWEAKS_VERSION is required"
-  [[ -n "${LABWC_TWEAKS_TAG:-}" ]] || die "LABWC_TWEAKS_TAG is required"
-  [[ -n "${LABWC_TWEAKS_TARBALL_URL:-}" ]] || die "LABWC_TWEAKS_TARBALL_URL is required"
-
+  validate_labwc_tweaks_settings
+  require_command sha256sum
   require_labwc_tweaks_build_prereqs
   download_labwc_tweaks_source
 

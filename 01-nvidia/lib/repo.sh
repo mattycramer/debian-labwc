@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-readonly SID_SUITE="sid"
-readonly SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
-readonly SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
-
 cuda_repo_base_url() {
   printf 'https://developer.download.nvidia.com/compute/cuda/repos/%s/%s\n' "$NVIDIA_REPO_DISTRO" "$NVIDIA_REPO_ARCH_PATH"
 }
@@ -53,76 +49,92 @@ download_file() {
   [[ -s "$destination" ]] || die "downloaded file is empty: $destination"
 }
 
-render_debian_components_sources() {
-  cat <<EOF
-Types: deb
-URIs: https://deb.debian.org/debian
-Suites: ${HOST_DEBIAN_CODENAME} ${NVIDIA_DEBIAN_UPDATES_SUITE}
-Components: contrib
-Architectures: amd64
-Signed-By: ${DEBIAN_ARCHIVE_KEYRING_PATH}
+debian_sources_deb822_have_contrib() {
+  local source_path="$1"
 
-Types: deb
-URIs: https://security.debian.org/debian-security
-Suites: ${NVIDIA_DEBIAN_SECURITY_SUITE}
-Components: contrib
-Architectures: amd64
-Signed-By: ${DEBIAN_ARCHIVE_KEYRING_PATH}
-EOF
+  [[ -r "$source_path" ]] || return 1
+  awk '
+    BEGIN {
+      RS = ""
+      FS = "\n"
+    }
+    {
+      uri_ok = 0
+      contrib_ok = 0
+      for (i = 1; i <= NF; i++) {
+        line = $i
+        sub(/\r$/, "", line)
+        if (line ~ /^[[:space:]]*#/) {
+          continue
+        }
+        if (line ~ /^URIs:[[:space:]]*/ &&
+            (line ~ /deb\.debian\.org\/debian/ || line ~ /security\.debian\.org\/debian-security/)) {
+          uri_ok = 1
+        }
+        if (line ~ /^Components:[[:space:]]*/ &&
+            line ~ /(^|[[:space:]])contrib([[:space:]]|$)/) {
+          contrib_ok = 1
+        }
+      }
+      if (uri_ok && contrib_ok) {
+        found = 1
+      }
+    }
+    END {
+      exit(found ? 0 : 1)
+    }
+  ' "$source_path"
 }
 
-ensure_debian_components_sources() {
-  local content=""
-  content="$(render_debian_components_sources)"
-  run_mutating_cmd install -D -m 0644 /dev/null "$DEBIAN_COMPONENTS_SOURCE_PATH"
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    log_info "dry-run: write $DEBIAN_COMPONENTS_SOURCE_PATH"
+debian_sources_list_have_contrib() {
+  local source_path="$1"
+
+  [[ -r "$source_path" ]] || return 1
+  awk '
+    /^[[:space:]]*#/ {
+      next
+    }
+    /^[[:space:]]*deb([[:space:]]+\[[^]]*\])?[[:space:]]+/ {
+      if (($0 ~ /deb\.debian\.org\/debian/ || $0 ~ /security\.debian\.org\/debian-security/) &&
+          $0 ~ /(^|[[:space:]])contrib([[:space:]]|$)/) {
+        found = 1
+      }
+    }
+    END {
+      exit(found ? 0 : 1)
+    }
+  ' "$source_path"
+}
+
+debian_contrib_configured() {
+  local source_path=""
+
+  if debian_sources_list_have_contrib "/etc/apt/sources.list"; then
     return 0
   fi
-  printf '%s\n' "$content" >"$DEBIAN_COMPONENTS_SOURCE_PATH"
+
+  for source_path in /etc/apt/sources.list.d/*; do
+    [[ -e "$source_path" ]] || continue
+    case "$source_path" in
+      *.sources)
+        if debian_sources_deb822_have_contrib "$source_path"; then
+          return 0
+        fi
+        ;;
+      *.list)
+        if debian_sources_list_have_contrib "$source_path"; then
+          return 0
+        fi
+        ;;
+    esac
+  done
+
+  return 1
 }
 
-render_sid_sources() {
-  cat <<EOF
-Types: deb
-URIs: https://deb.debian.org/debian
-Suites: ${SID_SUITE}
-Components: main
-Architectures: amd64
-Signed-By: ${DEBIAN_ARCHIVE_KEYRING_PATH}
-EOF
-}
-
-render_sid_preferences() {
-  cat <<EOF
-Package: *
-Pin: release n=${SID_SUITE}
-Pin-Priority: 100
-EOF
-}
-
-ensure_shared_sid_repository() {
-  local sources_content=""
-  local preferences_content=""
-
-  sources_content="$(render_sid_sources)"
-  preferences_content="$(render_sid_preferences)"
-
-  run_mutating_cmd install -D -m 0644 /dev/null "$SID_SOURCE_PATH"
-  run_mutating_cmd install -D -m 0644 /dev/null "$SID_PREFERENCES_PATH"
-  if [[ "${DRY_RUN:-0}" -eq 1 ]]; then
-    log_info "dry-run: write $SID_SOURCE_PATH"
-    log_info "dry-run: write $SID_PREFERENCES_PATH"
-    return 0
-  fi
-  printf '%s\n' "$sources_content" >"$SID_SOURCE_PATH"
-  printf '%s\n' "$preferences_content" >"$SID_PREFERENCES_PATH"
-}
-
-remove_debian_components_sources() {
-  if [[ -f "$DEBIAN_COMPONENTS_SOURCE_PATH" ]]; then
-    run_mutating_cmd rm -f "$DEBIAN_COMPONENTS_SOURCE_PATH"
-  fi
+require_debian_contrib_configured() {
+  debian_contrib_configured && return 0
+  die "Debian contrib is not configured in the existing apt sources. 01-nvidia will not write Debian archive files; enable contrib yourself and rerun the installer."
 }
 
 install_cuda_keyring_package() {

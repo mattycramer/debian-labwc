@@ -7,11 +7,11 @@ help:
 	  'Targets:' \
 	  '  help    Show this message' \
 	  '  doctor  Validate platform assumptions' \
-	  '  repo    Configure Debian contrib + NVIDIA upstream repositories' \
+	  '  repo    Validate Debian contrib and configure the NVIDIA upstream repository' \
 	  '  packages Install Debian prerequisites plus NVIDIA upstream driver and CUDA toolkit' \
 	  '  config  Render NVIDIA module configuration and refresh initramfs' \
 	  '  install Run repo + packages + config + verify' \
-	  '  verify  Verify upstream package, repo, switcherooctl, and CUDA state' \
+	  '  verify  Verify upstream packages, DRM modeset, switcherooctl, and CUDA state' \
 	  '  print-env Show resolved installer configuration' \
 	  '  nuke    Remove NVIDIA/CUDA packages and managed config'
 

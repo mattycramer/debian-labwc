@@ -225,8 +225,10 @@ parse_config_value() {
       ;;
   esac
 
+  # shellcheck disable=SC2016
   [[ "\$value" != *'\$('* ]] || die "command substitution is not allowed on line \$line_number in \$LABWC_MODULES_CONF"
   [[ "\$value" != *'\`'* ]] || die "backticks are not allowed on line \$line_number in \$LABWC_MODULES_CONF"
+  # shellcheck disable=SC2016
   [[ "\$value" != *'\${'* ]] || die "parameter expansion is not allowed on line \$line_number in \$LABWC_MODULES_CONF"
 
   printf '%s' "\$value"
@@ -625,7 +627,7 @@ build_dkms_override_script_content() {
 #!/usr/bin/env bash
 set -Eeuo pipefail
 IFS=\$'\\n\\t'
-exec "\${LABWC_TOOL_PATH}" dkms-post-install "\$@"
+exec "\${LABWC_TOOL_PATH}" dkms-post-install "\\\$@"
 EOF_SCRIPT
 }
 
@@ -869,6 +871,7 @@ expand_module_glob_for_kernel() {
 
   expanded_pattern="\${raw_pattern//\\\$kernelver/\$kernelver}"
   [[ "\$expanded_pattern" == /* ]] || die "expanded MODULE_GLOB must remain absolute: \$raw_pattern"
+  # shellcheck disable=SC2206
   matches=( \$expanded_pattern )
   for match in "\${matches[@]}"; do
     [[ -f "\$match" ]] || continue
@@ -1478,6 +1481,7 @@ load_sorted_fingerprints() {
   local -n target_ref="$1"
   shift
 
+  # shellcheck disable=SC2034
   mapfile -t target_ref < <("$@" | LC_ALL=C sort -u)
 }
 
@@ -1499,7 +1503,7 @@ managed_enrolled_fingerprints() {
 
   temp_dir="$(mktemp -d)"
   (
-    cd "$temp_dir"
+    cd "$temp_dir" || exit 1
     mokutil --export >/dev/null
   )
 
@@ -1527,7 +1531,7 @@ queue_managed_mok_deletions() {
 
   temp_dir="$(mktemp -d)"
   (
-    cd "$temp_dir"
+    cd "$temp_dir" || exit 1
     mokutil --export >/dev/null
   )
 
