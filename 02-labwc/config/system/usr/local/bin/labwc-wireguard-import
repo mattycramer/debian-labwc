@@ -9,6 +9,11 @@ if [[ ! -d "$IMPORT_DIR" ]]; then
   exit 0
 fi
 
+profile_has_private_key() {
+  local profile_path="$1"
+  grep -Eq '^[[:space:]]*PrivateKey[[:space:]]*=[[:space:]]*[^[:space:]#]+' "$profile_path"
+}
+
 systemctl is-active --quiet NetworkManager.service || {
   printf 'NetworkManager.service is not active; cannot import staged WireGuard profiles\n' >&2
   exit 1
@@ -19,6 +24,13 @@ profiles=("$IMPORT_DIR"/*.conf)
 shopt -u nullglob
 
 ((${#profiles[@]} > 0)) || exit 0
+
+for profile_path in "${profiles[@]}"; do
+  if ! profile_has_private_key "$profile_path"; then
+    printf '%s\n' "INFO: No WireGuard private key provided. You must manually enter the private key in the installed generated WireGuard configs if you want VPN to work."
+    exit 0
+  fi
+done
 
 for profile_path in "${profiles[@]}"; do
   profile_name="$(basename "${profile_path%.conf}")"

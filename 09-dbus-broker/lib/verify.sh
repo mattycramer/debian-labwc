@@ -52,7 +52,7 @@ verify_session_service_alias() {
 
 verify_session_service_aliases() {
   verify_session_service_alias "$(dbus_service_alias_path "org.freedesktop.Notifications.service")" "/usr/share/dbus-1/services/fr.emersion.mako.service"
-  verify_session_service_alias "$(dbus_service_alias_path "org.freedesktop.FileManager1.service")" "/usr/share/dbus-1/services/org.xfce.Thunar.FileManager1"
+  verify_session_service_alias "$(dbus_service_alias_path "org.freedesktop.FileManager1.service")" "/usr/share/dbus-1/services/org.xfce.Thunar.FileManager1.service"
   verify_session_service_alias "$(dbus_service_alias_path "org.freedesktop.thumbnails.Cache1.service")" "/usr/share/dbus-1/services/org.xfce.Tumbler.Cache1.service"
   verify_session_service_alias "$(dbus_service_alias_path "org.freedesktop.thumbnails.Manager1.service")" "/usr/share/dbus-1/services/org.xfce.Tumbler.Manager1.service"
   verify_session_service_alias "$(dbus_service_alias_path "org.freedesktop.thumbnails.Thumbnailer1.service")" "/usr/share/dbus-1/services/org.xfce.Tumbler.Thumbnailer1.service"

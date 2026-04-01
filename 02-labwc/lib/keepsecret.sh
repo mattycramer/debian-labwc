@@ -68,8 +68,8 @@ clone_keepsecret_source() {
   [[ "${KEEPSECRET_GIT_URL}" == https://* ]] || die "KEEPSECRET_GIT_URL must be an https URL"
 
   prepare_keepsecret_work_root
-  run_cmd runuser -u "$LABWC_TARGET_USER" -- sh -c "rm -rf -- '$source_dir' '$build_dir'"
-  retry_cmd 6 runuser -u "$LABWC_TARGET_USER" -- env HOME="$LABWC_TARGET_HOME" \
+  run_target_user_command -- sh -c "rm -rf -- '$source_dir' '$build_dir'"
+  retry_cmd 6 run_target_user_command -- \
     timeout 300 git -c http.version=HTTP/1.1 clone --depth 1 "$KEEPSECRET_GIT_URL" "$source_dir"
 }
 
@@ -81,8 +81,8 @@ install_keepsecret() {
   require_keepsecret_build_prereqs
   clone_keepsecret_source
 
-  run_cmd runuser -u "$LABWC_TARGET_USER" -- mkdir -p "$build_dir"
-  run_cmd runuser -u "$LABWC_TARGET_USER" -- env HOME="$LABWC_TARGET_HOME" cmake \
+  run_target_user_command -- mkdir -p "$build_dir"
+  run_target_user_command -- cmake \
     -S "$source_dir" \
     -B "$build_dir" \
     -G Ninja \
@@ -90,7 +90,7 @@ install_keepsecret() {
     -D BUILD_TESTING=OFF \
     -D CMAKE_INSTALL_PREFIX=/usr/local \
     -W no-dev
-  run_cmd runuser -u "$LABWC_TARGET_USER" -- env HOME="$LABWC_TARGET_HOME" cmake --build "$build_dir" --verbose
+  run_target_user_command -- cmake --build "$build_dir" --verbose
   run_cmd cmake --install "$build_dir"
   [[ -f "$build_dir/install_manifest.txt" ]] || die "keepsecret install did not produce install_manifest.txt"
   run_cmd install -d -m 0755 "$KEEPSECRET_MANIFEST_DIR"

@@ -167,7 +167,7 @@ PY
 }
 
 ensure_wireguard_private_key_in_env() {
-  local current_value prompt_value confirm_value
+  local current_value
 
   wireguard_prompt_required_for_phase || return 0
   [[ -f "$ENV_FILE" ]] || die "missing env file: $ENV_FILE"
@@ -177,31 +177,7 @@ ensure_wireguard_private_key_in_env() {
     validate_wireguard_private_key "$current_value" || die "WIREGUARD_PRIV_KEY in $ENV_FILE is invalid"
     return 0
   fi
-  [[ -t 0 && -t 1 ]] || die "WIREGUARD_PRIV_KEY is empty in $ENV_FILE and no interactive terminal is available for prompting"
-
-  while true; do
-    IFS= read -r -s -p "Enter WireGuard private key: " prompt_value
-    printf '\n'
-    IFS= read -r -s -p "Confirm WireGuard private key: " confirm_value
-    printf '\n'
-
-    [[ -n "$prompt_value" ]] || {
-      printf '%s\n' "WireGuard private key cannot be empty." >&2
-      continue
-    }
-    [[ "$prompt_value" == "$confirm_value" ]] || {
-      printf '%s\n' "WireGuard private key confirmation did not match." >&2
-      continue
-    }
-    [[ "$prompt_value" != *$'\n'* && "$prompt_value" != *$'\r'* ]] || die "WireGuard private key must not contain newlines"
-    if ! validate_wireguard_private_key "$prompt_value" >/dev/null 2>&1; then
-      printf '%s\n' "WireGuard private key is not a valid 32-byte base64 key." >&2
-      continue
-    fi
-    break
-  done
-
-  write_env_value "WIREGUARD_PRIV_KEY" "$prompt_value"
+  log_info "No WireGuard private key provided. You must manually enter the private key in the installed generated WireGuard configs if you want VPN to work."
 }
 
 parse_args() {

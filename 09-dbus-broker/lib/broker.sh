@@ -159,7 +159,7 @@ install_session_service_alias() {
 
 install_session_service_aliases() {
   install_session_service_alias "org.freedesktop.Notifications.service" "/usr/share/dbus-1/services/fr.emersion.mako.service"
-  install_session_service_alias "org.freedesktop.FileManager1.service" "/usr/share/dbus-1/services/org.xfce.Thunar.FileManager1"
+  install_session_service_alias "org.freedesktop.FileManager1.service" "/usr/share/dbus-1/services/org.xfce.Thunar.FileManager1.service"
   install_session_service_alias "org.freedesktop.thumbnails.Cache1.service" "/usr/share/dbus-1/services/org.xfce.Tumbler.Cache1.service"
   install_session_service_alias "org.freedesktop.thumbnails.Manager1.service" "/usr/share/dbus-1/services/org.xfce.Tumbler.Manager1.service"
   install_session_service_alias "org.freedesktop.thumbnails.Thumbnailer1.service" "/usr/share/dbus-1/services/org.xfce.Tumbler.Thumbnailer1.service"

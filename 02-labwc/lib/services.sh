@@ -56,6 +56,45 @@ render_template_to_file() {
   run_cmd chmod "$mode" "$destination"
 }
 
+target_user_env_path() {
+  printf '%s\n' "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+}
+
+run_target_user_command() {
+  local -a env_args=(
+    "HOME=$LABWC_TARGET_HOME"
+    "USER=$LABWC_TARGET_USER"
+    "LOGNAME=$LABWC_TARGET_USER"
+    "PATH=$(target_user_env_path)"
+    "XDG_CONFIG_HOME=$LABWC_TARGET_HOME/.config"
+    "XDG_CACHE_HOME=$LABWC_TARGET_HOME/.cache"
+    "XDG_DATA_HOME=$LABWC_TARGET_HOME/.local/share"
+    "XDG_STATE_HOME=$LABWC_TARGET_HOME/.local/state"
+    "TMPDIR=/tmp"
+    "TMP=/tmp"
+    "TEMP=/tmp"
+  )
+
+  while (($#)); do
+    case "$1" in
+      *=*)
+        env_args+=("$1")
+        shift
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done
+
+  (($# > 0)) || die "run_target_user_command requires a command"
+  run_cmd runuser -u "$LABWC_TARGET_USER" -- env -i "${env_args[@]}" "$@"
+}
+
 wireguard_profile_specs() {
   cat <<'EOF'
 sego005-semm001|Sweden|🇸🇪
@@ -93,6 +132,10 @@ stage_wireguard_profiles() {
   local import_dir profile_name profile_label profile_flag rendered_path
   import_dir="$(wireguard_import_dir)"
 
+  if [[ -n "${WIREGUARD_PRIV_KEY:-}" ]] && declare -F validate_wireguard_private_key >/dev/null 2>&1; then
+    validate_wireguard_private_key "$WIREGUARD_PRIV_KEY" >/dev/null 2>&1 || die "WIREGUARD_PRIV_KEY is invalid"
+  fi
+
   run_cmd install -d -m 0700 "$import_dir"
   run_cmd find "$import_dir" -maxdepth 1 -type f -name '*.conf' -delete
 
@@ -101,6 +144,10 @@ stage_wireguard_profiles() {
     rendered_path="${import_dir}/${profile_name}.conf"
     render_wireguard_profile_file "$profile_name" "$rendered_path"
   done < <(wireguard_profile_specs)
+
+  if [[ -z "${WIREGUARD_PRIV_KEY:-}" ]]; then
+    log_info "No WireGuard private key provided. You must manually enter the private key in the installed generated WireGuard configs if you want VPN to work."
+  fi
 }
 
 refresh_system_font_cache() {
@@ -128,22 +175,18 @@ refresh_user_font_cache() {
     return 0
   fi
 
-  run_cmd runuser -u "$LABWC_TARGET_USER" -- env \
-    HOME="$LABWC_TARGET_HOME" \
-    XDG_CONFIG_HOME="$LABWC_TARGET_HOME/.config" \
-    XDG_CACHE_HOME="$cache_home" \
-    fc-cache -f "${font_dirs[@]}"
+  run_target_user_command \
+    "XDG_CACHE_HOME=$cache_home" \
+    -- fc-cache -f "${font_dirs[@]}"
 }
 
 user_fontconfig_match() {
   local cache_home="$LABWC_TARGET_HOME/.cache"
   local pattern="$1"
 
-  run_cmd runuser -u "$LABWC_TARGET_USER" -- env \
-    HOME="$LABWC_TARGET_HOME" \
-    XDG_CONFIG_HOME="$LABWC_TARGET_HOME/.config" \
-    XDG_CACHE_HOME="$cache_home" \
-    fc-match -f '%{family}\n' "$pattern"
+  run_target_user_command \
+    "XDG_CACHE_HOME=$cache_home" \
+    -- fc-match -f '%{family}\n' "$pattern"
 }
 
 validate_user_fontconfig() {
@@ -181,17 +224,14 @@ bootstrap_target_user_gpg_key() {
     printf '\n'
   fi
   [[ -n "$gpg_passphrase" ]] || die "no GPG encryption password was provided"
-  run_cmd env \
-    HOME="$LABWC_TARGET_HOME" \
-    USER="$LABWC_TARGET_USER" \
-    LOGNAME="$LABWC_TARGET_USER" \
-    GNUPGHOME="$LABWC_TARGET_HOME/.gnupg" \
-    KWALLET_SESSION_GPG_PASSWD="$gpg_passphrase" \
-    LABWC_TARGET_USER="$LABWC_TARGET_USER" \
-    LABWC_GPG_KEY_REALNAME="${LABWC_GPG_KEY_REALNAME:-}" \
-    LABWC_GPG_KEY_EMAIL="${LABWC_GPG_KEY_EMAIL:-}" \
-    LABWC_GPG_KEY_EXPIRE="${LABWC_GPG_KEY_EXPIRE:-2y}" \
-    runuser -u "$LABWC_TARGET_USER" -- bash "$SCRIPT_DIR/libexec/ensure-gpg-key.sh"
+  run_target_user_command \
+    "GNUPGHOME=$LABWC_TARGET_HOME/.gnupg" \
+    "KWALLET_SESSION_GPG_PASSWD=$gpg_passphrase" \
+    "LABWC_TARGET_USER=$LABWC_TARGET_USER" \
+    "LABWC_GPG_KEY_REALNAME=${LABWC_GPG_KEY_REALNAME:-}" \
+    "LABWC_GPG_KEY_EMAIL=${LABWC_GPG_KEY_EMAIL:-}" \
+    "LABWC_GPG_KEY_EXPIRE=${LABWC_GPG_KEY_EXPIRE:-2y}" \
+    -- bash "$SCRIPT_DIR/libexec/ensure-gpg-key.sh"
   stage_target_user_gpg_secret_seed "$gpg_passphrase"
 }
 

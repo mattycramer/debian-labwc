@@ -50,8 +50,8 @@ download_labwc_tweaks_source() {
   local archive_path actual_sha
   archive_path="$(labwc_tweaks_archive_path)"
   prepare_labwc_tweaks_cache
-  run_cmd runuser -u "$LABWC_TARGET_USER" -- sh -c "rm -f -- '$archive_path'"
-  retry_cmd 6 runuser -u "$LABWC_TARGET_USER" -- env HOME="$LABWC_TARGET_HOME" \
+  run_target_user_command -- sh -c "rm -f -- '$archive_path'"
+  retry_cmd 6 run_target_user_command -- \
     curl --ipv4 --fail --location --retry 6 --retry-all-errors --retry-delay 2 --connect-timeout 20 --max-time 300 --silent --show-error -o "$archive_path" "$LABWC_TWEAKS_TARBALL_URL"
   actual_sha="$(sha256sum "$archive_path" | awk '{print $1}')"
   [[ "$actual_sha" == "$LABWC_TWEAKS_TARBALL_SHA" ]] || {
@@ -94,11 +94,11 @@ install_labwc_tweaks() {
   require_labwc_tweaks_build_prereqs
   download_labwc_tweaks_source
 
-  run_cmd runuser -u "$LABWC_TARGET_USER" -- sh -c "rm -rf -- '$source_dir' '$build_dir' && mkdir -p '$source_dir' '$build_dir'"
-  run_cmd runuser -u "$LABWC_TARGET_USER" -- tar -xzf "$archive_path" -C "$source_dir" --strip-components=1
-  run_cmd runuser -u "$LABWC_TARGET_USER" -- env HOME="$LABWC_TARGET_HOME" cmake -S "$source_dir" -B "$build_dir" -G Ninja -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=/usr -W no-dev
-  run_cmd runuser -u "$LABWC_TARGET_USER" -- env HOME="$LABWC_TARGET_HOME" cmake --build "$build_dir" --verbose
-  run_cmd runuser -u "$LABWC_TARGET_USER" -- env HOME="$LABWC_TARGET_HOME" ctest --verbose --force-new-ctest-process --test-dir "$build_dir"
+  run_target_user_command -- sh -c "rm -rf -- '$source_dir' '$build_dir' && mkdir -p '$source_dir' '$build_dir'"
+  run_target_user_command -- tar -xzf "$archive_path" -C "$source_dir" --strip-components=1
+  run_target_user_command -- cmake -S "$source_dir" -B "$build_dir" -G Ninja -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=/usr -W no-dev
+  run_target_user_command -- cmake --build "$build_dir" --verbose
+  run_target_user_command -- ctest --verbose --force-new-ctest-process --test-dir "$build_dir"
   run_cmd cmake --install "$build_dir"
 }
 
