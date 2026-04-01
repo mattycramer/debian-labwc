@@ -100,21 +100,6 @@ lock_wallpaper_target_path() {
   wallpaper_target_path "$wallpaper_source_path"
 }
 
-regreet_wallpaper_fit() {
-  case "${LABWC_WALLPAPER_MODE:-fill}" in
-    fill) printf '%s\n' "Cover" ;;
-    fit) printf '%s\n' "Contain" ;;
-    stretch) printf '%s\n' "Fill" ;;
-    center) printf '%s\n' "ScaleDown" ;;
-    tile)
-      die "LABWC_WALLPAPER_MODE='tile' is not supported when LABWC_GREETER='regreet'; use fill, fit, stretch, or center"
-      ;;
-    *)
-      die "LABWC_WALLPAPER_MODE must be one of fill, fit, stretch, center, or tile; found '${LABWC_WALLPAPER_MODE:-}'"
-      ;;
-  esac
-}
-
 ensure_user_base_dirs() {
   run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
     "$LABWC_TARGET_HOME/.config" \

@@ -204,23 +204,35 @@ require_sid_repository() {
   [[ -f "$SID_PREFERENCES_PATH" ]] || die "missing Debian sid preferences file: $SID_PREFERENCES_PATH; run 'make sid' in 00-system first"
 }
 
-resolved_requested_packages() {
+resolved_sid_packages() {
   printf '%s\n' "${SID_PACKAGES[@]}"
-  case "${LABWC_GREETER:-}" in
-    tuigreet)
-      printf '%s\n' "tuigreet"
-      ;;
-    regreet)
-      printf '%s\n' "cage"
-      ;;
-  esac
+}
+
+resolved_graphics_packages() {
   printf '%s\n' "${GRAPHICS_PACKAGES[@]}"
-  printf '%s\n' "${TWEAKS_BUILD_PACKAGES[@]}"
-  printf '%s\n' "${TWEAKS_SID_PACKAGES[@]}"
-  printf '%s\n' "${KEEPSECRET_BUILD_PACKAGES[@]}"
   if [[ "${LABWC_HAS_INTEL_GPU:-no}" == "yes" ]]; then
     printf '%s\n' "${INTEL_PACKAGES[@]}"
   fi
+}
+
+resolved_tweaks_build_packages() {
+  printf '%s\n' "${TWEAKS_BUILD_PACKAGES[@]}"
+}
+
+resolved_tweaks_sid_packages() {
+  printf '%s\n' "${TWEAKS_SID_PACKAGES[@]}"
+}
+
+resolved_keepsecret_build_packages() {
+  printf '%s\n' "${KEEPSECRET_BUILD_PACKAGES[@]}"
+}
+
+resolved_requested_packages() {
+  resolved_sid_packages
+  resolved_graphics_packages
+  resolved_tweaks_build_packages
+  resolved_tweaks_sid_packages
+  resolved_keepsecret_build_packages
 }
 
 install_requested_packages() {
@@ -230,18 +242,15 @@ install_requested_packages() {
   local -a tweaks_build_package_list=()
   local -a tweaks_sid_package_list=()
   local -a keepsecret_build_package_list=()
+  local -a all_package_list=()
   local -a apt_args=()
-  mapfile -t sid_package_list < <(printf '%s\n' "${SID_PACKAGES[@]}")
-  if [[ "${LABWC_GREETER:-}" == "tuigreet" ]]; then
-    sid_package_list+=("tuigreet")
-  fi
-  mapfile -t graphics_package_list < <(printf '%s\n' "${GRAPHICS_PACKAGES[@]}")
-  mapfile -t tweaks_build_package_list < <(printf '%s\n' "${TWEAKS_BUILD_PACKAGES[@]}")
-  mapfile -t tweaks_sid_package_list < <(printf '%s\n' "${TWEAKS_SID_PACKAGES[@]}")
-  mapfile -t keepsecret_build_package_list < <(printf '%s\n' "${KEEPSECRET_BUILD_PACKAGES[@]}")
-  if [[ "${LABWC_HAS_INTEL_GPU:-no}" == "yes" ]]; then
-    mapfile -O "${#graphics_package_list[@]}" -t graphics_package_list < <(printf '%s\n' "${INTEL_PACKAGES[@]}")
-  fi
+  mapfile -t all_package_list < <(resolved_requested_packages)
+  ((${#all_package_list[@]} > 0)) || die "resolved package set is empty"
+  mapfile -t sid_package_list < <(resolved_sid_packages)
+  mapfile -t graphics_package_list < <(resolved_graphics_packages)
+  mapfile -t tweaks_build_package_list < <(resolved_tweaks_build_packages)
+  mapfile -t tweaks_sid_package_list < <(resolved_tweaks_sid_packages)
+  mapfile -t keepsecret_build_package_list < <(resolved_keepsecret_build_packages)
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${sid_package_list[@]}"
   log_info "installing graphics package set from sid"

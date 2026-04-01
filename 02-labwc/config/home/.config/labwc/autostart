@@ -47,16 +47,25 @@ wait_for_system_bus() {
   return 1
 }
 
-update_activation_environment() {
-  if [ "${LABWC_UPDATE_ACTIVATION_ENV:-0}" != "1" ]; then
+update_dbus_activation_environment() {
+  dbus_vars=""
+  dbus_var_name=""
+  dbus_var_value=""
+  if ! command -v dbus-update-activation-environment >/dev/null 2>&1; then
     return 0
   fi
-  if command -v systemctl >/dev/null 2>&1; then
-    systemctl --user import-environment "$@" >/dev/null 2>&1 || true
-  fi
-  if command -v dbus-update-activation-environment >/dev/null 2>&1; then
-    dbus-update-activation-environment --systemd "$@" >/dev/null 2>&1 || true
-  fi
+  for dbus_var_name in "$@"; do
+    eval "dbus_var_value=\${$dbus_var_name+x}"
+    [ "$dbus_var_value" = "x" ] || continue
+    if [ -n "$dbus_vars" ]; then
+      dbus_vars="$dbus_vars $dbus_var_name"
+    else
+      dbus_vars="$dbus_var_name"
+    fi
+  done
+  [ -n "$dbus_vars" ] || return 0
+  # shellcheck disable=SC2086
+  dbus-update-activation-environment $dbus_vars >/dev/null 2>&1 || true
 }
 
 start_bg_once() {
@@ -77,22 +86,33 @@ start_bg_once swaybg swaybg -i "@BACKGROUND_WALLPAPER_PATH@" -m "@WALLPAPER_MODE
 
 wait_for_session_bus || true
 wait_for_system_bus || true
-update_activation_environment \
-  DBUS_SESSION_BUS_ADDRESS \
-  DISPLAY \
+update_dbus_activation_environment \
   WAYLAND_DISPLAY \
+  DISPLAY \
   XDG_CURRENT_DESKTOP \
   XDG_SESSION_TYPE \
   XDG_SESSION_DESKTOP \
   DESKTOP_SESSION \
   XCURSOR_THEME \
   XCURSOR_SIZE \
-  GPG_TTY \
-  SSH_AUTH_SOCK \
+  GDK_BACKEND \
+  CLUTTER_BACKEND \
+  SDL_VIDEODRIVER \
+  _JAVA_AWT_WM_NONREPARENTING \
+  NO_AT_BRIDGE \
+  MOZ_ENABLE_WAYLAND \
+  MOZ_WEBRENDER \
+  LIBVA_DRIVER_NAME \
+  LIBVA_DRI_DRIVER_NAME \
+  QT_QPA_PLATFORMTHEME \
+  QT_AUTO_SCREEN_SCALE_FACTOR \
+  WLR_NO_HARDWARE_CURSOR \
   PASSWORD_STORE \
   ELECTRON_OZONE_PLATFORM_HINT \
   QT_QPA_PLATFORM \
-  QT_WAYLAND_DISABLE_WINDOWDECORATION
+  QT_WAYLAND_DISABLE_WINDOWDECORATION \
+  GPG_TTY \
+  SSH_AUTH_SOCK
 
 if ! pgrep -u "$current_uid" -f '/polkit-kde-authentication-agent-1([[:space:]]|$)' >/dev/null 2>&1; then
   /usr/lib/x86_64-linux-gnu/libexec/polkit-kde-authentication-agent-1 >/dev/null 2>&1 &

@@ -22,7 +22,6 @@ render_template_content() {
   local lock_wallpaper_path=""
   local lock_wallpaper_name=""
   local regreet_background_path=""
-  local regreet_background_fit=""
   local updates_script="$LABWC_TARGET_HOME/.config/waybar/scripts/pending-updates.sh"
   local upgrade_script="$LABWC_TARGET_HOME/.config/waybar/scripts/run-upgrades.sh"
   local gpu_launch_script="$LABWC_TARGET_HOME/.config/waybar/scripts/gpu-launch.sh"
@@ -40,11 +39,8 @@ render_template_content() {
     fi
     lock_wallpaper_name="$(template_lock_wallpaper_name)"
   fi
-  if [[ "${LABWC_GREETER:-}" == "regreet" ]] && declare -F regreet_wallpaper_source_path >/dev/null 2>&1; then
-    regreet_background_path="/var/lib/greetd/greeter/.local/share/labwc-session/$(basename "$(regreet_wallpaper_source_path)")"
-  fi
-  if [[ "${LABWC_GREETER:-}" == "regreet" ]] && declare -F regreet_wallpaper_fit >/dev/null 2>&1; then
-    regreet_background_fit="$(regreet_wallpaper_fit)"
+  if declare -F regreet_wallpaper_target_path >/dev/null 2>&1; then
+    regreet_background_path="$(regreet_wallpaper_target_path)"
   fi
 
   env \
@@ -63,7 +59,6 @@ render_template_content() {
     TEMPLATE_LOCK_WALLPAPER_PATH="$lock_wallpaper_path" \
     TEMPLATE_LOCK_WALLPAPER_NAME="$lock_wallpaper_name" \
     TEMPLATE_REGREET_BACKGROUND_PATH="$regreet_background_path" \
-    TEMPLATE_REGREET_BACKGROUND_FIT="$regreet_background_fit" \
     TEMPLATE_WALLPAPER_MODE="${LABWC_WALLPAPER_MODE:-}" \
     TEMPLATE_IDLE_LOCK_SECONDS="${LABWC_IDLE_LOCK_SECONDS:-}" \
     TEMPLATE_IDLE_DPMS_SECONDS="${LABWC_IDLE_DPMS_SECONDS:-}" \
@@ -107,7 +102,6 @@ replacements = {
     "@LOCK_WALLPAPER_PATH@": os.environ.get("TEMPLATE_LOCK_WALLPAPER_PATH", ""),
     "@LOCK_WALLPAPER_NAME@": os.environ.get("TEMPLATE_LOCK_WALLPAPER_NAME", ""),
     "@REGREET_BACKGROUND_PATH@": os.environ.get("TEMPLATE_REGREET_BACKGROUND_PATH", ""),
-    "@REGREET_BACKGROUND_FIT@": os.environ.get("TEMPLATE_REGREET_BACKGROUND_FIT", ""),
     "@WALLPAPER_MODE@": os.environ.get("TEMPLATE_WALLPAPER_MODE", ""),
     "@IDLE_LOCK_SECONDS@": os.environ.get("TEMPLATE_IDLE_LOCK_SECONDS", ""),
     "@IDLE_DPMS_SECONDS@": os.environ.get("TEMPLATE_IDLE_DPMS_SECONDS", ""),

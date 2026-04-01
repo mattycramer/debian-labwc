@@ -1,58 +1,45 @@
-/* Managed by 02-labwc.
- * Style the fullscreen background and the framed login card conservatively so
- * regreet stays readable across wallpaper changes and GTK updates.
- */
-
 window,
-overlay {
-  color: #e8eef5;
+overlay,
+picture {
+  color: #ede9fe;
   background-color: transparent;
 }
 
-picture {
-  background-color: #0b1220;
-}
-
 selection {
-  color: #07111b;
-  background-color: #8ecae6;
+  color: #12091f;
+  background-color: #c4b5fd;
 }
 
 frame.background,
 frame.background > border {
-  background-color: rgba(9, 14, 22, 0.82);
-  border: 1px solid rgba(129, 146, 165, 0.22);
-  border-radius: 24px;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.44);
-}
-
-frame.background > grid {
-  color: #d9e5f2;
-  padding: 6px 22px 22px 22px;
+  background-color: rgba(12, 8, 20, 0.86);
+  border: 1px solid rgba(167, 139, 250, 0.38);
+  border-radius: 18px;
+  box-shadow: none;
 }
 
 frame.background > label {
-  color: #f8fafc;
+  color: #f5f3ff;
   font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  padding: 10px 22px 0 22px;
+  letter-spacing: 0.04em;
+  padding: 10px 20px 0 20px;
+}
+
+frame.background > grid {
+  color: #ddd6fe;
+  padding: 4px 20px 20px 20px;
 }
 
 frame.background > grid > label {
-  color: #9fb0c3;
+  color: #c4b5fd;
 }
 
 frame.background > grid > label:first-child {
-  color: #7dd3fc;
+  color: #f5f3ff;
   font-size: 22px;
   font-weight: 700;
   padding-bottom: 4px;
-}
-
-frame.background > grid > label:nth-child(2) {
-  color: #d9e5f2;
-  font-size: 15px;
 }
 
 entry,
@@ -61,10 +48,10 @@ combobox,
 button,
 togglebutton {
   min-height: 40px;
-  color: #eff5fb;
-  border: 1px solid rgba(129, 146, 165, 0.24);
-  border-radius: 12px;
-  background-color: rgba(16, 24, 36, 0.92);
+  color: #f5f3ff;
+  border: 1px solid rgba(167, 139, 250, 0.34);
+  border-radius: 10px;
+  background-color: rgba(23, 15, 35, 0.96);
   background-image: none;
   box-shadow: none;
   padding: 10px 14px;
@@ -72,14 +59,14 @@ togglebutton {
 
 entry,
 passwordentry {
-  caret-color: #7dd3fc;
+  caret-color: #c4b5fd;
 }
 
 entry image,
 passwordentry image,
 togglebutton image,
 button image {
-  color: #9fb0c3;
+  color: #c4b5fd;
 }
 
 entry:focus,
@@ -87,81 +74,30 @@ passwordentry:focus,
 combobox:focus,
 button:focus,
 togglebutton:focus {
-  border-color: rgba(125, 211, 252, 0.94);
-  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.18);
+  border-color: rgba(196, 181, 253, 0.92);
+  box-shadow: none;
 }
 
-entry:hover,
-passwordentry:hover,
-combobox:hover,
-button:hover,
-togglebutton:hover {
-  border-color: rgba(148, 163, 184, 0.4);
-}
-
-togglebutton:checked {
-  color: #07111b;
-  border-color: rgba(148, 210, 189, 0.82);
-  background-color: rgba(148, 210, 189, 0.92);
-}
-
-button {
-  font-weight: 600;
-}
-
+togglebutton:checked,
 button.suggested-action {
-  color: #07111b;
-  border-color: rgba(125, 211, 252, 0.78);
-  background-color: rgba(125, 211, 252, 0.96);
+  color: #12091f;
+  border-color: rgba(196, 181, 253, 0.96);
+  background-color: rgba(196, 181, 253, 0.96);
 }
 
-button.suggested-action:hover {
-  background-color: rgba(147, 221, 253, 0.98);
-}
-
-button.destructive-action {
-  color: #fff1f2;
-  border-color: rgba(248, 113, 113, 0.38);
-  background-color: rgba(127, 29, 29, 0.92);
-}
-
-button.destructive-action:hover {
-  background-color: rgba(153, 35, 35, 0.96);
-}
-
+button.destructive-action,
 infobar.error,
 infobar.error > revealer > box,
 infobar.error > revealer > box > box {
   color: #fff1f2;
-  background-color: rgba(91, 24, 18, 0.94);
+  background-color: rgba(127, 29, 29, 0.92);
   border: 1px solid rgba(248, 113, 113, 0.32);
-  border-radius: 14px;
-}
-
-infobar.error label {
-  color: #fff1f2;
 }
 
 popover.background,
 popover.background > contents {
-  color: #e8eef5;
-  background-color: rgba(9, 14, 22, 0.98);
-  border: 1px solid rgba(129, 146, 165, 0.22);
-  border-radius: 14px;
-}
-
-modelbutton,
-menuitem {
-  border-radius: 10px;
-  padding: 8px 12px;
-}
-
-modelbutton:hover,
-menuitem:hover {
-  background-color: rgba(125, 211, 252, 0.14);
-}
-
-*:disabled {
-  color: rgba(232, 238, 245, 0.48);
-  border-color: rgba(129, 146, 165, 0.12);
+  color: #ede9fe;
+  background-color: rgba(12, 8, 20, 0.98);
+  border: 1px solid rgba(167, 139, 250, 0.24);
+  border-radius: 12px;
 }

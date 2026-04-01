@@ -18,22 +18,16 @@ ensure_greeter_user() {
 }
 
 ensure_greeter_runtime_dirs() {
-  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter
-  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.cache
-  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.config
-  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.config/autostart
-  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.local
-  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.local/state
-  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.local/share
-  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.local/share/flatpak/db
+  run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/greetd/greeter
+  run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/greetd/greeter/.cache
+  run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/greetd/greeter/.config
+  run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/greetd/greeter/.local
+  run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/greetd/greeter/.local/state
+  run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/greetd/greeter/.local/share
 }
 
-validate_greetd_settings() {
+validate_greetd_vt() {
   [[ "${LABWC_GREETD_VT:-}" =~ ^[1-9][0-9]*$ ]] || die "LABWC_GREETD_VT must be a positive integer, found '${LABWC_GREETD_VT:-}'"
-  case "${LABWC_GREETER:-}" in
-    tuigreet|regreet) ;;
-    *) die "LABWC_GREETER must be 'tuigreet' or 'regreet', found '${LABWC_GREETER:-}'" ;;
-  esac
 }
 
 validate_regreet_settings() {
@@ -225,28 +219,29 @@ regreet_css_path() {
   printf '%s\n' "/etc/greetd/regreet.css"
 }
 
-regreet_state_dir() {
-  printf '%s\n' "/var/lib/regreet"
+greeter_regreet_launcher_path() {
+  printf '%s\n' "/usr/local/bin/labwc-greeter-regreet"
 }
 
-regreet_log_dir() {
-  printf '%s\n' "/var/log/regreet"
+greeter_labwc_config_dir() {
+  printf '%s\n' "/etc/labwc-greeter"
+}
+
+greeter_wallpaper_dir() {
+  printf '%s\n' "/usr/local/share/labwc-greeter"
 }
 
 regreet_wallpaper_target_path() {
-  printf '%s\n' "/var/lib/greetd/greeter/.local/share/labwc-session/$(basename "$(regreet_wallpaper_source_path)")"
+  printf '%s\n' "$(greeter_wallpaper_dir)/$(basename "$(regreet_wallpaper_source_path)")"
 }
 
 remove_regreet_support_files() {
   remove_if_present "$(regreet_binary_path)"
   remove_if_present "$(regreet_config_path)"
   remove_if_present "$(regreet_css_path)"
-  remove_if_present "$(regreet_state_dir)"
-  remove_if_present "$(regreet_log_dir)"
-  while IFS= read -r wallpaper_path; do
-    [[ -n "$wallpaper_path" ]] || continue
-    remove_if_present "$wallpaper_path"
-  done < <(find /var/lib/greetd/greeter/.local/share/labwc-session -maxdepth 1 -type f -name 'regreet-*' 2>/dev/null | LC_ALL=C sort)
+  remove_if_present "$(greeter_regreet_launcher_path)"
+  remove_if_present "$(greeter_labwc_config_dir)"
+  remove_if_present "$(greeter_wallpaper_dir)"
 }
 
 install_regreet_release() {
@@ -287,40 +282,34 @@ install_regreet_release() {
   run_cmd rm -rf -- "$tmpdir"
 }
 
-install_regreet_runtime_dirs() {
-  run_cmd install -d -m 0755 -o greeter -g greeter "$(regreet_state_dir)" "$(regreet_log_dir)"
-  run_cmd install -d -m 0755 -o greeter -g greeter /var/lib/greetd/greeter/.local/share/labwc-session
+install_regreet_support_dirs() {
+  run_cmd install -d -m 0755 "$(greeter_labwc_config_dir)" "$(greeter_wallpaper_dir)"
 }
 
 install_regreet_wallpaper() {
   local wallpaper_source_path
   wallpaper_source_path="$(regreet_wallpaper_source_path)"
-  run_cmd install -D -m 0644 -o greeter -g greeter "$wallpaper_source_path" "$(regreet_wallpaper_target_path)"
+  run_cmd install -D -m 0644 "$wallpaper_source_path" "$(regreet_wallpaper_target_path)"
 }
 
-install_selected_greeter_files() {
-  case "${LABWC_GREETER:-}" in
-    tuigreet)
-      remove_regreet_support_files
-      render_template_to_file "$(config_system_template_path "greetd/config.toml")" "/etc/greetd/config.toml" 0644
-      ;;
-    regreet)
-      install_regreet_release
-      install_regreet_runtime_dirs
-      install_regreet_wallpaper
-      render_template_to_file "$(config_system_template_path "greetd/config-regreet.toml")" "/etc/greetd/config.toml" 0644
-      render_template_to_file "$(config_system_template_path "greetd/regreet.toml")" "$(regreet_config_path)" 0644
-      render_template_to_file "$(config_system_template_path "greetd/regreet.css")" "$(regreet_css_path)" 0644
-      ;;
-  esac
+install_regreet_files() {
+  install_regreet_release
+  install_regreet_support_dirs
+  install_regreet_wallpaper
+  render_template_to_file "$(config_system_template_path "greetd/config.toml")" "/etc/greetd/config.toml" 0644
+  render_template_to_file "$(config_system_template_path "greetd/regreet.toml")" "$(regreet_config_path)" 0644
+  render_template_to_file "$(config_system_template_path "greetd/regreet.css")" "$(regreet_css_path)" 0644
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-greeter-regreet")" "$(greeter_regreet_launcher_path)" 0755
+  render_template_to_file "$(config_system_template_path "labwc-greeter/autostart")" "$(greeter_labwc_config_dir)/autostart" 0755
+  render_template_to_file "$(config_system_template_path "labwc-greeter/rc.xml")" "$(greeter_labwc_config_dir)/rc.xml" 0644
 }
 
 install_root_files() {
-  validate_greetd_settings
+  validate_greetd_vt
   ensure_greeter_user
   ensure_greeter_runtime_dirs
-  install_selected_greeter_files
-  render_template_to_file "$(config_system_template_path "greetd/10-vt.conf")" "/etc/systemd/system/greetd.service.d/10-vt.conf" 0644
+  remove_regreet_support_files
+  install_regreet_files
   render_template_to_file "$(config_system_template_path "usr/share/wayland-sessions/labwc.desktop")" "/usr/share/wayland-sessions/labwc.desktop" 0644
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-session")" "/usr/local/bin/labwc-session" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-power-menu")" "/usr/local/bin/labwc-power-menu" 0755
@@ -513,6 +502,7 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/labwc-vpnctl"
   remove_if_present "/usr/local/bin/labwc-wireguard-import"
   remove_if_present "/usr/local/bin/labwc-player-status"
+  remove_if_present "$(greeter_regreet_launcher_path)"
   remove_if_present "/usr/local/bin/thunar-open-archive"
   remove_if_present "/usr/local/bin/thunar-create-archive"
   remove_if_present "/usr/local/bin/thunar-extract-here"
@@ -528,7 +518,8 @@ nuke_all_state() {
   remove_if_present "/etc/greetd/config.toml"
   remove_if_present "$(regreet_config_path)"
   remove_if_present "$(regreet_css_path)"
-  remove_if_present "/etc/systemd/system/greetd.service.d/10-vt.conf"
+  remove_if_present "$(greeter_labwc_config_dir)"
+  remove_if_present "$(greeter_wallpaper_dir)"
   systemctl disable "$(wireguard_import_service_name)" >/dev/null 2>&1 || true
   systemctl disable labwc-vpn-default-off.service >/dev/null 2>&1 || true
   remove_if_present "/etc/systemd/system/labwc-wireguard-import.service"
@@ -536,9 +527,6 @@ nuke_all_state() {
   remove_labwc_tweaks_install
   remove_keepsecret_install
   remove_managed_wireguard_profiles
-  remove_if_present "$(regreet_state_dir)"
-  remove_if_present "$(regreet_log_dir)"
-  rmdir --ignore-fail-on-non-empty "/etc/systemd/system/greetd.service.d" >/dev/null 2>&1 || true
 
   log_info "removing target user systemd user unit links"
   disable_target_user_unit pipewire.service

@@ -1,22 +1,16 @@
-[background]
-path = "@REGREET_BACKGROUND_PATH@"
-fit = "@REGREET_BACKGROUND_FIT@"
-
 [env]
 XCURSOR_THEME = "@XCURSOR_THEME@"
 XCURSOR_SIZE = "@XCURSOR_SIZE@"
 
 [GTK]
-application_prefer_dark_theme = true
 cursor_theme_name = "@XCURSOR_THEME@"
-cursor_blink = true
+cursor_blink = false
 font_name = "Noto Sans 13"
-icon_theme_name = "Papirus-Dark"
 theme_name = "Adwaita"
 
 [commands]
-reboot = ["loginctl", "reboot"]
-poweroff = ["loginctl", "poweroff"]
+reboot = ["/usr/sbin/reboot"]
+poweroff = ["/usr/sbin/poweroff"]
 
 [appearance]
 greeting_msg = "Debian Labwc"

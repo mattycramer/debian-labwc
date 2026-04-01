@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" role="img" aria-labelledby="title desc">
+  <title id="title">Labwc greeter wallpaper</title>
+  <desc id="desc">Dark background with layered purple contours around a vertical center channel.</desc>
+  <defs>
+    <linearGradient id="coreFill" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#2f1646"/>
+      <stop offset="0.45" stop-color="#221032"/>
+      <stop offset="1" stop-color="#12081e"/>
+    </linearGradient>
+    <linearGradient id="innerGlow" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#8f49ff" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#3f1367" stop-opacity="0.18"/>
+    </linearGradient>
+    <filter id="softBlur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <path id="channelPath" d="M865 0 C820 110 780 128 740 200 C712 250 706 302 706 376 C706 442 724 486 778 558 C812 604 828 648 828 720 V1080 H1092 V720 C1092 648 1108 604 1142 558 C1196 486 1214 442 1214 376 C1214 302 1208 250 1180 200 C1140 128 1100 110 1055 0 Z"/>
+  </defs>
+  <rect width="1920" height="1080" fill="#030204"/>
+  <g opacity="0.22" filter="url(#softBlur)">
+    <use href="#channelPath" transform="translate(0 8) scale(1.08 1)" fill="#6f2bc9"/>
+  </g>
+  <g opacity="0.3" filter="url(#softBlur)">
+    <use href="#channelPath" transform="translate(0 4) scale(1.03 1)" fill="#944cff"/>
+  </g>
+  <use href="#channelPath" fill="url(#coreFill)"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <use href="#channelPath" stroke="#2a113e" stroke-width="82" opacity="0.32"/>
+    <use href="#channelPath" stroke="#4f1e7f" stroke-width="46" opacity="0.48"/>
+    <use href="#channelPath" stroke="#7d33cf" stroke-width="14" opacity="0.72"/>
+    <use href="#channelPath" stroke="#b180ff" stroke-width="4" opacity="0.92"/>
+  </g>
+  <path d="M814 468 C840 444 852 430 852 384 V1080 H1068 V384 C1068 430 1080 444 1106 468 C1122 484 1134 502 1142 528 C1116 518 1098 512 1072 512 C1040 512 1014 520 960 554 C906 520 880 512 848 512 C822 512 804 518 778 528 C786 502 798 484 814 468 Z" fill="url(#innerGlow)" opacity="0.82"/>
+</svg>

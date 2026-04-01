@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<labwc_config>
+  <core>
+    <gap>0</gap>
+    <adaptiveSync>no</adaptiveSync>
+    <allowTearing>no</allowTearing>
+    <autoEnableOutputs>yes</autoEnableOutputs>
+    <reuseOutputMode>yes</reuseOutputMode>
+    <xwaylandPersistence>no</xwaylandPersistence>
+    <primarySelection>no</primarySelection>
+  </core>
+  <focus>
+    <followMouse>no</followMouse>
+    <followMouseRequiresMovement>no</followMouseRequiresMovement>
+    <raiseOnFocus>no</raiseOnFocus>
+    <focusDelay>0</focusDelay>
+  </focus>
+  <windowSwitcher preview="no" outlines="no" unshade="no" order="focus">
+    <osd show="no" />
+  </windowSwitcher>
+  <desktops>
+    <popupTime>0</popupTime>
+    <names>
+      <name>Login</name>
+    </names>
+  </desktops>
+  <keyboard>
+    <keybind key="C-A-F1">
+      <action name="Execute"><command>/usr/bin/chvt 1</command></action>
+    </keybind>
+    <keybind key="C-A-F2">
+      <action name="Execute"><command>/usr/bin/chvt 2</command></action>
+    </keybind>
+    <keybind key="C-A-F3">
+      <action name="Execute"><command>/usr/bin/chvt 3</command></action>
+    </keybind>
+    <keybind key="C-A-F4">
+      <action name="Execute"><command>/usr/bin/chvt 4</command></action>
+    </keybind>
+    <keybind key="C-A-F5">
+      <action name="Execute"><command>/usr/bin/chvt 5</command></action>
+    </keybind>
+    <keybind key="C-A-F6">
+      <action name="Execute"><command>/usr/bin/chvt 6</command></action>
+    </keybind>
+    <keybind key="C-A-F7">
+      <action name="Execute"><command>/usr/bin/chvt 7</command></action>
+    </keybind>
+    <keybind key="C-A-F8">
+      <action name="Execute"><command>/usr/bin/chvt 8</command></action>
+    </keybind>
+    <keybind key="C-A-F9">
+      <action name="Execute"><command>/usr/bin/chvt 9</command></action>
+    </keybind>
+    <keybind key="C-A-F10">
+      <action name="Execute"><command>/usr/bin/chvt 10</command></action>
+    </keybind>
+    <keybind key="C-A-F11">
+      <action name="Execute"><command>/usr/bin/chvt 11</command></action>
+    </keybind>
+    <keybind key="C-A-F12">
+      <action name="Execute"><command>/usr/bin/chvt 12</command></action>
+    </keybind>
+    <keybind key="C-A-BackSpace">
+      <action name="Exit" />
+    </keybind>
+    <keybind key="C-A-r">
+      <action name="Reconfigure" />
+    </keybind>
+  </keyboard>
+  <windowRules>
+    <windowRule identifier="*" serverDecoration="no" skipWindowSwitcher="yes" />
+  </windowRules>
+  <theme>
+    <cornerRadius>0</cornerRadius>
+    <keepBorder>no</keepBorder>
+    <maximizedDecoration>none</maximizedDecoration>
+    <dropShadows>no</dropShadows>
+    <dropShadowsOnTiled>no</dropShadowsOnTiled>
+    <titlebar>
+      <showTitle>no</showTitle>
+    </titlebar>
+  </theme>
+</labwc_config>
