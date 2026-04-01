@@ -86,6 +86,24 @@ verify_driver_repository_visibility() {
   verify_nvidia_upstream_repository
 }
 
+verify_cuda_repository_sources() {
+  local sources_path=""
+  local legacy_path=""
+
+  sources_path="$(cuda_repo_sources_path)"
+  require_file "$sources_path"
+  grep -Fx 'Types: deb' "$sources_path" >/dev/null || die "missing Types: deb in $sources_path"
+  grep -Fx "URIs: $(cuda_repo_base_url)" "$sources_path" >/dev/null || die "unexpected NVIDIA upstream URI in $sources_path"
+  grep -Fx 'Suites: /' "$sources_path" >/dev/null || die "missing Suites: / in $sources_path"
+  grep -Fx 'Architectures: amd64' "$sources_path" >/dev/null || die "missing Architectures: amd64 in $sources_path"
+  grep -Fx "Signed-By: ${CUDA_ARCHIVE_KEYRING_PATH}" "$sources_path" >/dev/null || die "unexpected Signed-By path in $sources_path"
+
+  for legacy_path in /etc/apt/sources.list.d/cuda-*.list; do
+    [[ -e "$legacy_path" ]] || continue
+    die "legacy NVIDIA upstream repo file remains at $legacy_path; expected deb822 .sources only"
+  done
+}
+
 verify_module_config() {
   if [[ "$NVIDIA_ENABLE_DRM_MODESET" == "1" ]]; then
     require_file "$NVIDIA_MODULE_CONFIG_PATH"
@@ -231,6 +249,7 @@ verify_switcheroo_setup() {
 
 verify_installation() {
   verify_driver_repository_visibility
+  verify_cuda_repository_sources
   verify_installed_anchor_packages
   verify_module_config
   verify_ihd_preservation

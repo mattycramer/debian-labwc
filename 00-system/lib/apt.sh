@@ -31,27 +31,6 @@ apply_managed_sid_repository() {
   managed_sid_preferences_content >"$SID_PREFERENCES_PATH"
 }
 
-verify_managed_sid_file() {
-  local path="$1"
-  local render_function="$2"
-  local expected_file
-
-  require_file "$path"
-  expected_file="$(mktemp)"
-  "$render_function" >"$expected_file"
-  if ! cmp -s "$expected_file" "$path"; then
-    run_cmd rm -f -- "$expected_file"
-    die "unexpected managed sid repository file contents at $path"
-  fi
-  run_cmd rm -f -- "$expected_file"
-}
-
-verify_managed_sid_repository() {
-  [[ -f "$DEBIAN_ARCHIVE_KEYRING_PATH" ]] || die "missing Debian archive keyring: $DEBIAN_ARCHIVE_KEYRING_PATH"
-  verify_managed_sid_file "$SID_SOURCE_PATH" managed_sid_source_content
-  verify_managed_sid_file "$SID_PREFERENCES_PATH" managed_sid_preferences_content
-}
-
 remove_managed_sid_repository() {
   run_cmd rm -f -- "$SID_SOURCE_PATH" "$SID_PREFERENCES_PATH"
 }

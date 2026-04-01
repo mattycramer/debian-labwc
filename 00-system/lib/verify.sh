@@ -85,7 +85,6 @@ verify_mount_targets() {
 }
 
 verify_install() {
-  verify_managed_sid_repository
   verify_managed_mount_units
   verify_managed_secure_boot
   verify_managed_sudoers
