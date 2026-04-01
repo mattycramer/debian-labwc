@@ -113,6 +113,33 @@ require_secure_boot_runtime() {
   [[ -d /sys/firmware/efi/efivars ]] || die "Secure Boot MOK management requires EFI variable access; /sys/firmware/efi/efivars is not present"
 }
 
+require_mokutil_prompt_tty() {
+  local tty_path="/dev/tty"
+  local tty_fd=""
+
+  [[ -c "$tty_path" ]] || {
+    die "MOK changes require an interactive terminal so mokutil can prompt for a password immediately; $tty_path is unavailable"
+  }
+  exec {tty_fd}<>"$tty_path" || {
+    die "MOK changes require an interactive terminal so mokutil can prompt for a password immediately; no controlling terminal is available"
+  }
+  exec {tty_fd}>&-
+}
+
+run_interactive_mokutil() {
+  local tty_path="/dev/tty"
+  local tty_fd=""
+  local status=0
+
+  require_mokutil_prompt_tty
+  exec {tty_fd}<>"$tty_path" || {
+    die "MOK changes require an interactive terminal so mokutil can prompt for a password immediately; no controlling terminal is available"
+  }
+  mokutil "$@" <&$tty_fd >&$tty_fd 2>&1 || status=$?
+  exec {tty_fd}>&-
+  return "$status"
+}
+
 log_secure_boot_state() {
   local state=""
   state="$(mokutil --sb-state 2>/dev/null | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g; s/[[:space:]]$//')"
@@ -1585,7 +1612,7 @@ queue_managed_mok_deletions() {
 
   if ((${#delete_candidates[@]} > 0)); then
     log_warn "queueing MOK deletion for ${#delete_candidates[@]} enrolled certificate(s) with CN=${SYSTEM_SECURE_BOOT_CN}; mokutil will prompt for a password"
-    run_cmd mokutil --delete "${delete_candidates[@]}"
+    run_interactive_mokutil --delete "${delete_candidates[@]}"
   fi
 
   rm -rf -- "$temp_dir"
@@ -1611,7 +1638,7 @@ revoke_managed_pending_imports() {
     die "cannot revoke pending Labwc MOK imports while unrelated pending MOK imports exist"
   }
   log_warn "clearing stale pending Labwc MOK import requests"
-  run_cmd mokutil --revoke-import
+  run_interactive_mokutil --revoke-import
 }
 
 revoke_managed_pending_deletes() {
@@ -1619,7 +1646,7 @@ revoke_managed_pending_deletes() {
     die "cannot revoke pending Labwc MOK deletions while unrelated pending MOK delete requests exist"
   }
   log_warn "clearing stale pending Labwc MOK delete requests"
-  run_cmd mokutil --revoke-delete
+  run_interactive_mokutil --revoke-delete
 }
 
 apply_secure_boot_tooling() {
@@ -1831,7 +1858,7 @@ apply_managed_secure_boot() {
     fi
     if ((${#desired_imports[@]} > 0)); then
       log_warn "queueing MOK import for ${SYSTEM_SECURE_BOOT_CERT_PATH}; mokutil will prompt for a password"
-      run_cmd mokutil --import "$SYSTEM_SECURE_BOOT_CERT_PATH"
+      run_interactive_mokutil --import "$SYSTEM_SECURE_BOOT_CERT_PATH"
       load_sorted_fingerprints pending_imports managed_pending_mok_fingerprints import
       fingerprint_arrays_equal pending_imports desired_imports || {
         die "failed to queue the expected Labwc MOK import request"
