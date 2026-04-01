@@ -5,6 +5,7 @@ IFS='
 
 # Stop session clients first so they do not keep poking D-Bus or PipeWire
 # while the compositor and user bus are already shutting down.
+pkill -f '/usr/local/bin/labwc-start-waybar([[:space:]]|$)' >/dev/null 2>&1 || true
 pkill -x "waybar" >/dev/null 2>&1 || true
 pkill -x "kanshi" >/dev/null 2>&1 || true
 pkill -x "mako" >/dev/null 2>&1 || true

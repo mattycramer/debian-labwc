@@ -206,9 +206,14 @@ require_sid_repository() {
 
 resolved_requested_packages() {
   printf '%s\n' "${SID_PACKAGES[@]}"
-  if [[ "${LABWC_GREETER:-}" == "tuigreet" ]]; then
-    printf '%s\n' "tuigreet"
-  fi
+  case "${LABWC_GREETER:-}" in
+    tuigreet)
+      printf '%s\n' "tuigreet"
+      ;;
+    regreet)
+      printf '%s\n' "cage"
+      ;;
+  esac
   printf '%s\n' "${GRAPHICS_PACKAGES[@]}"
   printf '%s\n' "${TWEAKS_BUILD_PACKAGES[@]}"
   printf '%s\n' "${TWEAKS_SID_PACKAGES[@]}"

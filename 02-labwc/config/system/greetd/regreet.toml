@@ -10,7 +10,7 @@ XCURSOR_SIZE = "@XCURSOR_SIZE@"
 application_prefer_dark_theme = true
 cursor_theme_name = "@XCURSOR_THEME@"
 cursor_blink = true
-font_name = "Noto Sans 14"
+font_name = "Noto Sans 13"
 icon_theme_name = "Papirus-Dark"
 theme_name = "Adwaita"
 
@@ -19,9 +19,9 @@ reboot = ["loginctl", "reboot"]
 poweroff = ["loginctl", "poweroff"]
 
 [appearance]
-greeting_msg = "Welcome to labwc"
+greeting_msg = "Debian Labwc"
 
 [widget.clock]
-format = "%a %H:%M"
-resolution = "500ms"
-label_width = 160
+format = "%a %d %b  %H:%M"
+resolution = "1s"
+label_width = 220

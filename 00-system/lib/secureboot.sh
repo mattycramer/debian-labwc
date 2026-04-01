@@ -164,6 +164,9 @@ set -Eeuo pipefail
 IFS=\$'\\n\\t'
 shopt -s nullglob
 
+# Installed runtime asset managed by 00-system.
+# Automatic kernel/DKMS flows use this installed file only.
+
 readonly LABWC_MOK_KEY="${SYSTEM_SECURE_BOOT_KEY_PATH}"
 readonly LABWC_MOK_CERT="${SYSTEM_SECURE_BOOT_CERT_PATH}"
 readonly LABWC_MODULES_CONF="${SYSTEM_SECURE_BOOT_MODULES_CONFIG_PATH}"
@@ -448,6 +451,16 @@ module_sig_key() {
   "\$modinfo_bin" -F sig_key "\$1" 2>/dev/null || true
 }
 
+module_has_any_signature() {
+  local module_path="\$1"
+  local signer=""
+  local sig_key=""
+
+  signer="\$(module_signer "\$module_path")"
+  sig_key="\$(module_sig_key "\$module_path")"
+  [[ -n "\$signer" || -n "\$sig_key" ]]
+}
+
 module_is_labwc_signed() {
   local module_path="\$1"
   local signer=""
@@ -459,6 +472,19 @@ module_is_labwc_signed() {
   expected_sig_key="\$(managed_cert_fingerprint)"
 
   [[ "\$signer" == "\$LABWC_SIGNER_CN" && -n "\$sig_key" && "\$sig_key" == "\$expected_sig_key" ]]
+}
+
+module_signature_is_acceptable() {
+  local module_path="\$1"
+  local signer=""
+
+  module_has_any_signature "\$module_path" || return 1
+  signer="\$(module_signer "\$module_path")"
+  if [[ "\$signer" == "\$LABWC_SIGNER_CN" ]]; then
+    module_is_labwc_signed "\$module_path"
+    return
+  fi
+  return 0
 }
 
 mark_kernel_for_depmod() {
@@ -486,6 +512,10 @@ sign_module_in_place() {
 
   if module_is_labwc_signed "\$resolved_module"; then
     log_info "module already signed with managed Labwc key: \$resolved_module"
+    return 0
+  fi
+  if module_has_any_signature "\$resolved_module" && [[ "\$(module_signer "\$resolved_module")" != "\$LABWC_SIGNER_CN" ]]; then
+    log_info "module already signed by a non-Labwc signer; leaving existing signature intact: \$resolved_module"
     return 0
   fi
 
@@ -1106,7 +1136,7 @@ cmd_verify_managed_modules() {
     [[ -n "\$kernelver" ]] || continue
     while IFS= read -r module_path; do
       [[ -n "\$module_path" ]] || continue
-      module_is_labwc_signed "\$module_path" || die "out-of-tree module under updates/extra is not signed with the Labwc key: \$module_path"
+      module_signature_is_acceptable "\$module_path" || die "module under updates/extra is unsigned or signed with a stale Labwc key: \$module_path"
     done < <(list_external_module_files_for_kernel "\$kernelver")
     verify_managed_dkms_for_kernel "\$kernelver"
     verify_non_dkms_for_kernel "\$kernelver"
@@ -1167,6 +1197,7 @@ build_sign_module_helper_candidate() {
 #!/usr/bin/env bash
 set -Eeuo pipefail
 IFS=\$'\\n\\t'
+# Installed runtime helper. The repository is not used after install.
 exec "${SYSTEM_SECURE_BOOT_TOOL_PATH}" sign "\$@"
 EOF
 }
@@ -1178,6 +1209,7 @@ build_kernel_postinst_hook_candidate() {
 #!/usr/bin/env bash
 set -Eeuo pipefail
 IFS=\$'\\n\\t'
+# Installed runtime hook. The repository is not used after install.
 exec "${SYSTEM_SECURE_BOOT_TOOL_PATH}" kernel-hook image "\$@"
 EOF
 }
@@ -1189,6 +1221,7 @@ build_kernel_header_postinst_hook_candidate() {
 #!/usr/bin/env bash
 set -Eeuo pipefail
 IFS=\$'\\n\\t'
+# Installed runtime hook. The repository is not used after install.
 exec "${SYSTEM_SECURE_BOOT_TOOL_PATH}" kernel-hook headers "\$@"
 EOF
 }
@@ -1559,7 +1592,18 @@ queue_managed_mok_deletions() {
 }
 
 current_managed_cert_enrolled() {
-  mokutil --test-key "$SYSTEM_SECURE_BOOT_CERT_PATH" >/dev/null 2>&1
+  local current_fingerprint=""
+  local enrolled_fingerprint=""
+
+  current_fingerprint="$(certificate_fingerprint "$SYSTEM_SECURE_BOOT_CERT_PATH" DER 2>/dev/null || true)"
+  [[ -n "$current_fingerprint" ]] || return 1
+
+  while IFS= read -r enrolled_fingerprint; do
+    [[ -n "$enrolled_fingerprint" ]] || continue
+    [[ "$enrolled_fingerprint" == "$current_fingerprint" ]] && return 0
+  done < <(managed_enrolled_fingerprints)
+
+  return 1
 }
 
 revoke_managed_pending_imports() {
@@ -1795,10 +1839,16 @@ apply_managed_secure_boot() {
     fi
   fi
 
+  if (( current_enrolled == 1 )); then
+    log_info "managed Labwc MOK certificate is already enrolled"
+  elif ((${#desired_imports[@]} > 0 && ${#pending_imports[@]} > 0)); then
+    log_info "managed Labwc MOK import is already pending for the next reboot; no new password prompt is expected until it is completed or revoked"
+  fi
+
   apply_managed_dkms_signing_config
   apply_secure_boot_tooling
   if (( regenerated == 1 )); then
-    log_info "managed Labwc key was regenerated; re-signing currently installed managed modules"
+    log_info "managed Labwc key was regenerated; repairing currently installed Labwc-managed modules and unsigned out-of-tree modules"
   fi
   run_cmd "$SYSTEM_SECURE_BOOT_TOOL_PATH" repair-installed-modules
 

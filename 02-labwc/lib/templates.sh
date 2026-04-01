@@ -23,7 +23,6 @@ render_template_content() {
   local lock_wallpaper_name=""
   local regreet_background_path=""
   local regreet_background_fit=""
-  local regreet_move_to_output_action=""
   local updates_script="$LABWC_TARGET_HOME/.config/waybar/scripts/pending-updates.sh"
   local upgrade_script="$LABWC_TARGET_HOME/.config/waybar/scripts/run-upgrades.sh"
   local gpu_launch_script="$LABWC_TARGET_HOME/.config/waybar/scripts/gpu-launch.sh"
@@ -47,9 +46,6 @@ render_template_content() {
   if [[ "${LABWC_GREETER:-}" == "regreet" ]] && declare -F regreet_wallpaper_fit >/dev/null 2>&1; then
     regreet_background_fit="$(regreet_wallpaper_fit)"
   fi
-  if [[ "${LABWC_GREETER:-}" == "regreet" ]] && [[ -n "${LABWC_PRIMARY_OUTPUT:-}" ]]; then
-    regreet_move_to_output_action="      <action name=\"MoveToOutput\" output=\"${LABWC_PRIMARY_OUTPUT}\" />"
-  fi
 
   env \
     TEMPLATE_TARGET_HOME="$LABWC_TARGET_HOME" \
@@ -68,7 +64,6 @@ render_template_content() {
     TEMPLATE_LOCK_WALLPAPER_NAME="$lock_wallpaper_name" \
     TEMPLATE_REGREET_BACKGROUND_PATH="$regreet_background_path" \
     TEMPLATE_REGREET_BACKGROUND_FIT="$regreet_background_fit" \
-    TEMPLATE_REGREET_MOVE_TO_OUTPUT_ACTION="$regreet_move_to_output_action" \
     TEMPLATE_WALLPAPER_MODE="${LABWC_WALLPAPER_MODE:-}" \
     TEMPLATE_IDLE_LOCK_SECONDS="${LABWC_IDLE_LOCK_SECONDS:-}" \
     TEMPLATE_IDLE_DPMS_SECONDS="${LABWC_IDLE_DPMS_SECONDS:-}" \
@@ -113,7 +108,6 @@ replacements = {
     "@LOCK_WALLPAPER_NAME@": os.environ.get("TEMPLATE_LOCK_WALLPAPER_NAME", ""),
     "@REGREET_BACKGROUND_PATH@": os.environ.get("TEMPLATE_REGREET_BACKGROUND_PATH", ""),
     "@REGREET_BACKGROUND_FIT@": os.environ.get("TEMPLATE_REGREET_BACKGROUND_FIT", ""),
-    "@REGREET_MOVE_TO_OUTPUT_ACTION@": os.environ.get("TEMPLATE_REGREET_MOVE_TO_OUTPUT_ACTION", ""),
     "@WALLPAPER_MODE@": os.environ.get("TEMPLATE_WALLPAPER_MODE", ""),
     "@IDLE_LOCK_SECONDS@": os.environ.get("TEMPLATE_IDLE_LOCK_SECONDS", ""),
     "@IDLE_DPMS_SECONDS@": os.environ.get("TEMPLATE_IDLE_DPMS_SECONDS", ""),

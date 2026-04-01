@@ -3,5 +3,5 @@ vt = @GREETD_VT@
 switch = true
 
 [default_session]
-command = "/usr/local/bin/labwc-regreet-session"
+command = "env HOME=/var/lib/greetd/greeter USER=greeter LOGNAME=greeter XDG_CACHE_HOME=/var/lib/greetd/greeter/.cache XDG_CONFIG_HOME=/var/lib/greetd/greeter/.config XDG_DATA_HOME=/var/lib/greetd/greeter/.local/share XDG_STATE_HOME=/var/lib/greetd/greeter/.local/state GDK_BACKEND=wayland XCURSOR_THEME=@XCURSOR_THEME@ XCURSOR_SIZE=@XCURSOR_SIZE@ GTK_USE_PORTAL=0 GDK_DEBUG=no-portals NO_AT_BRIDGE=1 /usr/bin/cage -s -mlast -- /usr/local/bin/regreet --config /etc/greetd/regreet.toml --style /etc/greetd/regreet.css"
 user = "greeter"

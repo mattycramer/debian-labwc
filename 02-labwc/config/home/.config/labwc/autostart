@@ -47,22 +47,6 @@ wait_for_system_bus() {
   return 1
 }
 
-warm_polkit_service() {
-  if ! command -v systemctl >/dev/null 2>&1; then
-    return 0
-  fi
-  attempt=1
-  while [ "$attempt" -le 10 ]; do
-    systemctl start polkit.service >/dev/null 2>&1 || true
-    if systemctl is-active --quiet polkit.service >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 1
-    attempt=$((attempt + 1))
-  done
-  return 1
-}
-
 update_activation_environment() {
   if [ "${LABWC_UPDATE_ACTIVATION_ENV:-0}" != "1" ]; then
     return 0
@@ -94,6 +78,7 @@ start_bg_once swaybg swaybg -i "@BACKGROUND_WALLPAPER_PATH@" -m "@WALLPAPER_MODE
 wait_for_session_bus || true
 wait_for_system_bus || true
 update_activation_environment \
+  DBUS_SESSION_BUS_ADDRESS \
   DISPLAY \
   WAYLAND_DISPLAY \
   XDG_CURRENT_DESKTOP \
@@ -109,7 +94,6 @@ update_activation_environment \
   QT_QPA_PLATFORM \
   QT_WAYLAND_DISABLE_WINDOWDECORATION
 
-warm_polkit_service || true
 if ! pgrep -u "$current_uid" -f '/polkit-kde-authentication-agent-1([[:space:]]|$)' >/dev/null 2>&1; then
   /usr/lib/x86_64-linux-gnu/libexec/polkit-kde-authentication-agent-1 >/dev/null 2>&1 &
 fi
@@ -120,7 +104,9 @@ else
   start_bg_once kanshi kanshi
 fi
 start_bg_once mako mako
-start_bg_once waybar waybar --config "@TARGET_HOME@/.config/waybar/config.jsonc" --style "@TARGET_HOME@/.config/waybar/style.css"
+if [ -x /usr/local/bin/labwc-start-waybar ]; then
+  /usr/local/bin/labwc-start-waybar >/dev/null 2>&1 &
+fi
 if command -v /usr/local/bin/labwc-unlock-gpg-key >/dev/null 2>&1; then
   (
     sleep 1

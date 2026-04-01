@@ -217,20 +217,12 @@ regreet_binary_path() {
   printf '%s\n' "/usr/local/bin/regreet"
 }
 
-regreet_session_wrapper_path() {
-  printf '%s\n' "/usr/local/bin/labwc-regreet-session"
-}
-
 regreet_config_path() {
   printf '%s\n' "/etc/greetd/regreet.toml"
 }
 
 regreet_css_path() {
   printf '%s\n' "/etc/greetd/regreet.css"
-}
-
-regreet_labwc_config_dir() {
-  printf '%s\n' "/etc/greetd/labwc"
 }
 
 regreet_state_dir() {
@@ -247,10 +239,8 @@ regreet_wallpaper_target_path() {
 
 remove_regreet_support_files() {
   remove_if_present "$(regreet_binary_path)"
-  remove_if_present "$(regreet_session_wrapper_path)"
   remove_if_present "$(regreet_config_path)"
   remove_if_present "$(regreet_css_path)"
-  remove_if_present "$(regreet_labwc_config_dir)"
   remove_if_present "$(regreet_state_dir)"
   remove_if_present "$(regreet_log_dir)"
   while IFS= read -r wallpaper_path; do
@@ -321,10 +311,6 @@ install_selected_greeter_files() {
       render_template_to_file "$(config_system_template_path "greetd/config-regreet.toml")" "/etc/greetd/config.toml" 0644
       render_template_to_file "$(config_system_template_path "greetd/regreet.toml")" "$(regreet_config_path)" 0644
       render_template_to_file "$(config_system_template_path "greetd/regreet.css")" "$(regreet_css_path)" 0644
-      render_template_to_file "$(config_system_template_path "greetd/labwc/environment")" "$(regreet_labwc_config_dir)/environment" 0644
-      render_template_to_file "$(config_system_template_path "greetd/labwc/rc.xml")" "$(regreet_labwc_config_dir)/rc.xml" 0644
-      render_template_to_file "$(config_system_template_path "greetd/labwc/autostart")" "$(regreet_labwc_config_dir)/autostart" 0755
-      render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-regreet-session")" "$(regreet_session_wrapper_path)" 0755
       ;;
   esac
 }
@@ -343,6 +329,7 @@ install_root_files() {
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-record-toggle")" "/usr/local/bin/labwc-record-toggle" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-dpms")" "/usr/local/bin/labwc-dpms" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-refresh-outputs")" "/usr/local/bin/labwc-refresh-outputs" 0755
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-start-waybar")" "/usr/local/bin/labwc-start-waybar" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-lock")" "/usr/local/bin/labwc-lock" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-launcher-menu")" "/usr/local/bin/labwc-launcher-menu" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-module-menu")" "/usr/local/bin/labwc-module-menu" 0755
@@ -518,6 +505,7 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/labwc-record-toggle"
   remove_if_present "/usr/local/bin/labwc-dpms"
   remove_if_present "/usr/local/bin/labwc-refresh-outputs"
+  remove_if_present "/usr/local/bin/labwc-start-waybar"
   remove_if_present "/usr/local/bin/labwc-lock"
   remove_if_present "/usr/local/bin/labwc-launcher-menu"
   remove_if_present "/usr/local/bin/labwc-module-menu"
@@ -536,12 +524,10 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/labwc-workspace-state"
   remove_if_present "/usr/local/bin/labwc-workspace-status"
   remove_if_present "$(regreet_binary_path)"
-  remove_if_present "$(regreet_session_wrapper_path)"
   remove_if_present "/usr/share/wayland-sessions/labwc.desktop"
   remove_if_present "/etc/greetd/config.toml"
   remove_if_present "$(regreet_config_path)"
   remove_if_present "$(regreet_css_path)"
-  remove_if_present "$(regreet_labwc_config_dir)"
   remove_if_present "/etc/systemd/system/greetd.service.d/10-vt.conf"
   systemctl disable "$(wireguard_import_service_name)" >/dev/null 2>&1 || true
   systemctl disable labwc-vpn-default-off.service >/dev/null 2>&1 || true
