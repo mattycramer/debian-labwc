@@ -1793,6 +1793,7 @@ apply_managed_secure_boot() {
   local current_fingerprint=""
   local current_enrolled=0
   local regenerated=0
+  local refreshed_pending_import=0
   local fingerprint=""
   local -a pending_imports=()
   local -a pending_deletes=()
@@ -1852,9 +1853,14 @@ apply_managed_secure_boot() {
     fi
   fi
 
-  if ! fingerprint_arrays_equal pending_imports desired_imports; then
+  if ! fingerprint_arrays_equal pending_imports desired_imports || \
+     ((${#desired_imports[@]} > 0 && ${#pending_imports[@]} > 0)); then
     if ((${#pending_imports[@]} > 0)); then
+      if fingerprint_arrays_equal pending_imports desired_imports && ((${#desired_imports[@]} > 0)); then
+        log_warn "managed Labwc MOK import is already pending; revoking and re-queueing it so mokutil prompts for a password again"
+      fi
       revoke_managed_pending_imports
+      refreshed_pending_import=1
     fi
     if ((${#desired_imports[@]} > 0)); then
       log_warn "queueing MOK import for ${SYSTEM_SECURE_BOOT_CERT_PATH}; mokutil will prompt for a password"
@@ -1868,8 +1874,10 @@ apply_managed_secure_boot() {
 
   if (( current_enrolled == 1 )); then
     log_info "managed Labwc MOK certificate is already enrolled"
+  elif (( refreshed_pending_import == 1 )); then
+    log_info "managed Labwc MOK import was refreshed and is pending for the next reboot"
   elif ((${#desired_imports[@]} > 0 && ${#pending_imports[@]} > 0)); then
-    log_info "managed Labwc MOK import is already pending for the next reboot; no new password prompt is expected until it is completed or revoked"
+    log_info "managed Labwc MOK import is pending for the next reboot"
   fi
 
   apply_managed_dkms_signing_config
