@@ -1473,36 +1473,17 @@ mok_pending_stream() {
   esac
 }
 
-mok_pending_entries() {
+mok_pending_fingerprints() {
   local mode="$1"
   local line=""
   local fingerprint=""
-  local subject=""
 
   while IFS= read -r line; do
-    if [[ "$line" =~ ^\[key[[:space:]][0-9]+\]$ ]]; then
-      if [[ -n "$fingerprint" || -n "$subject" ]]; then
-        printf '%s|%s\n' "$fingerprint" "$subject"
-      fi
-      fingerprint=""
-      subject=""
-      continue
-    fi
-
     if [[ "$line" =~ ^SHA1[[:space:]]Fingerprint:[[:space:]](.+)$ ]]; then
       fingerprint="$(printf '%s' "${BASH_REMATCH[1]}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]:')"
-      continue
-    fi
-
-    if [[ "$line" =~ ^[[:space:]]*Subject:[[:space:]]*(.+)$ ]]; then
-      subject="${BASH_REMATCH[1]}"
-      continue
+      [[ -n "$fingerprint" ]] && printf '%s\n' "$fingerprint"
     fi
   done < <(mok_pending_stream "$mode")
-
-  if [[ -n "$fingerprint" || -n "$subject" ]]; then
-    printf '%s|%s\n' "$fingerprint" "$subject"
-  fi
 }
 
 subject_has_managed_cn() {
@@ -1511,28 +1492,60 @@ subject_has_managed_cn() {
   grep -Eq '(^|[,[:space:]])CN[[:space:]]*=[[:space:]]*Labwc Secure Boot($|[,[:space:]])' <<<"$subject_line"
 }
 
+fingerprint_array_contains() {
+  local fingerprint="$1"
+  shift
+  local candidate=""
+
+  for candidate in "$@"; do
+    [[ "$candidate" == "$fingerprint" ]] && return 0
+  done
+
+  return 1
+}
+
 managed_pending_mok_fingerprints() {
   local mode="$1"
+  local current_fingerprint=""
   local fingerprint=""
-  local subject=""
+  local -a managed_fingerprints=()
 
-  while IFS='|' read -r fingerprint subject; do
-    [[ -n "$fingerprint" ]] || continue
-    subject_has_managed_cn "$subject" || continue
-    printf '%s\n' "$fingerprint"
-  done < <(mok_pending_entries "$mode")
+  case "$mode" in
+    import)
+      current_fingerprint="$(certificate_fingerprint "$SYSTEM_SECURE_BOOT_CERT_PATH" DER 2>/dev/null || true)"
+      [[ -n "$current_fingerprint" ]] || return 0
+      while IFS= read -r fingerprint; do
+        [[ -n "$fingerprint" ]] || continue
+        [[ "$fingerprint" == "$current_fingerprint" ]] || continue
+        printf '%s\n' "$fingerprint"
+      done < <(mok_pending_fingerprints import)
+      ;;
+    delete)
+      load_sorted_fingerprints managed_fingerprints managed_enrolled_fingerprints
+      while IFS= read -r fingerprint; do
+        [[ -n "$fingerprint" ]] || continue
+        fingerprint_array_contains "$fingerprint" "${managed_fingerprints[@]}" || continue
+        printf '%s\n' "$fingerprint"
+      done < <(mok_pending_fingerprints delete)
+      ;;
+    *)
+      die "unsupported pending MOK mode: $mode"
+      ;;
+  esac
 }
 
 pending_mok_has_unmanaged_entries() {
   local mode="$1"
   local fingerprint=""
-  local subject=""
+  local -a pending_fingerprints=()
+  local -a managed_fingerprints=()
 
-  while IFS='|' read -r fingerprint subject; do
-    [[ -n "$fingerprint" || -n "$subject" ]] || continue
-    subject_has_managed_cn "$subject" && continue
+  load_sorted_fingerprints pending_fingerprints mok_pending_fingerprints "$mode"
+  load_sorted_fingerprints managed_fingerprints managed_pending_mok_fingerprints "$mode"
+  for fingerprint in "${pending_fingerprints[@]}"; do
+    fingerprint_array_contains "$fingerprint" "${managed_fingerprints[@]}" && continue
     return 0
-  done < <(mok_pending_entries "$mode")
+  done
 
   return 1
 }
