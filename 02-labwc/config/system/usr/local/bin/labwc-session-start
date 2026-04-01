@@ -1,0 +1,41 @@
+#!/bin/sh
+set -eu
+
+clear_session_bus_environment() {
+  unset DBUS_SESSION_BUS_ADDRESS
+  unset DBUS_SESSION_BUS_PID
+  unset DBUS_SESSION_BUS_WINDOWID
+  unset DBUS_STARTER_ADDRESS
+  unset DBUS_STARTER_BUS_TYPE
+}
+
+broker_user_bus_ready() {
+  [ -n "$runtime_bus_path" ] || return 1
+  [ -S "$runtime_bus_path" ] || return 1
+
+  if ! command -v /usr/bin/dbus-send >/dev/null 2>&1; then
+    return 0
+  fi
+
+  DBUS_SESSION_BUS_ADDRESS="unix:path=${runtime_bus_path}" \
+    /usr/bin/dbus-send \
+      --session \
+      --type=method_call \
+      --dest=org.freedesktop.DBus \
+      /org/freedesktop/DBus \
+      org.freedesktop.DBus.ListNames >/dev/null 2>&1
+}
+
+runtime_bus_path=""
+if [ -n "${XDG_RUNTIME_DIR:-}" ]; then
+  runtime_bus_path="${XDG_RUNTIME_DIR}/bus"
+fi
+
+if broker_user_bus_ready; then
+  clear_session_bus_environment
+  export DBUS_SESSION_BUS_ADDRESS="unix:path=${runtime_bus_path}"
+  exec /usr/local/bin/labwc-session
+fi
+
+clear_session_bus_environment
+exec /usr/bin/dbus-run-session -- /usr/local/bin/labwc-session

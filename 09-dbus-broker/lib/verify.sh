@@ -134,14 +134,34 @@ verify_user_runtime() {
 
 verify_labwc_session_compatibility() {
   local session_wrapper="/usr/local/bin/labwc-session"
+  local session_entry="/usr/local/bin/labwc-session-start"
+  local session_desktop="/usr/share/wayland-sessions/labwc.desktop"
   local session_autostart="${DBUS_BROKER_TARGET_HOME}/.config/labwc/autostart"
   if [[ -f "$session_wrapper" ]]; then
-    if grep -F "dbus-update-activation-environment --systemd" "$session_wrapper" >/dev/null; then
-      return 0
-    fi
-
     grep -F "LABWC_UPDATE_ACTIVATION_ENV=0" "$session_wrapper" >/dev/null || {
       die "labwc-session wrapper lost the managed dbus activation contract"
+    }
+
+    [[ -x "$session_entry" ]] || die "missing executable broker-aware labwc session entrypoint: $session_entry"
+    grep -F 'DBUS_SESSION_BUS_ADDRESS=' "$session_entry" >/dev/null || {
+      die "labwc session entrypoint lost broker-backed user-bus export"
+    }
+    grep -F 'dbus-run-session' "$session_entry" >/dev/null || {
+      die "labwc session entrypoint lost dbus-run-session fallback"
+    }
+
+    [[ -f "$session_desktop" ]] || die "missing labwc desktop session file: $session_desktop"
+    awk -F= '
+      $1 == "Exec" {
+        if ($2 == "/usr/local/bin/labwc-session-start") {
+          found = 1
+        }
+      }
+      END {
+        exit(found ? 0 : 1)
+      }
+    ' "$session_desktop" >/dev/null || {
+      die "labwc desktop session no longer uses the broker-aware session entrypoint"
     }
 
     [[ -f "$session_autostart" ]] || {
@@ -150,6 +170,12 @@ verify_labwc_session_compatibility() {
 
     grep -F "dbus-update-activation-environment" "$session_autostart" >/dev/null || {
       die "labwc autostart lost dbus activation-environment handoff"
+    }
+    grep -F -- "--systemd" "$session_autostart" >/dev/null || {
+      die "labwc autostart lost dbus/systemd activation-environment handoff"
+    }
+    grep -F "DBUS_SESSION_BUS_ADDRESS" "$session_autostart" >/dev/null || {
+      die "labwc autostart no longer exports DBUS_SESSION_BUS_ADDRESS into the activation environment"
     }
   fi
 }

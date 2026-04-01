@@ -51,7 +51,9 @@ update_dbus_activation_environment() {
   dbus_vars=""
   dbus_var_name=""
   dbus_var_value=""
-  if ! command -v dbus-update-activation-environment >/dev/null 2>&1; then
+  dbus_attempt=1
+  dbus_max_attempts=10
+  if ! command -v /usr/bin/dbus-update-activation-environment >/dev/null 2>&1; then
     return 0
   fi
   for dbus_var_name in "$@"; do
@@ -64,8 +66,18 @@ update_dbus_activation_environment() {
     fi
   done
   [ -n "$dbus_vars" ] || return 0
-  # shellcheck disable=SC2086
-  dbus-update-activation-environment $dbus_vars >/dev/null 2>&1 || true
+
+  while [ "$dbus_attempt" -le "$dbus_max_attempts" ]; do
+    # shellcheck disable=SC2086
+    if /usr/bin/dbus-update-activation-environment --systemd $dbus_vars >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+    dbus_attempt=$((dbus_attempt + 1))
+  done
+
+  printf '%s\n' "ERROR: dbus/systemd activation environment sync failed after ${dbus_max_attempts} attempts." >&2
+  return 1
 }
 
 start_bg_once() {
@@ -89,6 +101,7 @@ wait_for_system_bus || true
 update_dbus_activation_environment \
   WAYLAND_DISPLAY \
   DISPLAY \
+  DBUS_SESSION_BUS_ADDRESS \
   XDG_CURRENT_DESKTOP \
   XDG_SESSION_TYPE \
   XDG_SESSION_DESKTOP \

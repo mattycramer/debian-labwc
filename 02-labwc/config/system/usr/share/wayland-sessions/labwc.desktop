@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Labwc
 Comment=Labwc session
-Exec=/usr/bin/dbus-run-session -- @SESSION_WRAPPER@
+Exec=/usr/local/bin/labwc-session-start
 Type=Application
 DesktopNames=labwc;wlroots;

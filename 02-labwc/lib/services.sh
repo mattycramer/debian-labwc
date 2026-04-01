@@ -311,6 +311,7 @@ install_root_files() {
   remove_regreet_support_files
   install_regreet_files
   render_template_to_file "$(config_system_template_path "usr/share/wayland-sessions/labwc.desktop")" "/usr/share/wayland-sessions/labwc.desktop" 0644
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-session-start")" "/usr/local/bin/labwc-session-start" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-session")" "/usr/local/bin/labwc-session" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-power-menu")" "/usr/local/bin/labwc-power-menu" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-screenshot-full")" "/usr/local/bin/labwc-screenshot-full" 0755
@@ -488,6 +489,7 @@ nuke_all_state() {
 
   log_info "removing installed helper scripts and session files"
   remove_if_present "/usr/local/bin/labwc-session"
+  remove_if_present "/usr/local/bin/labwc-session-start"
   remove_if_present "/usr/local/bin/labwc-power-menu"
   remove_if_present "/usr/local/bin/labwc-screenshot-full"
   remove_if_present "/usr/local/bin/labwc-screenshot-region"
