@@ -547,8 +547,6 @@ nuke_all_state() {
   systemctl disable labwc-vpn-default-off.service >/dev/null 2>&1 || true
   remove_if_present "/etc/systemd/system/labwc-wireguard-import.service"
   remove_if_present "/etc/systemd/system/labwc-vpn-default-off.service"
-  remove_if_present "$SID_SOURCE_PATH"
-  remove_if_present "$SID_PREFERENCES_PATH"
   remove_labwc_tweaks_install
   remove_keepsecret_install
   remove_managed_wireguard_profiles

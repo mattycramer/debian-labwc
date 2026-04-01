@@ -168,6 +168,7 @@ phase_repo() {
 phase_packages() {
   log_info "phase: packages"
   phase_repo
+  verify_sid_prerequisite_repository
   install_debian_prerequisite_packages
   install_nvidia_stack
 }

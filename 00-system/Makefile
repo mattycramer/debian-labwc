@@ -1,6 +1,6 @@
 SHELL := /usr/bin/env bash
 
-.PHONY: help guard-non-root doctor mounts permissions secureboot sudoers install verify print-env nuke
+.PHONY: help guard-non-root doctor sid mounts permissions secureboot sudoers install verify print-env nuke
 
 help:
 	@printf '%s\n' \
@@ -8,12 +8,13 @@ help:
 	  '  NOTE:        Run make as a non-root user; do not use sudo make' \
 	  '  help         Show this message' \
 	  '  doctor       Validate platform assumptions and resolve the invoking user' \
+	  '  sid          Install /etc/apt/sources.list.d/sid.sources and /etc/apt/preferences.d/sid exactly as managed by 00-system' \
 	  '  mounts       Install four device-gated top-level g-drive mount/watch units from mounts.conf' \
 	  '  permissions  Create the hardened torrent account, add the invoking user to torrent, and repair required path ownership/modes' \
 	  '  secureboot   Install Secure Boot dependencies, manage the Labwc MOK, install the DKMS framework drop-in, zz- kernel hooks, the custom module source root, and the sign-module helper' \
 	  '  sudoers      Install the hardened invoking-user policy and read-only helper wrappers under /etc/sudoers.d' \
-	  '  install      Run doctor, permissions, mounts, secureboot, sudoers, and verify' \
-	  '  verify       Check generated mount units, Secure Boot state, sudoers, and required path permissions' \
+	  '  install      Run doctor, sid, permissions, mounts, secureboot, sudoers, and verify' \
+	  '  verify       Check the managed sid archive files, generated mount units, Secure Boot state, sudoers, and required path permissions' \
 	  '  print-env    Print resolved target user/path state' \
 	  '  nuke         Remove generated Secure Boot state, scoped module hooks/helpers, mount units, and sudoers policy; directory permissions stay in place'
 
@@ -25,6 +26,9 @@ guard-non-root:
 
 doctor: guard-non-root
 	@SYSTEM_MAKE_WRAPPER=1 sudo --preserve-env=SYSTEM_MAKE_WRAPPER bash ./install.sh --phase doctor
+
+sid: guard-non-root
+	@SYSTEM_MAKE_WRAPPER=1 sudo --preserve-env=SYSTEM_MAKE_WRAPPER bash ./install.sh --phase sid
 
 mounts: guard-non-root
 	@SYSTEM_MAKE_WRAPPER=1 sudo --preserve-env=SYSTEM_MAKE_WRAPPER bash ./install.sh --phase mounts

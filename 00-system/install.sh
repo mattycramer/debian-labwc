@@ -13,6 +13,8 @@ source "$SCRIPT_DIR/lib/log.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/assert.sh"
 # shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/apt.sh"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/accounts.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/detect.sh"
@@ -29,7 +31,7 @@ source "$SCRIPT_DIR/lib/verify.sh"
 
 usage() {
   cat <<'EOF'
-Usage: ./install.sh --phase doctor|mounts|permissions|secureboot|sudoers|verify|print-env|nuke|all
+Usage: ./install.sh --phase doctor|sid|mounts|permissions|secureboot|sudoers|verify|print-env|nuke|all
 EOF
 }
 
@@ -61,6 +63,12 @@ require_make_wrapper() {
 phase_doctor() {
   log_info "phase: doctor"
   run_preflight_checks 1
+}
+
+phase_sid() {
+  log_info "phase: sid"
+  phase_doctor
+  apply_managed_sid_repository
 }
 
 run_preflight_checks() {
@@ -156,6 +164,7 @@ phase_print_env() {
 phase_nuke() {
   log_info "phase: nuke"
   run_preflight_checks 0
+  remove_managed_sid_repository
   remove_managed_secure_boot
   remove_managed_mount_units
   remove_managed_sudoers
@@ -167,6 +176,7 @@ main() {
   require_make_wrapper
   case "$PHASE" in
     doctor) phase_doctor ;;
+    sid) phase_sid ;;
     mounts) phase_mounts ;;
     permissions) phase_permissions ;;
     secureboot) phase_secureboot ;;
@@ -176,6 +186,7 @@ main() {
     nuke) phase_nuke ;;
     install|all)
       phase_doctor
+      phase_sid
       phase_permissions
       phase_mounts
       phase_secureboot

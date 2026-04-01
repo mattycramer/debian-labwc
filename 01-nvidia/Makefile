@@ -8,7 +8,7 @@ help:
 	  '  help    Show this message' \
 	  '  doctor  Validate platform assumptions' \
 	  '  repo    Validate Debian contrib and configure the NVIDIA upstream repository' \
-	  '  packages Install Debian prerequisites plus NVIDIA upstream driver and CUDA toolkit' \
+	  '  packages Install sid-targeted Debian prerequisites plus NVIDIA upstream driver and CUDA toolkit' \
 	  '  config  Render NVIDIA module configuration and refresh initramfs' \
 	  '  install Run repo + packages + config + verify' \
 	  '  verify  Verify upstream packages, DRM modeset, switcherooctl, and CUDA state' \
