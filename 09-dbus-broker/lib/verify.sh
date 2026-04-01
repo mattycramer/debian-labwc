@@ -134,8 +134,23 @@ verify_user_runtime() {
 
 verify_labwc_session_compatibility() {
   local session_wrapper="/usr/local/bin/labwc-session"
+  local session_autostart="${DBUS_BROKER_TARGET_HOME}/.config/labwc/autostart"
   if [[ -f "$session_wrapper" ]]; then
-    grep -F "dbus-update-activation-environment --systemd" "$session_wrapper" >/dev/null || die "labwc-session wrapper lost dbus activation-environment handoff"
+    if grep -F "dbus-update-activation-environment --systemd" "$session_wrapper" >/dev/null; then
+      return 0
+    fi
+
+    grep -F "LABWC_UPDATE_ACTIVATION_ENV=0" "$session_wrapper" >/dev/null || {
+      die "labwc-session wrapper lost the managed dbus activation contract"
+    }
+
+    [[ -f "$session_autostart" ]] || {
+      die "missing labwc autostart script for managed dbus activation handoff: $session_autostart"
+    }
+
+    grep -F "dbus-update-activation-environment" "$session_autostart" >/dev/null || {
+      die "labwc autostart lost dbus activation-environment handoff"
+    }
   fi
 }
 
