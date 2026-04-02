@@ -225,6 +225,7 @@ phase_doctor() {
   require_command mv
   require_command python3
   require_command useradd
+  require_command usermod
 }
 
 phase_detect() {

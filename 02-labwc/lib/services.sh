@@ -17,6 +17,31 @@ ensure_greeter_user() {
     greeter
 }
 
+greeter_access_groups() {
+  local group_name
+  for group_name in seat video render input audio; do
+    getent group "$group_name" >/dev/null 2>&1 || continue
+    printf '%s\n' "$group_name"
+  done
+}
+
+ensure_greeter_access_groups() {
+  local group_csv=""
+  local group_name
+
+  while IFS= read -r group_name; do
+    [[ -n "$group_name" ]] || continue
+    if [[ -n "$group_csv" ]]; then
+      group_csv+=",${group_name}"
+    else
+      group_csv="$group_name"
+    fi
+  done < <(greeter_access_groups)
+
+  [[ -n "$group_csv" ]] || return 0
+  run_cmd usermod -a -G "$group_csv" greeter
+}
+
 ensure_greeter_runtime_dirs() {
   run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/greetd/greeter
   run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/greetd/greeter/.cache
@@ -343,6 +368,7 @@ install_regreet_files() {
 install_root_files() {
   validate_greetd_vt
   ensure_greeter_user
+  ensure_greeter_access_groups
   ensure_greeter_runtime_dirs
   remove_regreet_support_files
   install_regreet_files
