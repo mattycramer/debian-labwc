@@ -2,7 +2,3 @@
 set -eu
 IFS='
 	'
-
-if command -v swaybg >/dev/null 2>&1; then
-  /usr/bin/swaybg -i "@REGREET_BACKGROUND_PATH@" -m fill >/dev/null 2>&1 &
-fi

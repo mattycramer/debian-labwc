@@ -2,6 +2,10 @@
 XCURSOR_THEME = "@XCURSOR_THEME@"
 XCURSOR_SIZE = "@XCURSOR_SIZE@"
 
+[background]
+path = "@REGREET_BACKGROUND_PATH@"
+fit = "Cover"
+
 [GTK]
 cursor_theme_name = "@XCURSOR_THEME@"
 cursor_blink = false

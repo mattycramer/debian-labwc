@@ -146,8 +146,8 @@ verify_labwc_session_compatibility() {
     grep -F 'DBUS_SESSION_BUS_ADDRESS=' "$session_entry" >/dev/null || {
       die "labwc session entrypoint lost broker-backed user-bus export"
     }
-    grep -F 'dbus-run-session' "$session_entry" >/dev/null || {
-      die "labwc session entrypoint lost dbus-run-session fallback"
+    grep -F 'refusing to fall back to dbus-run-session' "$session_entry" >/dev/null || {
+      die "labwc session entrypoint lost the broker-only no-fallback contract"
     }
 
     [[ -f "$session_desktop" ]] || die "missing labwc desktop session file: $session_desktop"

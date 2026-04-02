@@ -265,7 +265,6 @@ phase_release_doctor() {
 phase_enable() {
   log_info "phase: enable"
   phase_doctor
-  require_command dbus-run-session
   require_command runuser
   require_command gpg
   require_command gpgconf

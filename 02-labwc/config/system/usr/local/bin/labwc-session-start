@@ -28,7 +28,7 @@ broker_user_bus_ready() {
 
 wait_for_broker_user_bus() {
   attempt=1
-  while [ "$attempt" -le 5 ]; do
+  while [ "$attempt" -le 15 ]; do
     if broker_user_bus_ready; then
       return 0
     fi
@@ -50,5 +50,5 @@ if wait_for_broker_user_bus; then
   exec /usr/local/bin/labwc-session
 fi
 
-clear_session_bus_environment
-exec /usr/bin/dbus-run-session -- /usr/bin/env LABWC_SESSION_BUS_MODE=private /usr/local/bin/labwc-session
+printf '%s\n' "ERROR: systemd user bus did not appear at ${runtime_bus_path:-unknown}; refusing to fall back to dbus-run-session" >&2
+exit 1
