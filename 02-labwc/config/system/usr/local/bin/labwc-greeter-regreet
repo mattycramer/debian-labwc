@@ -3,6 +3,10 @@ set -eu
 
 export GDK_BACKEND=wayland
 export LIBSEAT_BACKEND=logind
+export XDG_SESSION_TYPE=wayland
+export XDG_CURRENT_DESKTOP=labwc:wlroots
+export XDG_SESSION_DESKTOP=labwc
+export DESKTOP_SESSION=labwc
 export GTK_USE_PORTAL=0
 export GDK_DEBUG=no-portals
 export GTK_A11Y=none

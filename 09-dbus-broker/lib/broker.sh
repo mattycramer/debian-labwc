@@ -381,6 +381,7 @@ enable_broker_runtime() {
   require_file "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-launch"
   require_file "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker"
 
+  install_session_service_aliases
   run_cmd systemctl daemon-reload
   reload_user_manager_if_reachable
   system_fragment="$(systemctl show -p FragmentPath --value dbus.service 2>/dev/null || true)"
