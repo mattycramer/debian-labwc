@@ -37,6 +37,7 @@ readonly SID_PACKAGES=(
   pipewire
   pipewire-audio
   pipewire-pulse
+  libspa-0.2-bluetooth
   libspa-0.2-libcamera
   wireplumber
   rtkit
@@ -79,7 +80,9 @@ readonly SID_PACKAGES=(
   upower
   power-profiles-daemon
   network-manager
+  network-manager-dispatcher
   network-manager-tui
+  bluez
   fonts-font-awesome
   fonts-noto
   fonts-noto-core

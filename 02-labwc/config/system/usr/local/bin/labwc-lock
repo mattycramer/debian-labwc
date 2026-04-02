@@ -9,11 +9,13 @@ fallback_wallpaper="@TARGET_HOME@/.local/share/labwc-session/${wallpaper_name}"
 wallpaper_path="$runtime_wallpaper"
 scaling_mode="${LABWC_WALLPAPER_MODE:-fill}"
 ready_fifo=""
+ready_dir=""
 ready_fd=""
 
 cleanup_ready_fifo() {
   [[ -n "$ready_fd" ]] && eval "exec ${ready_fd}<&-" || true
   [[ -n "$ready_fifo" ]] && rm -f -- "$ready_fifo" || true
+  [[ -n "$ready_dir" ]] && rm -rf -- "$ready_dir" || true
 }
 
 if [[ ! -r "$wallpaper_path" && -r "$fallback_wallpaper" ]]; then
@@ -25,7 +27,8 @@ if [[ ! -r "$wallpaper_path" ]]; then
   exit 1
 fi
 
-ready_fifo="$(mktemp -u "${XDG_RUNTIME_DIR:-/tmp}/labwc-swaylock-ready.XXXXXX")"
+ready_dir="$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/labwc-swaylock-ready.XXXXXX")"
+ready_fifo="${ready_dir}/ready"
 mkfifo -m 0600 "$ready_fifo"
 exec {ready_fd}<>"$ready_fifo"
 trap cleanup_ready_fifo EXIT

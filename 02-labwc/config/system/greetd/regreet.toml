@@ -9,8 +9,8 @@ font_name = "Noto Sans 13"
 theme_name = "Adwaita"
 
 [commands]
-reboot = ["/usr/sbin/reboot"]
-poweroff = ["/usr/sbin/poweroff"]
+reboot = ["loginctl", "reboot"]
+poweroff = ["loginctl", "poweroff"]
 
 [appearance]
 greeting_msg = "Debian Labwc"

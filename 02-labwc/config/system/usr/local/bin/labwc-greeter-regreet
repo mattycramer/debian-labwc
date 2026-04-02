@@ -1,50 +1,6 @@
 #!/bin/sh
 set -eu
 
-clear_session_bus_environment() {
-  unset DBUS_SESSION_BUS_ADDRESS
-  unset DBUS_SESSION_BUS_PID
-  unset DBUS_SESSION_BUS_WINDOWID
-  unset DBUS_STARTER_ADDRESS
-  unset DBUS_STARTER_BUS_TYPE
-}
-
-wait_for_pid_exit() {
-  wait_pid="$1"
-  wait_attempt=1
-  while [ "$wait_attempt" -le 10 ]; do
-    if ! kill -0 "$wait_pid" 2>/dev/null; then
-      return 0
-    fi
-    sleep 1
-    wait_attempt=$((wait_attempt + 1))
-  done
-  return 1
-}
-
-terminate_greeter_compositor() {
-  compositor_pid="${LABWC_PID:-}"
-  case "$compositor_pid" in
-    ''|*[!0-9]*)
-      printf '%s\n' "ERROR: LABWC_PID is not available for greeter compositor shutdown." >&2
-      return 1
-      ;;
-  esac
-
-  kill -TERM "$compositor_pid"
-  if wait_for_pid_exit "$compositor_pid"; then
-    return 0
-  fi
-
-  kill -KILL "$compositor_pid"
-  if wait_for_pid_exit "$compositor_pid"; then
-    return 0
-  fi
-
-  printf '%s\n' "ERROR: Failed to stop greeter compositor PID ${compositor_pid}." >&2
-  return 1
-}
-
 export GDK_BACKEND=wayland
 export LIBSEAT_BACKEND=logind
 export GTK_USE_PORTAL=0
@@ -53,9 +9,4 @@ export GTK_A11Y=none
 export NO_AT_BRIDGE=1
 export XCURSOR_THEME="@XCURSOR_THEME@"
 export XCURSOR_SIZE="@XCURSOR_SIZE@"
-
-status=0
-/usr/local/bin/regreet --config /etc/greetd/regreet.toml --style /etc/greetd/regreet.css || status=$?
-clear_session_bus_environment
-terminate_greeter_compositor
-exit "$status"
+exec /usr/local/bin/regreet --config /etc/greetd/regreet.toml --style /etc/greetd/regreet.css

@@ -340,6 +340,7 @@ install_regreet_release() {
   [[ -f "$extracted_path" ]] || die "regreet tarball did not extract an executable file at '$extracted_path'"
   [[ -x "$extracted_path" ]] || die "regreet tarball did not extract an executable binary at '$extracted_path'"
   run_cmd install -D -m 0755 "$extracted_path" "$(regreet_binary_path)"
+  assert_release_binary_dependencies "$(regreet_binary_path)" "regreet"
   "$(regreet_binary_path)" --version >/dev/null 2>&1 || die "installed regreet binary failed the --version self-test"
   trap - RETURN
   run_cmd rm -rf -- "$tmpdir"
@@ -490,6 +491,12 @@ enable_system_services_only() {
   run_cmd systemctl enable switcheroo-control.service
   run_cmd systemctl enable udisks2.service
   run_cmd systemctl enable upower.service
+  if systemctl cat bluetooth.service >/dev/null 2>&1; then
+    run_cmd systemctl enable bluetooth.service
+    if ! systemctl is-active --quiet bluetooth.service >/dev/null 2>&1; then
+      run_cmd systemctl start bluetooth.service
+    fi
+  fi
 }
 
 enable_all_services() {
