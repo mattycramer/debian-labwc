@@ -3,7 +3,7 @@ vt = @GREETD_VT@
 switch = true
 
 [general]
-source_profile = true
+source_profile = false
 
 [default_session]
 command = "/usr/bin/dbus-run-session -- /usr/bin/env HOME=/var/lib/greetd/greeter USER=greeter LOGNAME=greeter XDG_CACHE_HOME=/var/lib/greetd/greeter/.cache XDG_CONFIG_HOME=/var/lib/greetd/greeter/.config XDG_DATA_HOME=/var/lib/greetd/greeter/.local/share XDG_STATE_HOME=/var/lib/greetd/greeter/.local/state GDK_BACKEND=wayland LIBSEAT_BACKEND=logind LABWC_UPDATE_ACTIVATION_ENV=0 XCURSOR_THEME=@XCURSOR_THEME@ XCURSOR_SIZE=@XCURSOR_SIZE@ /usr/bin/labwc -C /etc/labwc-greeter"

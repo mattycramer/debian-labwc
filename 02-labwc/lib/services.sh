@@ -374,6 +374,7 @@ install_root_files() {
   ensure_greeter_runtime_dirs
   remove_regreet_support_files
   install_regreet_files
+  render_template_to_file "$(config_system_template_path "pam.d/greetd")" "/etc/pam.d/greetd" 0644
   render_template_to_file "$(config_system_template_path "usr/share/wayland-sessions/labwc.desktop")" "/usr/share/wayland-sessions/labwc.desktop" 0644
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-session-start")" "/usr/local/bin/labwc-session-start" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-session")" "/usr/local/bin/labwc-session" 0755
@@ -580,6 +581,7 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/labwc-workspace-status"
   remove_if_present "$(regreet_binary_path)"
   remove_if_present "/usr/share/wayland-sessions/labwc.desktop"
+  remove_if_present "/etc/pam.d/greetd"
   remove_if_present "/etc/greetd/config.toml"
   remove_if_present "$(regreet_config_path)"
   remove_if_present "$(regreet_css_path)"
