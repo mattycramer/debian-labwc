@@ -49,6 +49,8 @@ ensure_greeter_runtime_dirs() {
   run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/greetd/greeter/.local
   run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/greetd/greeter/.local/state
   run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/greetd/greeter/.local/share
+  run_cmd install -d -m 0750 -o greeter -g greeter /var/log/regreet
+  run_cmd install -D -m 0640 -o greeter -g greeter /dev/null /var/log/regreet/log
 }
 
 validate_greetd_vt() {
@@ -604,6 +606,7 @@ nuke_all_state() {
 
   log_info "removing greeter cache and greeter user"
   remove_if_present "/var/lib/greetd/greeter"
+  remove_if_present "/var/log/regreet"
   if getent passwd greeter >/dev/null 2>&1; then
     userdel greeter >/dev/null 2>&1 || true
   fi
