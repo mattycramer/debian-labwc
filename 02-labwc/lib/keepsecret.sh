@@ -10,7 +10,7 @@ readonly KEEPSECRET_MANIFEST_DIR="/var/lib/labwc-session"
 readonly KEEPSECRET_MANIFEST_PATH="${KEEPSECRET_MANIFEST_DIR}/keepsecret-install-manifest.txt"
 
 keepsecret_work_root() {
-  printf '%s-%s\n' "$KEEPSECRET_TMP_ROOT_PREFIX" "$LABWC_TARGET_USER"
+  printf '%s\n' "$KEEPSECRET_TMP_ROOT_PREFIX"
 }
 
 validate_keepsecret_settings() {

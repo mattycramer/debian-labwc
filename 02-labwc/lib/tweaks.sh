@@ -16,7 +16,7 @@ labwc_tweaks_cache_root() {
 }
 
 labwc_tweaks_work_root() {
-  printf '%s-%s\n' "$LABWC_TWEAKS_TMP_ROOT_PREFIX" "$LABWC_TARGET_USER"
+  printf '%s\n' "$LABWC_TWEAKS_TMP_ROOT_PREFIX"
 }
 
 validate_labwc_tweaks_settings() {
