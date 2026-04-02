@@ -179,10 +179,9 @@ generate_mount_unit_file() {
   local options="$4"
   local timeout="$5"
   local destination_path="$6"
-  local device_path device_unit requires_path
+  local device_path requires_path
 
   device_path="$(resolve_mount_device_path "$source")"
-  device_unit="$(device_unit_name_from_device_path "$device_path")"
   requires_path="$(dirname -- "$where")"
 
   cat >"$destination_path" <<EOF
@@ -191,8 +190,6 @@ generate_mount_unit_file() {
 Description=Local mount for $where
 Documentation=man:systemd.mount(5)
 ConditionPathExists=$device_path
-Wants=$device_unit
-After=$device_unit
 RequiresMountsFor=$requires_path
 
 [Mount]
@@ -209,10 +206,9 @@ generate_activation_service_file() {
   local source="$2"
   local mount_unit="$3"
   local destination_path="$4"
-  local device_path device_unit
+  local device_path
 
   device_path="$(resolve_mount_device_path "$source")"
-  device_unit="$(device_unit_name_from_device_path "$device_path")"
 
   cat >"$destination_path" <<EOF
 # Managed locally. Do not edit manually.
@@ -220,8 +216,6 @@ generate_activation_service_file() {
 Description=Activate the mount for $where when the device is present
 Documentation=man:systemd.path(5) man:systemd.service(5)
 ConditionPathExists=$device_path
-Wants=$device_unit
-After=$device_unit
 
 [Service]
 Type=oneshot

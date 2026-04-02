@@ -286,10 +286,6 @@ greeter_regreet_launcher_path() {
   printf '%s\n' "/usr/local/bin/labwc-greeter-regreet"
 }
 
-greeter_session_launcher_path() {
-  printf '%s\n' "/usr/local/bin/labwc-greeter-session-start"
-}
-
 greeter_labwc_config_dir() {
   printf '%s\n' "/etc/labwc-greeter"
 }
@@ -306,7 +302,6 @@ remove_regreet_support_files() {
   remove_if_present "$(regreet_binary_path)"
   remove_if_present "$(regreet_config_path)"
   remove_if_present "$(regreet_css_path)"
-  remove_if_present "$(greeter_session_launcher_path)"
   remove_if_present "$(greeter_regreet_launcher_path)"
   remove_if_present "$(greeter_labwc_config_dir)"
   remove_if_present "$(greeter_wallpaper_dir)"
@@ -368,7 +363,6 @@ install_regreet_files() {
   render_template_to_file "$(config_system_template_path "greetd/config.toml")" "/etc/greetd/config.toml" 0644
   render_template_to_file "$(config_system_template_path "greetd/regreet.toml")" "$(regreet_config_path)" 0644
   render_template_to_file "$(config_system_template_path "greetd/regreet.css")" "$(regreet_css_path)" 0644
-  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-greeter-session-start")" "$(greeter_session_launcher_path)" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-greeter-regreet")" "$(greeter_regreet_launcher_path)" 0755
   render_template_to_file "$(config_system_template_path "labwc-greeter/autostart")" "$(greeter_labwc_config_dir)/autostart" 0755
   render_template_to_file "$(config_system_template_path "labwc-greeter/rc.xml")" "$(greeter_labwc_config_dir)/rc.xml" 0644
@@ -489,6 +483,9 @@ enable_system_services_only() {
   run_cmd systemctl enable greetd.service
   run_cmd systemctl enable seatd.service
   run_cmd systemctl enable NetworkManager.service
+  if systemctl cat NetworkManager-dispatcher.service >/dev/null 2>&1; then
+    run_cmd systemctl enable NetworkManager-dispatcher.service
+  fi
   run_cmd systemctl enable "$(wireguard_import_service_name)"
   run_cmd systemctl enable labwc-vpn-default-off.service
   if ! systemctl is-active --quiet NetworkManager.service >/dev/null 2>&1; then
@@ -539,6 +536,7 @@ nuke_all_state() {
   remove_if_present "$LABWC_TARGET_HOME/.config/kanshi"
   remove_if_present "$LABWC_TARGET_HOME/.config/wofi"
   remove_if_present "$LABWC_TARGET_HOME/.config/mako"
+  remove_if_present "$LABWC_TARGET_HOME/.config/wireplumber"
   remove_if_present "$LABWC_TARGET_HOME/.config/fzf"
   remove_if_present "$LABWC_TARGET_HOME/.config/swaylock"
   remove_if_present "$LABWC_TARGET_HOME/.config/foot"
@@ -582,7 +580,6 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/labwc-vpnctl"
   remove_if_present "/usr/local/bin/labwc-wireguard-import"
   remove_if_present "/usr/local/bin/labwc-player-status"
-  remove_if_present "$(greeter_session_launcher_path)"
   remove_if_present "$(greeter_regreet_launcher_path)"
   remove_if_present "/usr/local/bin/thunar-open-archive"
   remove_if_present "/usr/local/bin/thunar-create-archive"

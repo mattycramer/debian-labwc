@@ -330,6 +330,10 @@ render_portals() {
   render_home_template_file ".config/xdg-desktop-portal/portals.conf"
 }
 
+render_wireplumber() {
+  render_home_template_file ".config/wireplumber/wireplumber.conf.d/10-disable-bluez-midi.conf"
+}
+
 install_wallpaper() {
   local wallpaper_source_path wallpaper_name
   run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.local/share/labwc-session"
@@ -359,6 +363,7 @@ render_all_configs() {
     "$config_root/swaylock" \
     "$config_root/foot" \
     "$config_root/gammastep" \
+    "$config_root/wireplumber/wireplumber.conf.d" \
     "$config_root/xdg-desktop-portal" \
     "$config_root/fontconfig" \
     "$config_root/labwc-session" \
@@ -398,6 +403,7 @@ render_all_configs() {
   render_foot
   render_kitty
   render_gammastep
+  render_wireplumber
   render_portals
   run_cmd chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.config" "$LABWC_TARGET_HOME/.local"
 }
