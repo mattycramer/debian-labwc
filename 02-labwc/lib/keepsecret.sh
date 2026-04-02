@@ -37,13 +37,13 @@ install_keepsecret() {
   extract_root="${work_root}/extract"
 
   [[ "$work_root" == /tmp/* ]] || die "keepsecret work root must stay under /tmp: $work_root"
+  remove_keepsecret_install
   remove_if_present "$work_root"
   run_cmd install -d -m 0755 "$work_root"
 
   log_info "installing keepsecret ${GITHUB_KEEPSECRET_TAG} (${GITHUB_KEEPSECRET_COMMIT_SHA})"
   download_release_tarball "keepsecret" "$GITHUB_KEEPSECRET_URL" "$GITHUB_KEEPSECRET_TARBALL_SHA" "$tarball_path"
   extract_release_payload_tree "keepsecret" "$tarball_path" "usr/local" "$extract_root"
-  remove_keepsecret_install
   install_release_payload_tree "$extract_root" "$KEEPSECRET_MANIFEST_PATH"
   assert_release_binary_dependencies "$KEEPSECRET_BIN_PATH" "keepsecret"
   if command -v update-desktop-database >/dev/null 2>&1; then
