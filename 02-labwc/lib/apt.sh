@@ -80,7 +80,6 @@ readonly SID_PACKAGES=(
   upower
   power-profiles-daemon
   network-manager
-  network-manager-dispatcher
   network-manager-tui
   bluez
   fonts-font-awesome
