@@ -22,6 +22,7 @@ render_template_content() {
   local lock_wallpaper_path=""
   local lock_wallpaper_name=""
   local regreet_background_path=""
+  local intel_media_env=""
   local updates_script="$LABWC_TARGET_HOME/.config/waybar/scripts/pending-updates.sh"
   local upgrade_script="$LABWC_TARGET_HOME/.config/waybar/scripts/run-upgrades.sh"
   local gpu_launch_script="$LABWC_TARGET_HOME/.config/waybar/scripts/gpu-launch.sh"
@@ -41,6 +42,13 @@ render_template_content() {
   fi
   if declare -F regreet_wallpaper_target_path >/dev/null 2>&1; then
     regreet_background_path="$(regreet_wallpaper_target_path)"
+  fi
+  if [[ "${LABWC_HAS_INTEL_GPU:-no}" == "yes" ]]; then
+    intel_media_env="$(cat <<'EOF'
+LIBVA_DRIVER_NAME=iHD
+LIBVA_DRI_DRIVER_NAME=iHD
+EOF
+)"
   fi
 
   env \
@@ -68,6 +76,7 @@ render_template_content() {
     TEMPLATE_GPU_LAUNCH_SCRIPT="$gpu_launch_script" \
     TEMPLATE_KANSHI_INTERNAL_PROFILE="$kanshi_internal_profile" \
     TEMPLATE_KANSHI_EXTERNAL_CLAUSE="$kanshi_external_clause" \
+    TEMPLATE_INTEL_MEDIA_ENV="$intel_media_env" \
     TEMPLATE_GREETD_VT="${LABWC_GREETD_VT:-}" \
     TEMPLATE_SESSION_WRAPPER="/usr/local/bin/labwc-session" \
     TEMPLATE_WIREGUARD_PRIV_KEY="${WIREGUARD_PRIV_KEY:-}" \
@@ -111,6 +120,7 @@ replacements = {
     "@GPU_LAUNCH_SCRIPT@": os.environ.get("TEMPLATE_GPU_LAUNCH_SCRIPT", ""),
     "@KANSHI_INTERNAL_PROFILE@": os.environ.get("TEMPLATE_KANSHI_INTERNAL_PROFILE", ""),
     "@KANSHI_EXTERNAL_CLAUSE@": os.environ.get("TEMPLATE_KANSHI_EXTERNAL_CLAUSE", ""),
+    "@INTEL_MEDIA_ENV@": os.environ.get("TEMPLATE_INTEL_MEDIA_ENV", ""),
     "@GREETD_VT@": os.environ.get("TEMPLATE_GREETD_VT", ""),
     "@SESSION_WRAPPER@": os.environ.get("TEMPLATE_SESSION_WRAPPER", ""),
     "@WIREGUARD_PRIV_KEY@": os.environ.get("TEMPLATE_WIREGUARD_PRIV_KEY", ""),
