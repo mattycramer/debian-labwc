@@ -26,16 +26,29 @@ broker_user_bus_ready() {
       org.freedesktop.DBus.ListNames >/dev/null 2>&1
 }
 
+wait_for_broker_user_bus() {
+  attempt=1
+  while [ "$attempt" -le 5 ]; do
+    if broker_user_bus_ready; then
+      return 0
+    fi
+    sleep 1
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
+
 runtime_bus_path=""
 if [ -n "${XDG_RUNTIME_DIR:-}" ]; then
   runtime_bus_path="${XDG_RUNTIME_DIR}/bus"
 fi
 
-if broker_user_bus_ready; then
+if wait_for_broker_user_bus; then
   clear_session_bus_environment
+  export LABWC_SESSION_BUS_MODE=systemd
   export DBUS_SESSION_BUS_ADDRESS="unix:path=${runtime_bus_path}"
   exec /usr/local/bin/labwc-session
 fi
 
 clear_session_bus_environment
-exec /usr/bin/dbus-run-session -- /usr/local/bin/labwc-session
+exec /usr/bin/dbus-run-session -- /usr/bin/env LABWC_SESSION_BUS_MODE=private /usr/local/bin/labwc-session

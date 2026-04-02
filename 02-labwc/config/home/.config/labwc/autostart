@@ -67,17 +67,35 @@ update_dbus_activation_environment() {
   done
   [ -n "$dbus_vars" ] || return 0
 
+  systemd_user_env_ready() {
+    command -v /usr/bin/systemctl >/dev/null 2>&1 || return 1
+    /usr/bin/systemctl --user show-environment >/dev/null 2>&1
+  }
+
   while [ "$dbus_attempt" -le "$dbus_max_attempts" ]; do
-    # shellcheck disable=SC2086
-    if /usr/bin/dbus-update-activation-environment --systemd $dbus_vars >/dev/null 2>&1; then
-      return 0
+    if [ "${LABWC_SESSION_BUS_MODE:-}" = "private" ]; then
+      # shellcheck disable=SC2086
+      if /usr/bin/dbus-update-activation-environment $dbus_vars >/dev/null 2>&1; then
+        return 0
+      fi
+    else
+      if systemd_user_env_ready; then
+        # shellcheck disable=SC2086
+        if /usr/bin/dbus-update-activation-environment --systemd $dbus_vars >/dev/null 2>&1; then
+          return 0
+        fi
+      fi
+      # shellcheck disable=SC2086
+      if /usr/bin/dbus-update-activation-environment $dbus_vars >/dev/null 2>&1; then
+        return 0
+      fi
     fi
     sleep 1
     dbus_attempt=$((dbus_attempt + 1))
   done
 
-  printf '%s\n' "ERROR: dbus/systemd activation environment sync failed after ${dbus_max_attempts} attempts." >&2
-  return 1
+  printf '%s\n' "WARN: dbus activation environment sync failed after ${dbus_max_attempts} attempts." >&2
+  return 0
 }
 
 start_bg_once() {

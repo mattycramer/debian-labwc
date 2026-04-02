@@ -191,7 +191,7 @@ generate_mount_unit_file() {
 Description=Local mount for $where
 Documentation=man:systemd.mount(5)
 ConditionPathExists=$device_path
-BindsTo=$device_unit
+Wants=$device_unit
 After=$device_unit
 RequiresMountsFor=$requires_path
 
@@ -220,7 +220,7 @@ generate_activation_service_file() {
 Description=Activate the mount for $where when the device is present
 Documentation=man:systemd.path(5) man:systemd.service(5)
 ConditionPathExists=$device_path
-BindsTo=$device_unit
+Wants=$device_unit
 After=$device_unit
 
 [Service]
@@ -270,7 +270,7 @@ generate_ownership_service_file() {
 [Unit]
 Description=Local ownership fixup for $where
 Documentation=man:systemd.service(5)
-Requires=$mount_unit
+Wants=$mount_unit
 After=$mount_unit
 ConditionPathIsMountPoint=$where
 
