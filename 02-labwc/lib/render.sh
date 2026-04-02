@@ -296,7 +296,6 @@ EOF
     fi
   fi
 
-  local config
   KANSHI_INTERNAL_PROFILE="$internal_profile" \
   KANSHI_EXTERNAL_CLAUSE="$external_clause" \
     render_home_template_file ".config/kanshi/config"

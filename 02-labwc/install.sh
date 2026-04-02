@@ -25,6 +25,8 @@ source "$SCRIPT_DIR/lib/render.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/services.sh"
 # shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/release_payload.sh"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/tweaks.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/keepsecret.sh"
@@ -219,6 +221,8 @@ phase_doctor() {
   require_command lspci
   require_command getent
   require_command awk
+  require_command mktemp
+  require_command mv
   require_command python3
   require_command useradd
 }
@@ -246,17 +250,15 @@ phase_render() {
   render_all_configs
 }
 
-phase_build_doctor() {
-  require_command runuser
+phase_release_doctor() {
   require_command curl
   require_command tar
   require_command sha256sum
-  require_command cmake
-  require_command ctest
-  require_command gcc
-  require_command git
-  require_command ninja
-  require_command timeout
+  require_command mktemp
+  require_command find
+  require_command stat
+  require_command ldd
+  require_command grep
 }
 
 phase_enable() {
@@ -278,7 +280,7 @@ phase_enable() {
 phase_extras() {
   log_info "phase: extras"
   phase_doctor
-  phase_build_doctor
+  phase_release_doctor
   load_env_file
   install_labwc_tweaks
   install_keepsecret

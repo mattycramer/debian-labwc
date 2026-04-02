@@ -2,11 +2,6 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-run_gui() {
-  command -v "$1" >/dev/null 2>&1 || return 1
-  nohup "$@" >/dev/null 2>&1 &
-}
-
 run_terminal() {
   local title="$1"
   local command_string="$2"

@@ -12,7 +12,7 @@ help:
 	  '  render    Download, verify, extract, and install the pinned compiled release, unit overrides, and D-Bus compatibility aliases' \
 	  '  enable    Reload systemd and stage the managed broker units for next reboot/login without restarting the current buses' \
 	  '  verify    Verify provenance, installed files, unit overrides, compatibility aliases, and broker-backed or staged runtime state' \
-	  '  nuke      Remove managed unit overrides and unmanaged artifacts, keep package-owned files, then restart dbus.service' \
+	  '  nuke      Remove managed unit overrides and unmanaged artifacts, keep package-owned files, and stage fallback dbus.service units without restarting active buses' \
 	  '  print-env Show effective environment values and detected state in 09-dbus-broker/.env'
 
 doctor:

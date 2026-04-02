@@ -31,7 +31,13 @@ run_terminal() {
   local command_string="$2"
   if command -v foot >/dev/null 2>&1; then
     nohup foot -T "$title" -e bash -lc "$command_string" >/dev/null 2>&1 &
+    return 0
   fi
+  if command -v kitty >/dev/null 2>&1; then
+    nohup kitty --title "$title" bash -lc "$command_string" >/dev/null 2>&1 &
+    return 0
+  fi
+  return 1
 }
 
 open_network_settings() {
@@ -194,7 +200,7 @@ case "$category:$action" in
     case "$selection" in
       "Open disk usage") run_terminal "Storage" 'exec ncdu /' ;;
       "Browse files") run_gui thunar ;;
-      "Filesystem details") run_terminal "Storage" 'df -h / "$HOME"; printf "\n"; lsblk -o NAME,FSTYPE,SIZE,TYPE,MOUNTPOINT; printf "\nPress Enter to close..."; read -r _' ;;
+      "Filesystem details") run_terminal "Storage" "df -h / \"\$HOME\"; printf \"\\n\"; lsblk -o NAME,FSTYPE,SIZE,TYPE,MOUNTPOINT; printf \"\\nPress Enter to close...\"; read -r _" ;;
       *) exit 0 ;;
     esac
     ;;

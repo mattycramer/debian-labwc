@@ -7,6 +7,17 @@ fi
 
 readonly DBUS_BROKER_SESSION_SERVICE_ALIAS_DIR="/usr/local/share/dbus-1/services"
 
+github_api_json() {
+  local url="$1"
+  retry_cmd 3 curl --fail --location --max-time 30 --silent --show-error "$url"
+}
+
+github_json_field() {
+  local json_input="$1"
+  local python_code="$2"
+  printf '%s' "$json_input" | python3 -c "$python_code" 2>/dev/null || true
+}
+
 init_broker_runtime_paths() {
   local tarball_name
   tarball_name="$(basename -- "$DBUS_BROKER_TARBALL_URL")"
@@ -41,8 +52,6 @@ validate_env_settings() {
   require_path_prefix "DBUS_BROKER_USER_UNIT_PATH" "$DBUS_BROKER_USER_UNIT_PATH" "/etc/systemd/user"
   require_path_prefix "DBUS_BROKER_STATE_DIR" "$DBUS_BROKER_STATE_DIR" "/var/lib"
   require_path_prefix "DBUS_BROKER_TMP_DIR" "$DBUS_BROKER_TMP_DIR" "/tmp"
-
-  require_yes_no "DBUS_BROKER_RESTART_USER_BUS_IF_ACTIVE" "$DBUS_BROKER_RESTART_USER_BUS_IF_ACTIVE"
 
   [[ "$DBUS_BROKER_TARBALL_URL" == *.tar.gz ]] || die "DBUS_BROKER_TARBALL_URL must point to a .tar.gz asset"
   [[ "$DBUS_BROKER_TARBALL_URL" == *"/${DBUS_BROKER_TAG}/"* ]] || die "DBUS_BROKER_TARBALL_URL must include DBUS_BROKER_TAG in release path"
@@ -166,19 +175,35 @@ install_session_service_aliases() {
 }
 
 verify_release_tag_commit() {
-  local owner repo ref_api release_api release_json ref_json asset_name digest
+  local owner repo ref_api tag_api release_api release_json ref_json tag_json asset_name digest
+  local object_type object_sha ref_commit tag_depth
   owner="$(printf '%s' "$DBUS_BROKER_TARBALL_URL" | awk -F/ '{print $4}')"
   repo="$(printf '%s' "$DBUS_BROKER_TARBALL_URL" | awk -F/ '{print $5}')"
   [[ -n "$owner" && -n "$repo" ]] || die "could not derive github owner/repo from DBUS_BROKER_TARBALL_URL"
 
   ref_api="https://api.github.com/repos/${owner}/${repo}/git/ref/tags/${DBUS_BROKER_TAG}"
   release_api="https://api.github.com/repos/${owner}/${repo}/releases/tags/${DBUS_BROKER_TAG}"
-  ref_json="$(retry_cmd 3 curl --fail --location --max-time 30 --silent --show-error "$ref_api")" || die "failed to resolve git tag ref from GitHub API"
-  release_json="$(retry_cmd 3 curl --fail --location --max-time 30 --silent --show-error "$release_api")" || die "failed to resolve release metadata from GitHub API"
+  ref_json="$(github_api_json "$ref_api")" || die "failed to resolve git tag ref from GitHub API"
+  release_json="$(github_api_json "$release_api")" || die "failed to resolve release metadata from GitHub API"
 
-  local ref_commit
-  ref_commit="$(printf '%s' "$ref_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["object"]["sha"])' 2>/dev/null || true)"
-  [[ -n "$ref_commit" ]] || die "could not parse git tag commit from GitHub API response"
+  object_type="$(github_json_field "$ref_json" 'import json,sys; print(json.load(sys.stdin)["object"]["type"])')"
+  object_sha="$(github_json_field "$ref_json" 'import json,sys; print(json.load(sys.stdin)["object"]["sha"])')"
+  [[ -n "$object_type" && -n "$object_sha" ]] || die "could not parse git tag object from GitHub API response"
+
+  ref_commit="$object_sha"
+  tag_depth=0
+  while [[ "$object_type" == "tag" ]]; do
+    tag_api="https://api.github.com/repos/${owner}/${repo}/git/tags/${object_sha}"
+    tag_json="$(github_api_json "$tag_api")" || die "failed to resolve annotated git tag object from GitHub API"
+    object_type="$(github_json_field "$tag_json" 'import json,sys; print(json.load(sys.stdin)["object"]["type"])')"
+    object_sha="$(github_json_field "$tag_json" 'import json,sys; print(json.load(sys.stdin)["object"]["sha"])')"
+    [[ -n "$object_type" && -n "$object_sha" ]] || die "could not parse annotated git tag object from GitHub API response"
+    ref_commit="$object_sha"
+    tag_depth=$((tag_depth + 1))
+    ((tag_depth <= 4)) || die "git tag resolution exceeded maximum depth while resolving '$DBUS_BROKER_TAG'"
+  done
+
+  [[ "$object_type" == "commit" ]] || die "git tag '$DBUS_BROKER_TAG' did not resolve to a commit object, found '$object_type'"
   [[ "$ref_commit" == "$DBUS_BROKER_COMMIT_SHA" ]] || die "tag commit mismatch: expected '$DBUS_BROKER_COMMIT_SHA', got '$ref_commit'"
 
   asset_name="$(basename -- "$DBUS_BROKER_TARBALL_URL")"
@@ -415,14 +440,11 @@ remove_broker_install() {
   run_cmd rmdir --ignore-fail-on-non-empty "$DBUS_BROKER_STATE_DIR" >/dev/null 2>&1 || true
 
   run_cmd systemctl daemon-reload
+  reload_user_manager_if_reachable
   fallback_fragment="$(systemctl show -p FragmentPath --value dbus.service 2>/dev/null || true)"
   [[ -n "$fallback_fragment" && -f "$fallback_fragment" ]] || die "no fallback dbus.service fragment is available after removing managed override"
-  run_cmd systemctl restart dbus.service
-  if [[ "$DBUS_BROKER_RESTART_USER_BUS_IF_ACTIVE" == "yes" ]]; then
-    runuser -u "$DBUS_BROKER_TARGET_USER" -- systemctl --user daemon-reload >/dev/null 2>&1 || true
-    runuser -u "$DBUS_BROKER_TARGET_USER" -- systemctl --user restart dbus.service >/dev/null 2>&1 || true
-  fi
   run_cmd journalctl --update-catalog >/dev/null 2>&1 || true
+  log_info "managed dbus-broker overrides removed; fallback dbus.service units are staged for next reboot/login or a later controlled dbus.service restart"
 }
 
 print_env_redacted() {

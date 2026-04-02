@@ -91,7 +91,7 @@ disconnect_managed_profiles() {
 }
 
 restore_regular_networking() {
-  local device_name device_type device_state device_connection
+  local device_name device_type device_state _
 
   nmcli networking on >/dev/null 2>&1 || true
 
@@ -99,7 +99,7 @@ restore_regular_networking() {
     return 0
   fi
 
-  while IFS=: read -r device_name device_type device_state device_connection; do
+  while IFS=: read -r device_name device_type device_state _; do
     [[ -n "$device_name" ]] || continue
     case "$device_type" in
       ethernet|wifi)

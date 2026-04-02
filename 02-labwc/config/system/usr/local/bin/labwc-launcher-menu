@@ -22,7 +22,13 @@ run_terminal() {
   local command_string="$2"
   if command -v foot >/dev/null 2>&1; then
     nohup foot -T "$title" -e bash -lc "$command_string" >/dev/null 2>&1 &
+    return 0
   fi
+  if command -v kitty >/dev/null 2>&1; then
+    nohup kitty --title "$title" bash -lc "$command_string" >/dev/null 2>&1 &
+    return 0
+  fi
+  return 1
 }
 
 entries=(
@@ -65,7 +71,7 @@ selection="$(choose "Launch" "${entries[@]}")"
 
 case "$selection" in
   "Applications") exec wofi --show drun ;;
-  "Terminal") run_terminal "Terminal" 'exec "${SHELL:-/bin/bash}"' ;;
+  "Terminal") run_terminal "Terminal" "exec \"\${SHELL:-/bin/bash}\"" ;;
   "Kitty") run_gui kitty ;;
   "Files") run_gui thunar ;;
   "Browser") run_gui thorium-browser ;;

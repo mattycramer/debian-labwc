@@ -39,11 +39,7 @@ write_autogen_block() {
 
   temp_file="$(mktemp "$(dirname "$env_file")/.env.tmp.XXXXXX")"
   block_file="$(mktemp "$(dirname "$env_file")/.env.block.XXXXXX")"
-
-  cleanup_detect_temp_files() {
-    rm -f -- "${temp_file:-}" "${block_file:-}"
-  }
-  trap cleanup_detect_temp_files RETURN
+  trap 'rm -f -- "${temp_file:-}" "${block_file:-}"' RETURN
 
   cat >"$block_file" <<EOF
 $AUTOGEN_BEGIN

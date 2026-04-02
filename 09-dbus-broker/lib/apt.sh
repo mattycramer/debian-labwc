@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
 readonly SID_SUITE="sid"
+readonly SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
+readonly SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
+readonly DEBIAN_ARCHIVE_KEYRING_PATH="/usr/share/keyrings/debian-archive-keyring.gpg"
 
 readonly DBUS_RUNTIME_PACKAGES=(
   ca-certificates
@@ -39,6 +42,12 @@ apt_yes_args() {
 apt_update() {
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
     apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o DPkg::Lock::Timeout=60
+}
+
+require_sid_repository() {
+  [[ -f "$DEBIAN_ARCHIVE_KEYRING_PATH" ]] || die "missing Debian archive keyring: $DEBIAN_ARCHIVE_KEYRING_PATH"
+  [[ -f "$SID_SOURCE_PATH" ]] || die "missing Debian sid source file: $SID_SOURCE_PATH; run 'make sid' in 00-system first"
+  [[ -f "$SID_PREFERENCES_PATH" ]] || die "missing Debian sid preferences file: $SID_PREFERENCES_PATH; run 'make sid' in 00-system first"
 }
 
 install_dbus_runtime_packages() {

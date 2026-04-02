@@ -129,7 +129,7 @@ render_wireguard_profile_file() {
 }
 
 stage_wireguard_profiles() {
-  local import_dir profile_name profile_label profile_flag rendered_path
+  local import_dir profile_name rendered_path
   import_dir="$(wireguard_import_dir)"
 
   if [[ -n "${WIREGUARD_PRIV_KEY:-}" ]] && declare -F validate_wireguard_private_key >/dev/null 2>&1; then
@@ -139,7 +139,7 @@ stage_wireguard_profiles() {
   run_cmd install -d -m 0700 "$import_dir"
   run_cmd find "$import_dir" -maxdepth 1 -type f -name '*.conf' -delete
 
-  while IFS='|' read -r profile_name profile_label profile_flag; do
+  while IFS='|' read -r profile_name _ _; do
     [[ -n "$profile_name" ]] || continue
     rendered_path="${import_dir}/${profile_name}.conf"
     render_wireguard_profile_file "$profile_name" "$rendered_path"
@@ -158,20 +158,16 @@ refresh_user_font_cache() {
   local cache_home="$LABWC_TARGET_HOME/.cache"
   local cache_dir="${cache_home}/fontconfig"
   local user_fonts_dir="$LABWC_TARGET_HOME/.local/share/fonts"
-  local legacy_fonts_dir="$LABWC_TARGET_HOME/.fonts"
   local -a font_dirs=()
 
   if [[ -d "$user_fonts_dir" ]]; then
     font_dirs+=("$user_fonts_dir")
   fi
-  if [[ -d "$legacy_fonts_dir" ]]; then
-    font_dirs+=("$legacy_fonts_dir")
-  fi
 
   run_cmd install -d -m 0700 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$cache_home" "$cache_dir"
 
   if ((${#font_dirs[@]} == 0)); then
-    log_info "rendered $LABWC_TARGET_HOME/.config/fontconfig/fonts.conf; no user font directories under $user_fonts_dir or $legacy_fonts_dir, so only the system font cache was refreshed"
+    log_info "rendered $LABWC_TARGET_HOME/.config/fontconfig/fonts.conf; no user font directory exists under $user_fonts_dir, so only the system font cache was refreshed"
     return 0
   fi
 
@@ -208,8 +204,8 @@ validate_user_fontconfig() {
 }
 
 remove_managed_wireguard_profiles() {
-  local profile_name profile_label profile_flag
-  while IFS='|' read -r profile_name profile_label profile_flag; do
+  local profile_name _
+  while IFS='|' read -r profile_name _; do
     [[ -n "$profile_name" ]] || continue
     nmcli connection delete id "$profile_name" >/dev/null 2>&1 || true
   done < <(wireguard_profile_specs)
@@ -464,7 +460,6 @@ enable_system_services_only() {
   run_cmd systemctl enable switcheroo-control.service
   run_cmd systemctl enable udisks2.service
   run_cmd systemctl enable upower.service
-  run_cmd systemctl restart polkit.service >/dev/null 2>&1 || true
 }
 
 enable_all_services() {

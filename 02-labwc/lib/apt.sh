@@ -4,7 +4,6 @@ readonly SID_SUITE="sid"
 readonly SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
 readonly SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
 readonly DEBIAN_ARCHIVE_KEYRING_PATH="/usr/share/keyrings/debian-archive-keyring.gpg"
-readonly SID_REPO_URI="https://deb.debian.org/debian"
 readonly SID_PACKAGES=(
   labwc
   kanshi
@@ -32,6 +31,8 @@ readonly SID_PACKAGES=(
   ffmpegthumbnailer
   nnn
   nano
+  ca-certificates
+  curl
   librsvg2-common
   pipewire
   pipewire-audio
@@ -40,7 +41,6 @@ readonly SID_PACKAGES=(
   wireplumber
   rtkit
   dbus-user-session
-  at-spi2-core
   libgtk-4-1
   greetd
   gammastep
@@ -132,41 +132,6 @@ readonly GRAPHICS_PACKAGES=(
   libvulkan1
 )
 
-readonly TWEAKS_BUILD_PACKAGES=(
-  build-essential
-  cmake
-  git
-  libglib2.0-dev
-  libxkbcommon-dev
-  libxml2-dev
-  ninja-build
-  pkg-config
-)
-
-readonly TWEAKS_SID_PACKAGES=(
-  qt6-base-dev
-  qt6-base-dev-tools
-  qt6-declarative-dev
-  qt6-declarative-dev-tools
-  qt6-l10n-tools
-  qt6-svg-dev
-  qt6-tools-dev
-  qt6-tools-dev-tools
-)
-
-readonly KEEPSECRET_BUILD_PACKAGES=(
-  extra-cmake-modules
-  libkf6config-dev
-  libkf6coreaddons-dev
-  libkf6crash-dev
-  libkf6dbusaddons-dev
-  libkf6i18n-dev
-  libkf6itemmodels-dev
-  libkirigami-dev
-  kirigami-addons-dev
-  libsecret-1-dev
-)
-
 readonly INTEL_PACKAGES=(
   intel-media-va-driver
 )
@@ -215,50 +180,23 @@ resolved_graphics_packages() {
   fi
 }
 
-resolved_tweaks_build_packages() {
-  printf '%s\n' "${TWEAKS_BUILD_PACKAGES[@]}"
-}
-
-resolved_tweaks_sid_packages() {
-  printf '%s\n' "${TWEAKS_SID_PACKAGES[@]}"
-}
-
-resolved_keepsecret_build_packages() {
-  printf '%s\n' "${KEEPSECRET_BUILD_PACKAGES[@]}"
-}
-
 resolved_requested_packages() {
   resolved_sid_packages
   resolved_graphics_packages
-  resolved_tweaks_build_packages
-  resolved_tweaks_sid_packages
-  resolved_keepsecret_build_packages
 }
 
 install_requested_packages() {
   log_info "installing sid package set"
   local -a sid_package_list=()
   local -a graphics_package_list=()
-  local -a tweaks_build_package_list=()
-  local -a tweaks_sid_package_list=()
-  local -a keepsecret_build_package_list=()
   local -a all_package_list=()
   local -a apt_args=()
   mapfile -t all_package_list < <(resolved_requested_packages)
   ((${#all_package_list[@]} > 0)) || die "resolved package set is empty"
   mapfile -t sid_package_list < <(resolved_sid_packages)
   mapfile -t graphics_package_list < <(resolved_graphics_packages)
-  mapfile -t tweaks_build_package_list < <(resolved_tweaks_build_packages)
-  mapfile -t tweaks_sid_package_list < <(resolved_tweaks_sid_packages)
-  mapfile -t keepsecret_build_package_list < <(resolved_keepsecret_build_packages)
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${sid_package_list[@]}"
   log_info "installing graphics package set from sid"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${graphics_package_list[@]}"
-  log_info "installing generic build dependencies for labwc-tweaks source build from sid"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${tweaks_build_package_list[@]}"
-  log_info "installing Qt build dependencies for labwc-tweaks source build from sid"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${tweaks_sid_package_list[@]}"
-  log_info "installing keepsecret source build dependencies"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${keepsecret_build_package_list[@]}"
 }

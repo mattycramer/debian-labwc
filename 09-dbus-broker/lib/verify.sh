@@ -88,7 +88,7 @@ verify_system_runtime() {
   normalized_exe_path="$(normalize_runtime_exe_path "$exe_path")"
   case "$normalized_exe_path" in
     "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-launch")
-      ps -o comm= --ppid "$main_pid" | grep -Fx "dbus-broker" >/dev/null || die "dbus-broker worker process is not attached under dbus-broker-launch"
+      pgrep -P "$main_pid" -x dbus-broker >/dev/null 2>&1 || die "dbus-broker worker process is not attached under dbus-broker-launch"
       ;;
     */dbus-daemon)
       log_warn "system dbus.service is still running dbus-daemon; managed dbus-broker will apply after reboot or the next controlled dbus.service restart"

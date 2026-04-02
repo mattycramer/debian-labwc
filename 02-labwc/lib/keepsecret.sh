@@ -4,6 +4,7 @@ readonly KEEPSECRET_BIN_PATH="/usr/local/bin/keepsecret"
 readonly KEEPSECRET_DESKTOP_PATH="/usr/local/share/applications/org.kde.keepsecret.desktop"
 readonly KEEPSECRET_APPDATA_PATH="/usr/local/share/metainfo/org.kde.keepsecret.metainfo.xml"
 readonly KEEPSECRET_ICON_PATH="/usr/local/share/icons/hicolor/scalable/apps/org.kde.keepsecret.svg"
+readonly KEEPSECRET_LOGGING_CATEGORIES_PATH="/usr/local/share/qlogging-categories6/keepsecret.categories"
 readonly KEEPSECRET_TMP_ROOT_PREFIX="/tmp/labwc-keepsecret"
 readonly KEEPSECRET_MANIFEST_DIR="/var/lib/labwc-session"
 readonly KEEPSECRET_MANIFEST_PATH="${KEEPSECRET_MANIFEST_DIR}/keepsecret-install-manifest.txt"
@@ -12,106 +13,51 @@ keepsecret_work_root() {
   printf '%s-%s\n' "$KEEPSECRET_TMP_ROOT_PREFIX" "$LABWC_TARGET_USER"
 }
 
-keepsecret_source_dir() {
-  printf '%s/source\n' "$(keepsecret_work_root)"
-}
-
-keepsecret_build_dir() {
-  printf '%s/build\n' "$(keepsecret_work_root)"
-}
-
-prepare_keepsecret_work_root() {
-  local work_root
-  work_root="$(keepsecret_work_root)"
-  [[ "$work_root" == /tmp/* ]] || die "keepsecret work root must stay under /tmp: $work_root"
-  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$work_root"
-}
-
-keepsecret_package_installed() {
-  dpkg-query -W -f='${Status}\n' "$1" 2>/dev/null | grep -F "install ok installed" >/dev/null
-}
-
-require_keepsecret_build_prereqs() {
-  local pkg
-  local -a required_packages=(
-    extra-cmake-modules
-    qt6-base-dev
-    qt6-base-dev-tools
-    qt6-declarative-dev
-    qt6-declarative-dev-tools
-    qt6-l10n-tools
-    qt6-svg-dev
-    qt6-tools-dev
-    qt6-tools-dev-tools
-    libkf6config-dev
-    libkf6coreaddons-dev
-    libkf6crash-dev
-    libkf6dbusaddons-dev
-    libkf6i18n-dev
-    libkf6itemmodels-dev
-    libkirigami-dev
-    kirigami-addons-dev
-    libsecret-1-dev
-  )
-
-  for pkg in "${required_packages[@]}"; do
-    keepsecret_package_installed "$pkg" || die "missing package '$pkg'; rerun ./install.sh --phase packages before enabling keepsecret"
-  done
-}
-
-clone_keepsecret_source() {
-  local source_dir build_dir
-  source_dir="$(keepsecret_source_dir)"
-  build_dir="$(keepsecret_build_dir)"
-
-  [[ -n "${KEEPSECRET_GIT_URL:-}" ]] || die "KEEPSECRET_GIT_URL is required"
-  [[ "${KEEPSECRET_GIT_URL}" == https://* ]] || die "KEEPSECRET_GIT_URL must be an https URL"
-
-  prepare_keepsecret_work_root
-  run_target_user_command -- sh -c "rm -rf -- '$source_dir' '$build_dir'"
-  retry_cmd 6 run_target_user_command -- \
-    timeout 300 git -c http.version=HTTP/1.1 clone --depth 1 "$KEEPSECRET_GIT_URL" "$source_dir"
+validate_keepsecret_settings() {
+  [[ "${GITHUB_KEEPSECRET_TAG:-}" =~ ^[A-Za-z0-9._-]+$ ]] || {
+    die "GITHUB_KEEPSECRET_TAG must contain only alnum, dot, underscore, or dash, found '${GITHUB_KEEPSECRET_TAG:-}'"
+  }
+  [[ "${GITHUB_KEEPSECRET_URL:-}" =~ ^https://github\.com/[^/]+/[^/]+/releases/download/${GITHUB_KEEPSECRET_TAG}/[^/?#]+\.tar\.gz$ ]] || {
+    die "GITHUB_KEEPSECRET_URL must be a GitHub release tarball for tag '${GITHUB_KEEPSECRET_TAG}', found '${GITHUB_KEEPSECRET_URL:-}'"
+  }
+  [[ "${GITHUB_KEEPSECRET_TARBALL_SHA:-}" =~ ^[0-9a-f]{64}$ ]] || {
+    die "GITHUB_KEEPSECRET_TARBALL_SHA must be a 64 character lowercase hex sha256, found '${GITHUB_KEEPSECRET_TARBALL_SHA:-}'"
+  }
+  [[ "${GITHUB_KEEPSECRET_COMMIT_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || {
+    die "GITHUB_KEEPSECRET_COMMIT_SHA must be a 40 character lowercase hex commit sha, found '${GITHUB_KEEPSECRET_COMMIT_SHA:-}'"
+  }
 }
 
 install_keepsecret() {
-  local source_dir build_dir
-  source_dir="$(keepsecret_source_dir)"
-  build_dir="$(keepsecret_build_dir)"
+  local work_root tarball_path extract_root
 
-  require_keepsecret_build_prereqs
-  clone_keepsecret_source
+  validate_keepsecret_settings
+  work_root="$(keepsecret_work_root)"
+  tarball_path="${work_root}/keepsecret.tar.gz"
+  extract_root="${work_root}/extract"
 
-  run_target_user_command -- mkdir -p "$build_dir"
-  run_target_user_command -- cmake \
-    -S "$source_dir" \
-    -B "$build_dir" \
-    -G Ninja \
-    -D CMAKE_BUILD_TYPE=Release \
-    -D BUILD_TESTING=OFF \
-    -D CMAKE_INSTALL_PREFIX=/usr/local \
-    -W no-dev
-  run_target_user_command -- cmake --build "$build_dir" --verbose
-  run_cmd cmake --install "$build_dir"
-  [[ -f "$build_dir/install_manifest.txt" ]] || die "keepsecret install did not produce install_manifest.txt"
-  run_cmd install -d -m 0755 "$KEEPSECRET_MANIFEST_DIR"
-  run_cmd install -m 0644 "$build_dir/install_manifest.txt" "$KEEPSECRET_MANIFEST_PATH"
+  [[ "$work_root" == /tmp/* ]] || die "keepsecret work root must stay under /tmp: $work_root"
+  remove_if_present "$work_root"
+  run_cmd install -d -m 0755 "$work_root"
+
+  log_info "installing keepsecret ${GITHUB_KEEPSECRET_TAG} (${GITHUB_KEEPSECRET_COMMIT_SHA})"
+  download_release_tarball "keepsecret" "$GITHUB_KEEPSECRET_URL" "$GITHUB_KEEPSECRET_TARBALL_SHA" "$tarball_path"
+  extract_release_payload_tree "keepsecret" "$tarball_path" "usr/local" "$extract_root"
+  remove_keepsecret_install
+  install_release_payload_tree "$extract_root" "$KEEPSECRET_MANIFEST_PATH"
+  assert_release_binary_dependencies "$KEEPSECRET_BIN_PATH" "keepsecret"
   if command -v update-desktop-database >/dev/null 2>&1; then
     run_cmd update-desktop-database /usr/local/share/applications >/dev/null 2>&1 || true
   fi
+  remove_if_present "$work_root"
 }
 
 remove_keepsecret_install() {
-  if [[ -f "$KEEPSECRET_MANIFEST_PATH" ]]; then
-    while IFS= read -r installed_path; do
-      [[ -n "$installed_path" ]] || continue
-      remove_if_present "$installed_path"
-    done <"$KEEPSECRET_MANIFEST_PATH"
-  else
-    remove_if_present "$KEEPSECRET_BIN_PATH"
-    remove_if_present "$KEEPSECRET_DESKTOP_PATH"
-    remove_if_present "$KEEPSECRET_APPDATA_PATH"
-    remove_if_present "$KEEPSECRET_ICON_PATH"
-  fi
-  remove_if_present "$KEEPSECRET_MANIFEST_PATH"
+  remove_release_manifest_install "$KEEPSECRET_MANIFEST_PATH"
+  remove_if_present "$KEEPSECRET_BIN_PATH"
+  remove_if_present "$KEEPSECRET_DESKTOP_PATH"
+  remove_if_present "$KEEPSECRET_APPDATA_PATH"
+  remove_if_present "$KEEPSECRET_ICON_PATH"
+  remove_if_present "$KEEPSECRET_LOGGING_CATEGORIES_PATH"
   remove_if_present "$(keepsecret_work_root)"
 }

@@ -11,7 +11,7 @@ help:
 	  '  install     Run doctor, detect, packages, render, enable, extras' \
 	  '  render      Render configs from .env' \
 	  '  enable      Install root-owned files and enable services' \
-	  '  extras      Build and install optional network-fetched extras' \
+	  '  extras      Install optional pinned GitHub release extras' \
 	  '  reconfigure Run detect, render, enable' \
 	  '  print-env   Print effective env values' \
 	  '  nuke        Remove generated state and disable installed wiring'
