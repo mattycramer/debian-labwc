@@ -34,6 +34,29 @@ validate_labwc_tweaks_settings() {
   }
 }
 
+patch_labwc_tweaks_login_helper() {
+  local helper_path="$1"
+
+  require_file "$helper_path"
+  python3 - "$helper_path" <<'PY'
+from pathlib import Path
+import sys
+
+helper_path = Path(sys.argv[1])
+content = helper_path.read_text(encoding="utf-8")
+old = '  [[ "$value" =~ ^[[:alnum:]_.:+ -]+$ ]] || die "invalid GTK theme name: ${value}"\n'
+new = (
+    '  local theme_re=\'^[[:alnum:]_.:+ -]+$\'\n'
+    '  [[ "$value" =~ $theme_re ]] || die "invalid GTK theme name: ${value}"\n'
+)
+
+if old in content:
+    content = content.replace(old, new, 1)
+
+helper_path.write_text(content, encoding="utf-8")
+PY
+}
+
 install_labwc_tweaks() {
   local work_root tarball_path extract_root
 
@@ -52,7 +75,14 @@ install_labwc_tweaks() {
   remove_labwc_tweaks_install
   install_release_payload_tree "$extract_root" "$LABWC_TWEAKS_MANIFEST_PATH"
   assert_release_binary_dependencies "$LABWC_TWEAKS_BIN_PATH" "labwc-tweaks"
-  "$LABWC_TWEAKS_BIN_PATH" --version >/dev/null 2>&1 || die "installed labwc-tweaks binary failed the --version self-test"
+  require_file "$LABWC_TWEAKS_DESKTOP_PATH"
+  require_file "$LABWC_TWEAKS_APPDATA_PATH"
+  require_file "$LABWC_TWEAKS_ICON_PATH"
+  require_file "$LABWC_TWEAKS_POLICY_PATH"
+  require_dir "$LABWC_TWEAKS_DATA_DIR"
+  require_file "$LABWC_TWEAKS_LOGIN_HELPER_PATH"
+  patch_labwc_tweaks_login_helper "$LABWC_TWEAKS_LOGIN_HELPER_PATH"
+  bash -n "$LABWC_TWEAKS_LOGIN_HELPER_PATH"
   remove_if_present "$work_root"
 }
 
