@@ -128,8 +128,7 @@ readonly SID_PACKAGES=(
   pkgconf
   clang
   lld
-  cargo
-  rustc
+  rustup
   cmake
   ninja-build
   meson

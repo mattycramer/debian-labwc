@@ -26,6 +26,7 @@ readonly DBUS_RUNTIME_PACKAGES=(
   ninja-build
   pkgconf
   python3-docutils
+  rustup
   libapparmor1
   libexpat1
   libsystemd0

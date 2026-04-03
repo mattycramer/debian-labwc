@@ -61,9 +61,9 @@ verify_session_service_alias() {
   local alias_path="$1"
   local source_path="$2"
   [[ -f "$source_path" ]] || return 0
-  [[ -L "$alias_path" ]] || die "missing D-Bus compatibility alias: $alias_path"
-  [[ "$(readlink -f "$alias_path")" == "$(readlink -f "$source_path")" ]] || {
-    die "D-Bus compatibility alias '$alias_path' does not point at '$source_path'"
+  [[ -f "$alias_path" ]] || die "missing D-Bus compatibility service file: $alias_path"
+  cmp -s "$alias_path" "$source_path" || {
+    die "D-Bus compatibility service file '$alias_path' does not match '$source_path'"
   }
 }
 

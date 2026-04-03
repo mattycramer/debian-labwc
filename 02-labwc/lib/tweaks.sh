@@ -57,10 +57,11 @@ verify_labwc_tweaks_stage() {
 }
 
 install_labwc_tweaks() {
-  local work_root repo_dir build_dir stage_root provenance
+  local work_root repo_dir build_dir stage_root provenance log_path
 
   validate_labwc_tweaks_settings
-  work_root="$(fetch_source_checkout "labwc-tweaks" "$LABWC_TWEAKS_GIT_URL" "$LABWC_TWEAKS_COMMIT_SHA")"
+  log_path="$(build_log_path "labwc-tweaks-build")"
+  work_root="$(fetch_source_checkout "labwc-tweaks" "$LABWC_TWEAKS_GIT_URL" "$LABWC_TWEAKS_COMMIT_SHA" "$log_path")"
   repo_dir="$work_root/source"
   build_dir="$work_root/build"
   stage_root="$work_root/stage"
@@ -68,12 +69,12 @@ install_labwc_tweaks() {
   trap 'cleanup_source_checkout "$work_root"' RETURN
 
   log_info "building labwc-tweaks from ${LABWC_TWEAKS_COMMIT_SHA}"
-  run_cmd cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
+  run_logged_command "$log_path" cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
     -D CMAKE_BUILD_TYPE=Release \
     -D CMAKE_INSTALL_PREFIX=/usr \
     -W no-dev
-  run_cmd cmake --build "$build_dir" --verbose
-  run_cmd env DESTDIR="$stage_root" cmake --install "$build_dir" --prefix /usr
+  run_logged_command "$log_path" cmake --build "$build_dir" --verbose
+  run_logged_command "$log_path" env DESTDIR="$stage_root" cmake --install "$build_dir" --prefix /usr
   verify_labwc_tweaks_stage "$stage_root"
 
   remove_labwc_tweaks_install
@@ -92,6 +93,7 @@ install_labwc_tweaks() {
 LABWC_TWEAKS_GIT_URL="$LABWC_TWEAKS_GIT_URL"
 LABWC_TWEAKS_COMMIT_SHA="$LABWC_TWEAKS_COMMIT_SHA"
 LABWC_TWEAKS_PATCH_SERIES="patches/release/series"
+LABWC_TWEAKS_BUILD_LOG="$log_path"
 LABWC_TWEAKS_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 EOF
 )"

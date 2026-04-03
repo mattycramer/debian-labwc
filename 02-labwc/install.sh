@@ -232,9 +232,7 @@ phase_doctor() {
 
 phase_source_build_doctor() {
   require_command git
-  require_command curl
-  require_command cargo
-  require_command rustc
+  require_command rustup
   require_command cmake
   require_command ninja
   require_command pkg-config

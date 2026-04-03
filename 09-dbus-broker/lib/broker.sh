@@ -6,11 +6,47 @@ if ! declare -F retry_cmd >/dev/null 2>&1; then
 fi
 
 readonly DBUS_BROKER_SESSION_SERVICE_ALIAS_DIR="/usr/local/share/dbus-1/services"
+readonly DBUS_BROKER_BUILD_LOG_DIR="/var/log/labwc-build"
+
+dbus_broker_build_log_path() {
+  printf '%s/dbus-broker-build.log\n' "$DBUS_BROKER_BUILD_LOG_DIR"
+}
+
+prepare_build_log_dir() {
+  run_cmd install -d -m 0755 "$DBUS_BROKER_BUILD_LOG_DIR"
+}
+
+run_logged_command() {
+  local log_path="$1"
+  shift
+  local rc=0
+
+  prepare_build_log_dir
+  printf '[%s] CMD:' "$(timestamp)" >>"$log_path"
+  printf ' %q' "$@" >>"$log_path"
+  printf '\n' >>"$log_path"
+
+  if command -v tee >/dev/null 2>&1; then
+    set +e
+    "$@" 2>&1 | tee -a "$log_path"
+    rc=${PIPESTATUS[0]}
+    set -e
+  else
+    set +e
+    "$@" >>"$log_path" 2>&1
+    rc=$?
+    set -e
+  fi
+
+  if ((rc != 0)); then
+    printf '[%s] ERROR: command failed with exit status %s\n' "$(timestamp)" "$rc" >>"$log_path"
+  fi
+  return "$rc"
+}
 
 init_broker_runtime_paths() {
   DBUS_BROKER_BACKUP_DIR="${DBUS_BROKER_STATE_DIR%/}/backups"
-  DBUS_BROKER_CARGO_HOME="${DBUS_BROKER_STATE_DIR%/}/cargo"
-  DBUS_BROKER_RUSTUP_HOME="${DBUS_BROKER_STATE_DIR%/}/rustup"
+  DBUS_BROKER_TOOLCHAIN_BIN_DIR="${DBUS_BROKER_STATE_DIR%/}/toolchain-bin"
   DBUS_BROKER_LEGACY_PROVENANCE_PATH="${DBUS_BROKER_INSTALL_SHARE_DIR%/}/release.env"
   DBUS_BROKER_LEGACY_VERIFICATION_PATH="${DBUS_BROKER_INSTALL_SHARE_DIR%/}/release-verification.txt"
   DBUS_BROKER_BUILD_PROVENANCE_PATH="${DBUS_BROKER_INSTALL_SHARE_DIR%/}/source-build.env"
@@ -156,7 +192,7 @@ install_session_service_alias() {
   alias_path="$(dbus_service_alias_path "$alias_name")"
   backup_existing_path "$alias_path"
   run_cmd install -d -m 0755 "$DBUS_BROKER_SESSION_SERVICE_ALIAS_DIR"
-  run_cmd ln -sfn "$source_path" "$alias_path"
+  run_cmd install -m 0644 "$source_path" "$alias_path"
 }
 
 install_session_service_aliases() {
@@ -217,33 +253,30 @@ apply_patch_series_if_present() {
 
 ensure_rustup_toolchain() {
   local toolchain="$1"
-  local rustup_bin init_script
+  local cargo_bin rustc_bin
+  local log_path
 
   [[ "$toolchain" =~ ^nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || {
     die "DBUS_BROKER_RUST_TOOLCHAIN must be a dated nightly, found '$toolchain'"
   }
 
-  run_cmd install -d -m 0755 "$DBUS_BROKER_CARGO_HOME" "$DBUS_BROKER_RUSTUP_HOME"
-  rustup_bin="$DBUS_BROKER_CARGO_HOME/bin/rustup"
+  require_command rustup
+  log_path="$(dbus_broker_build_log_path)"
+  run_logged_command "$log_path" rustup toolchain install "$toolchain" --profile minimal
 
-  if [[ ! -x "$rustup_bin" ]]; then
-    init_script="$(mktemp "/tmp/dbus-broker-rustup.XXXXXX.sh")"
-    retry_cmd 3 curl --fail --location --max-time 180 --silent --show-error \
-      -o "$init_script" "https://sh.rustup.rs"
-    run_cmd chmod 0755 "$init_script"
-    run_cmd env CARGO_HOME="$DBUS_BROKER_CARGO_HOME" RUSTUP_HOME="$DBUS_BROKER_RUSTUP_HOME" sh "$init_script" -y --profile minimal --default-toolchain none
-    run_cmd rm -f -- "$init_script"
-  fi
+  cargo_bin="$(rustup which cargo --toolchain "$toolchain")"
+  rustc_bin="$(rustup which rustc --toolchain "$toolchain")"
+  require_file "$cargo_bin"
+  require_file "$rustc_bin"
 
-  run_cmd env CARGO_HOME="$DBUS_BROKER_CARGO_HOME" RUSTUP_HOME="$DBUS_BROKER_RUSTUP_HOME" "$rustup_bin" toolchain install "$toolchain" --profile minimal
+  run_cmd install -d -m 0755 "$DBUS_BROKER_TOOLCHAIN_BIN_DIR"
+  run_cmd ln -sfn "$cargo_bin" "$DBUS_BROKER_TOOLCHAIN_BIN_DIR/cargo"
+  run_cmd ln -sfn "$rustc_bin" "$DBUS_BROKER_TOOLCHAIN_BIN_DIR/rustc"
 }
 
 run_with_rust_toolchain() {
   env \
-    CARGO_HOME="$DBUS_BROKER_CARGO_HOME" \
-    RUSTUP_HOME="$DBUS_BROKER_RUSTUP_HOME" \
-    PATH="$DBUS_BROKER_CARGO_HOME/bin:$PATH" \
-    RUSTUP_TOOLCHAIN="$DBUS_BROKER_RUST_TOOLCHAIN" \
+    PATH="$DBUS_BROKER_TOOLCHAIN_BIN_DIR:$PATH" \
     "$@"
 }
 
@@ -346,16 +379,16 @@ prepare_source_build() {
   DBUS_BROKER_STAGE_DIR="$DBUS_BROKER_WORK_ROOT/stage"
   DBUS_BROKER_SUBPROJECTS_LOCK_PATH="$DBUS_BROKER_WORK_ROOT/subprojects.lock"
 
-  retry_cmd 3 git clone --quiet --filter=blob:none "$DBUS_BROKER_GIT_URL" "$DBUS_BROKER_REPO_DIR"
-  retry_cmd 3 git -C "$DBUS_BROKER_REPO_DIR" fetch --quiet --depth 1 origin "$DBUS_BROKER_COMMIT_SHA"
-  run_cmd git -C "$DBUS_BROKER_REPO_DIR" checkout --quiet --detach "$DBUS_BROKER_COMMIT_SHA"
+  retry_cmd 3 run_logged_command "$(dbus_broker_build_log_path)" git clone --quiet --filter=blob:none "$DBUS_BROKER_GIT_URL" "$DBUS_BROKER_REPO_DIR"
+  retry_cmd 3 run_logged_command "$(dbus_broker_build_log_path)" git -C "$DBUS_BROKER_REPO_DIR" fetch --quiet --depth 1 origin "$DBUS_BROKER_COMMIT_SHA"
+  run_logged_command "$(dbus_broker_build_log_path)" git -C "$DBUS_BROKER_REPO_DIR" checkout --quiet --detach "$DBUS_BROKER_COMMIT_SHA"
   verify_checkout_remote "$DBUS_BROKER_REPO_DIR" "$DBUS_BROKER_GIT_URL"
   [[ "$(git -C "$DBUS_BROKER_REPO_DIR" rev-parse HEAD)" == "$DBUS_BROKER_COMMIT_SHA" ]] || {
     die "dbus-broker checkout did not resolve to expected commit '$DBUS_BROKER_COMMIT_SHA'"
   }
   apply_patch_series_if_present "$DBUS_BROKER_REPO_DIR"
 
-  run_with_rust_toolchain bash -lc '
+  run_logged_command "$(dbus_broker_build_log_path)" env PATH="$DBUS_BROKER_TOOLCHAIN_BIN_DIR:$PATH" bash -lc '
     set -euo pipefail
     cd "$1"
     meson subprojects download
@@ -370,9 +403,9 @@ prepare_source_build() {
   done <"$meson_args_file"
   run_cmd rm -f -- "$meson_args_file"
 
-  run_with_rust_toolchain meson setup "$DBUS_BROKER_BUILD_DIR" "$DBUS_BROKER_REPO_DIR" "${meson_args[@]}"
-  run_with_rust_toolchain meson compile -C "$DBUS_BROKER_BUILD_DIR"
-  run_cmd env DESTDIR="$DBUS_BROKER_STAGE_DIR" meson install -C "$DBUS_BROKER_BUILD_DIR" --no-rebuild
+  run_logged_command "$(dbus_broker_build_log_path)" env PATH="$DBUS_BROKER_TOOLCHAIN_BIN_DIR:$PATH" meson setup "$DBUS_BROKER_BUILD_DIR" "$DBUS_BROKER_REPO_DIR" "${meson_args[@]}"
+  run_logged_command "$(dbus_broker_build_log_path)" env PATH="$DBUS_BROKER_TOOLCHAIN_BIN_DIR:$PATH" meson compile -C "$DBUS_BROKER_BUILD_DIR"
+  run_logged_command "$(dbus_broker_build_log_path)" env DESTDIR="$DBUS_BROKER_STAGE_DIR" PATH="$DBUS_BROKER_TOOLCHAIN_BIN_DIR:$PATH" meson install -C "$DBUS_BROKER_BUILD_DIR" --no-rebuild
   require_stage_layout "$DBUS_BROKER_STAGE_DIR"
   assert_stage_binary_dependencies "$DBUS_BROKER_STAGE_DIR"
 }
@@ -404,6 +437,7 @@ DBUS_BROKER_RUSTC_VERSION="$(run_with_rust_toolchain rustc --version)"
 DBUS_BROKER_CARGO_VERSION="$(run_with_rust_toolchain cargo --version)"
 DBUS_BROKER_MESON_VERSION="$(meson --version)"
 DBUS_BROKER_BINDGEN_VERSION="$(bindgen --version)"
+DBUS_BROKER_BUILD_LOG="$(dbus_broker_build_log_path)"
 DBUS_BROKER_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 EOF
 )"
@@ -533,8 +567,7 @@ remove_broker_install() {
     "$(dbus_service_alias_path "org.freedesktop.thumbnails.Thumbnailer1.service")")
 
   cleanup_build_workspace
-  remove_if_present "$DBUS_BROKER_CARGO_HOME"
-  remove_if_present "$DBUS_BROKER_RUSTUP_HOME"
+  remove_if_present "$DBUS_BROKER_TOOLCHAIN_BIN_DIR"
   remove_if_present "$DBUS_BROKER_BACKUP_DIR"
   run_cmd rmdir --ignore-fail-on-non-empty "$DBUS_BROKER_STATE_DIR" >/dev/null 2>&1 || true
 

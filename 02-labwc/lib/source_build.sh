@@ -1,6 +1,44 @@
 #!/usr/bin/env bash
 
 readonly LABWC_SOURCE_BUILD_STATE_DIR="/var/lib/labwc-session"
+readonly LABWC_BUILD_LOG_DIR="/var/log/labwc-build"
+
+prepare_build_log_dir() {
+  run_cmd install -d -m 0755 "$LABWC_BUILD_LOG_DIR"
+}
+
+build_log_path() {
+  local name="$1"
+  printf '%s/%s.log\n' "$LABWC_BUILD_LOG_DIR" "$name"
+}
+
+run_logged_command() {
+  local log_path="$1"
+  shift
+  local rc=0
+
+  prepare_build_log_dir
+  printf '[%s] CMD:' "$(timestamp)" >>"$log_path"
+  printf ' %q' "$@" >>"$log_path"
+  printf '\n' >>"$log_path"
+
+  if command -v tee >/dev/null 2>&1; then
+    set +e
+    "$@" 2>&1 | tee -a "$log_path"
+    rc=${PIPESTATUS[0]}
+    set -e
+  else
+    set +e
+    "$@" >>"$log_path" 2>&1
+    rc=$?
+    set -e
+  fi
+
+  if ((rc != 0)); then
+    printf '[%s] ERROR: command failed with exit status %s\n' "$(timestamp)" "$rc" >>"$log_path"
+  fi
+  return "$rc"
+}
 
 remove_manifest_install() {
   local manifest_path="$1"
@@ -129,6 +167,7 @@ fetch_source_checkout() {
   local repo_name="$1"
   local source_url="$2"
   local commit_sha="$3"
+  local log_path="${4:-}"
   local work_root repo_dir
 
   require_https_url "${repo_name} source url" "$source_url"
@@ -137,9 +176,15 @@ fetch_source_checkout() {
   work_root="$(mktemp -d "/tmp/${repo_name}.XXXXXX")"
   repo_dir="$work_root/source"
 
-  retry_cmd 3 git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
-  retry_cmd 3 git -C "$repo_dir" fetch --quiet --depth 1 origin "$commit_sha"
-  run_cmd git -C "$repo_dir" checkout --quiet --detach "$commit_sha"
+  if [[ -n "$log_path" ]]; then
+    retry_cmd 3 run_logged_command "$log_path" git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
+    retry_cmd 3 run_logged_command "$log_path" git -C "$repo_dir" fetch --quiet --depth 1 origin "$commit_sha"
+    run_logged_command "$log_path" git -C "$repo_dir" checkout --quiet --detach "$commit_sha"
+  else
+    retry_cmd 3 git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
+    retry_cmd 3 git -C "$repo_dir" fetch --quiet --depth 1 origin "$commit_sha"
+    run_cmd git -C "$repo_dir" checkout --quiet --detach "$commit_sha"
+  fi
   verify_checkout_remote "$repo_dir" "$source_url"
   [[ "$(git -C "$repo_dir" rev-parse HEAD)" == "$commit_sha" ]] || {
     die "${repo_name} checkout did not resolve to expected commit '$commit_sha'"
@@ -161,41 +206,37 @@ ensure_source_state_dir() {
   run_cmd install -d -m 0755 "$LABWC_SOURCE_BUILD_STATE_DIR"
 }
 
-rust_home_dir() {
-  printf '%s/cargo\n' "$1"
-}
-
-rustup_home_dir() {
-  printf '%s/rustup\n' "$1"
+rust_toolchain_bin_dir() {
+  printf '%s/toolchain-bin\n' "$1"
 }
 
 ensure_rustup_toolchain() {
   local state_root="$1"
   local toolchain="$2"
-  local cargo_home rustup_home rustup_bin init_script
+  local toolchain_bin_dir cargo_bin rustc_bin
+  local log_path="${3:-}"
 
   [[ "$state_root" == /var/lib/* ]] || die "rust state root must stay under /var/lib: $state_root"
   [[ "$toolchain" =~ ^nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || {
     die "rust toolchain must be a dated nightly, found '$toolchain'"
   }
 
-  cargo_home="$(rust_home_dir "$state_root")"
-  rustup_home="$(rustup_home_dir "$state_root")"
-  rustup_bin="$cargo_home/bin/rustup"
-
-  run_cmd install -d -m 0755 "$state_root"
-  run_cmd install -d -m 0755 "$cargo_home" "$rustup_home"
-
-  if [[ ! -x "$rustup_bin" ]]; then
-    init_script="$(mktemp "/tmp/rustup-init.XXXXXX.sh")"
-    retry_cmd 3 curl --fail --location --max-time 180 --silent --show-error \
-      -o "$init_script" "https://sh.rustup.rs"
-    run_cmd chmod 0755 "$init_script"
-    run_cmd env CARGO_HOME="$cargo_home" RUSTUP_HOME="$rustup_home" sh "$init_script" -y --profile minimal --default-toolchain none
-    run_cmd rm -f -- "$init_script"
+  require_command rustup
+  if [[ -n "$log_path" ]]; then
+    run_logged_command "$log_path" rustup toolchain install "$toolchain" --profile minimal
+  else
+    run_cmd rustup toolchain install "$toolchain" --profile minimal
   fi
 
-  run_cmd env CARGO_HOME="$cargo_home" RUSTUP_HOME="$rustup_home" "$rustup_bin" toolchain install "$toolchain" --profile minimal
+  cargo_bin="$(rustup which cargo --toolchain "$toolchain")"
+  rustc_bin="$(rustup which rustc --toolchain "$toolchain")"
+  require_file "$cargo_bin"
+  require_file "$rustc_bin"
+
+  toolchain_bin_dir="$(rust_toolchain_bin_dir "$state_root")"
+  run_cmd install -d -m 0755 "$state_root" "$toolchain_bin_dir"
+  run_cmd ln -sfn "$cargo_bin" "$toolchain_bin_dir/cargo"
+  run_cmd ln -sfn "$rustc_bin" "$toolchain_bin_dir/rustc"
 }
 
 run_with_rust_toolchain() {
@@ -204,22 +245,20 @@ run_with_rust_toolchain() {
   shift 2
 
   env \
-    CARGO_HOME="$(rust_home_dir "$state_root")" \
-    RUSTUP_HOME="$(rustup_home_dir "$state_root")" \
-    PATH="$(rust_home_dir "$state_root")/bin:$PATH" \
+    PATH="$(rust_toolchain_bin_dir "$state_root"):$PATH" \
     "$@"
 }
 
 rust_version_output() {
   local state_root="$1"
   local toolchain="$2"
-  run_with_rust_toolchain "$state_root" "$toolchain" rustc +"$toolchain" --version
+  run_with_rust_toolchain "$state_root" "$toolchain" rustc --version
 }
 
 cargo_version_output() {
   local state_root="$1"
   local toolchain="$2"
-  run_with_rust_toolchain "$state_root" "$toolchain" cargo +"$toolchain" --version
+  run_with_rust_toolchain "$state_root" "$toolchain" cargo --version
 }
 
 write_source_provenance() {

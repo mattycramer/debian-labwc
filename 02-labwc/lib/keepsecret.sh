@@ -26,10 +26,11 @@ verify_keepsecret_stage() {
 }
 
 install_keepsecret() {
-  local work_root repo_dir build_dir stage_root provenance
+  local work_root repo_dir build_dir stage_root provenance log_path
 
   validate_keepsecret_settings
-  work_root="$(fetch_source_checkout "keepsecret" "$KEEPSECRET_GIT_URL" "$KEEPSECRET_COMMIT_SHA")"
+  log_path="$(build_log_path "keepsecret-build")"
+  work_root="$(fetch_source_checkout "keepsecret" "$KEEPSECRET_GIT_URL" "$KEEPSECRET_COMMIT_SHA" "$log_path")"
   repo_dir="$work_root/source"
   build_dir="$work_root/build"
   stage_root="$work_root/stage"
@@ -37,11 +38,11 @@ install_keepsecret() {
   trap 'cleanup_source_checkout "$work_root"' RETURN
 
   log_info "building keepsecret from ${KEEPSECRET_COMMIT_SHA}"
-  run_cmd cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
+  run_logged_command "$log_path" cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
     -D CMAKE_BUILD_TYPE=Release \
     -D CMAKE_INSTALL_PREFIX=/usr/local
-  run_cmd cmake --build "$build_dir" --verbose
-  run_cmd env DESTDIR="$stage_root" cmake --install "$build_dir" --prefix /usr/local
+  run_logged_command "$log_path" cmake --build "$build_dir" --verbose
+  run_logged_command "$log_path" env DESTDIR="$stage_root" cmake --install "$build_dir" --prefix /usr/local
   verify_keepsecret_stage "$stage_root"
 
   remove_keepsecret_install
@@ -59,6 +60,7 @@ install_keepsecret() {
 KEEPSECRET_GIT_URL="$KEEPSECRET_GIT_URL"
 KEEPSECRET_COMMIT_SHA="$KEEPSECRET_COMMIT_SHA"
 KEEPSECRET_PATCH_SERIES="patches/release/series"
+KEEPSECRET_BUILD_LOG="$log_path"
 KEEPSECRET_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 EOF
 )"

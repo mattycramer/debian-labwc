@@ -1,0 +1,28 @@
+#!/bin/sh
+set -eu
+
+timestamp() {
+  date -u '+%Y-%m-%dT%H:%M:%SZ'
+}
+
+log_file="/var/log/regreet/greeter-session.log"
+
+if [ ! -d /var/log/regreet ]; then
+  printf '%s\n' "ERROR: missing /var/log/regreet for greeter session logging" >&2
+  exit 1
+fi
+
+: >>"$log_file"
+exec >>"$log_file" 2>&1
+
+printf '[%s] INFO: starting labwc greeter session wrapper\n' "$(timestamp)"
+printf '[%s] INFO: XDG_RUNTIME_DIR=%s GREETD_SOCK=%s WAYLAND_DISPLAY=%s\n' \
+  "$(timestamp)" \
+  "${XDG_RUNTIME_DIR:-unset}" \
+  "${GREETD_SOCK:-unset}" \
+  "${WAYLAND_DISPLAY:-unset}"
+
+/usr/bin/dbus-run-session -- /usr/bin/labwc -C /etc/labwc-greeter -S /usr/local/bin/labwc-greeter-regreet
+rc=$?
+printf '[%s] ERROR: labwc greeter session exited with status %s\n' "$(timestamp)" "$rc"
+exit "$rc"

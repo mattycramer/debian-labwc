@@ -288,6 +288,10 @@ greeter_regreet_launcher_path() {
   printf '%s\n' "/usr/local/bin/labwc-greeter-regreet"
 }
 
+greeter_session_wrapper_path() {
+  printf '%s\n' "/usr/local/bin/labwc-greeter-session"
+}
+
 greeter_labwc_config_dir() {
   printf '%s\n' "/etc/labwc-greeter"
 }
@@ -304,33 +308,35 @@ remove_regreet_runtime_files() {
   remove_if_present "$(regreet_config_path)"
   remove_if_present "$(regreet_css_path)"
   remove_if_present "$(greeter_regreet_launcher_path)"
+  remove_if_present "$(greeter_session_wrapper_path)"
   remove_if_present "$(greeter_labwc_config_dir)"
   remove_if_present "$(greeter_wallpaper_dir)"
 }
 
 install_regreet_binary() {
-  local work_root repo_dir target_dir rust_state_root provenance
+  local work_root repo_dir target_dir rust_state_root provenance log_path
 
   validate_regreet_settings
   ensure_source_state_dir
+  log_path="$(build_log_path "regreet-build")"
   rust_state_root="$(regreet_rust_state_root)"
-  ensure_rustup_toolchain "$rust_state_root" "$REGREET_RUST_TOOLCHAIN"
-  work_root="$(fetch_source_checkout "regreet" "$REGREET_GIT_URL" "$REGREET_COMMIT_SHA")"
+  ensure_rustup_toolchain "$rust_state_root" "$REGREET_RUST_TOOLCHAIN" "$log_path"
+  work_root="$(fetch_source_checkout "regreet" "$REGREET_GIT_URL" "$REGREET_COMMIT_SHA" "$log_path")"
   repo_dir="$work_root/source"
   target_dir="$work_root/target"
 
   trap 'cleanup_source_checkout "$work_root"' RETURN
 
   log_info "building regreet from ${REGREET_COMMIT_SHA} with ${REGREET_RUST_TOOLCHAIN}"
-  run_with_rust_toolchain "$rust_state_root" "$REGREET_RUST_TOOLCHAIN" \
-    env \
+  run_logged_command "$log_path" \
+    env PATH="$(rust_toolchain_bin_dir "$rust_state_root"):$PATH" \
       GREETD_CONFIG_DIR=/etc/greetd \
       STATE_DIR=/var/lib/regreet \
       LOG_DIR=/var/log/regreet \
       REBOOT_CMD="loginctl reboot" \
       POWEROFF_CMD="loginctl poweroff" \
       CARGO_TARGET_DIR="$target_dir" \
-      cargo +"$REGREET_RUST_TOOLCHAIN" build --release --features gtk4_8 --manifest-path "$repo_dir/Cargo.toml"
+      cargo build --release --features gtk4_8 --manifest-path "$repo_dir/Cargo.toml"
 
   run_cmd install -D -m 0755 "$target_dir/release/regreet" "$(regreet_binary_path)"
   assert_binary_dependencies "$(regreet_binary_path)" "regreet"
@@ -342,6 +348,7 @@ REGREET_COMMIT_SHA="$REGREET_COMMIT_SHA"
 REGREET_RUST_TOOLCHAIN="$REGREET_RUST_TOOLCHAIN"
 REGREET_RUSTC_VERSION="$(rust_version_output "$rust_state_root" "$REGREET_RUST_TOOLCHAIN")"
 REGREET_CARGO_VERSION="$(cargo_version_output "$rust_state_root" "$REGREET_RUST_TOOLCHAIN")"
+REGREET_BUILD_LOG="$log_path"
 REGREET_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 EOF
 )"
@@ -368,6 +375,7 @@ install_regreet_runtime_files() {
   render_template_to_file "$(config_system_template_path "greetd/config.toml")" "/etc/greetd/config.toml" 0644
   render_template_to_file "$(config_system_template_path "greetd/regreet.toml")" "$(regreet_config_path)" 0644
   render_template_to_file "$(config_system_template_path "greetd/regreet.css")" "$(regreet_css_path)" 0644
+  render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-greeter-session")" "$(greeter_session_wrapper_path)" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-greeter-regreet")" "$(greeter_regreet_launcher_path)" 0755
   render_template_to_file "$(config_system_template_path "labwc-greeter/autostart")" "$(greeter_labwc_config_dir)/autostart" 0755
   render_template_to_file "$(config_system_template_path "labwc-greeter/rc.xml")" "$(greeter_labwc_config_dir)/rc.xml" 0644

@@ -47,6 +47,7 @@ verify_keepsecret_install() {
 
 verify_greeter_contract() {
   require_file "/etc/greetd/config.toml"
+  require_file "/usr/local/bin/labwc-greeter-session"
   require_file "/usr/local/bin/labwc-greeter-regreet"
   require_file "/etc/pam.d/greetd"
   require_file "/etc/pam.d/greetd-greeter"
@@ -55,6 +56,9 @@ verify_greeter_contract() {
 
   grep -F 'dbus-run-session -- /usr/bin/labwc' "/etc/greetd/config.toml" >/dev/null || {
     die "greetd config lost the managed dbus-run-session greeter contract"
+  }
+  grep -F '/usr/local/bin/labwc-greeter-session' "/etc/greetd/config.toml" >/dev/null || {
+    die "greetd config lost the managed greeter session wrapper"
   }
   grep -F 'LABWC_UPDATE_ACTIVATION_ENV=1' "/etc/greetd/config.toml" >/dev/null || {
     die "greetd config lost the managed activation-environment contract"
@@ -101,6 +105,7 @@ verify_session_activation_contract() {
 
 verify_shell_and_units() {
   dash -n "$LABWC_TARGET_HOME/.config/labwc/autostart"
+  sh -n "/usr/local/bin/labwc-greeter-session"
   sh -n "/usr/local/bin/labwc-greeter-regreet"
   sh -n "/usr/local/bin/labwc-session-start"
   bash -n "/usr/local/bin/labwc-session"

@@ -78,13 +78,9 @@ phase_doctor() {
   require_command grep
   require_command id
   require_command install
-  require_command git
   require_command journalctl
-  require_command jq
-  require_command meson
   require_command mktemp
   require_command mv
-  require_command ninja
   require_command python3
   require_command readlink
   require_command rm
@@ -98,6 +94,15 @@ phase_doctor() {
   require_command systemd-analyze
   require_command tar
   require_command rmdir
+}
+
+phase_build_doctor() {
+  require_command git
+  require_command meson
+  require_command ninja
+  require_command bindgen
+  require_command rustup
+  require_command ldd
 }
 
 phase_detect() {
@@ -119,6 +124,7 @@ phase_packages() {
 phase_render() {
   log_info "phase: render"
   phase_doctor
+  phase_build_doctor
   load_env_file
   validate_env_settings
   trap 'cleanup_build_workspace' RETURN
@@ -140,6 +146,7 @@ phase_enable() {
 phase_verify() {
   log_info "phase: verify"
   phase_doctor
+  phase_build_doctor
   load_env_file
   validate_env_settings
   verify_install
