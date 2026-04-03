@@ -19,7 +19,7 @@ ensure_greeter_user() {
 
 greeter_access_groups() {
   local group_name
-  for group_name in seat video render input audio; do
+  for group_name in video render input audio; do
     getent group "$group_name" >/dev/null 2>&1 || continue
     printf '%s\n' "$group_name"
   done
@@ -49,6 +49,7 @@ ensure_greeter_runtime_dirs() {
   run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/greetd/greeter/.local
   run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/greetd/greeter/.local/state
   run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/greetd/greeter/.local/share
+  run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/regreet
   run_cmd install -d -m 0750 -o greeter -g greeter /var/log/regreet
   run_cmd install -D -m 0640 -o greeter -g greeter /dev/null /var/log/regreet/log
 }
@@ -58,17 +59,10 @@ validate_greetd_vt() {
 }
 
 validate_regreet_settings() {
-  [[ "${GITHUB_REGREET_TAG:-}" =~ ^[A-Za-z0-9._-]+$ ]] || {
-    die "GITHUB_REGREET_TAG must contain only alnum, dot, underscore, or dash, found '${GITHUB_REGREET_TAG:-}'"
-  }
-  [[ "${GITHUB_REGREET_TARBALL:-}" =~ ^https://github\.com/[^/]+/[^/]+/releases/download/${GITHUB_REGREET_TAG}/[^/?#]+\.tar\.gz$ ]] || {
-    die "GITHUB_REGREET_TARBALL must be a GitHub release tarball for tag '${GITHUB_REGREET_TAG}', found '${GITHUB_REGREET_TARBALL:-}'"
-  }
-  [[ "${GITHUB_REGREET_TARBALL_SHA:-}" =~ ^[0-9a-f]{64}$ ]] || {
-    die "GITHUB_REGREET_TARBALL_SHA must be a 64 character lowercase hex sha256, found '${GITHUB_REGREET_TARBALL_SHA:-}'"
-  }
-  [[ "${GITHUB_REGREET_COMMIT_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || {
-    die "GITHUB_REGREET_COMMIT_SHA must be a 40 character lowercase hex commit sha, found '${GITHUB_REGREET_COMMIT_SHA:-}'"
+  require_https_url "REGREET_GIT_URL" "${REGREET_GIT_URL:-}"
+  require_commit_sha "${REGREET_COMMIT_SHA:-}"
+  [[ "${REGREET_RUST_TOOLCHAIN:-}" =~ ^nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || {
+    die "REGREET_RUST_TOOLCHAIN must be a dated nightly, found '${REGREET_RUST_TOOLCHAIN:-}'"
   }
 }
 
@@ -274,6 +268,14 @@ regreet_binary_path() {
   printf '%s\n' "/usr/local/bin/regreet"
 }
 
+regreet_provenance_path() {
+  printf '%s\n' "/var/lib/labwc-session/regreet-build.env"
+}
+
+regreet_rust_state_root() {
+  printf '%s\n' "/var/lib/labwc-session/rust"
+}
+
 regreet_config_path() {
   printf '%s\n' "/etc/greetd/regreet.toml"
 }
@@ -298,8 +300,7 @@ regreet_wallpaper_target_path() {
   printf '%s\n' "$(greeter_wallpaper_dir)/$(basename "$(regreet_wallpaper_source_path)")"
 }
 
-remove_regreet_support_files() {
-  remove_if_present "$(regreet_binary_path)"
+remove_regreet_runtime_files() {
   remove_if_present "$(regreet_config_path)"
   remove_if_present "$(regreet_css_path)"
   remove_if_present "$(greeter_regreet_launcher_path)"
@@ -307,43 +308,47 @@ remove_regreet_support_files() {
   remove_if_present "$(greeter_wallpaper_dir)"
 }
 
-install_regreet_release() {
-  local tmpdir tarball_path extracted_path actual_sha tar_listing
-  local -a tar_entries=()
+install_regreet_binary() {
+  local work_root repo_dir target_dir rust_state_root provenance
 
   validate_regreet_settings
-  require_command curl
-  require_command tar
-  require_command sha256sum
-  require_command mktemp
+  ensure_source_state_dir
+  rust_state_root="$(regreet_rust_state_root)"
+  ensure_rustup_toolchain "$rust_state_root" "$REGREET_RUST_TOOLCHAIN"
+  work_root="$(fetch_source_checkout "regreet" "$REGREET_GIT_URL" "$REGREET_COMMIT_SHA")"
+  repo_dir="$work_root/source"
+  target_dir="$work_root/target"
 
-  tmpdir="$(mktemp -d)"
-  trap 'rm -rf -- "$tmpdir"' RETURN
-  tarball_path="$tmpdir/regreet.tar.gz"
-  extracted_path="$tmpdir/regreet"
+  trap 'cleanup_source_checkout "$work_root"' RETURN
 
-  log_info "installing regreet ${GITHUB_REGREET_TAG} (${GITHUB_REGREET_COMMIT_SHA})"
-  retry_cmd 3 curl --fail --location --max-time 60 --silent --show-error -o "$tarball_path" "$GITHUB_REGREET_TARBALL"
-  actual_sha="$(sha256sum "$tarball_path" | awk '{print $1}')"
-  [[ "$actual_sha" == "$GITHUB_REGREET_TARBALL_SHA" ]] || {
-    die "regreet tarball sha256 mismatch: expected ${GITHUB_REGREET_TARBALL_SHA}, got ${actual_sha}"
-  }
+  log_info "building regreet from ${REGREET_COMMIT_SHA} with ${REGREET_RUST_TOOLCHAIN}"
+  run_with_rust_toolchain "$rust_state_root" "$REGREET_RUST_TOOLCHAIN" \
+    env \
+      GREETD_CONFIG_DIR=/etc/greetd \
+      STATE_DIR=/var/lib/regreet \
+      LOG_DIR=/var/log/regreet \
+      REBOOT_CMD="loginctl reboot" \
+      POWEROFF_CMD="loginctl poweroff" \
+      CARGO_TARGET_DIR="$target_dir" \
+      cargo +"$REGREET_RUST_TOOLCHAIN" build --release --features gtk4_8 --manifest-path "$repo_dir/Cargo.toml"
 
-  mapfile -t tar_entries < <(tar -tf "$tarball_path")
-  ((${#tar_entries[@]} == 1)) || die "regreet tarball must contain exactly one file, found ${#tar_entries[@]}"
-  [[ "${tar_entries[0]}" == "regreet" ]] || die "regreet tarball must contain a top-level 'regreet' file, found '${tar_entries[0]}'"
-  tar_listing="$(tar -tvf "$tarball_path")"
-  [[ "${tar_listing:0:1}" == "-" ]] || die "regreet tarball entry must be a regular file, found '${tar_listing%% *}'"
-
-  run_cmd tar -xf "$tarball_path" -C "$tmpdir"
-  [[ ! -L "$extracted_path" ]] || die "regreet tarball extracted a symlink, expected a regular file"
-  [[ -f "$extracted_path" ]] || die "regreet tarball did not extract an executable file at '$extracted_path'"
-  [[ -x "$extracted_path" ]] || die "regreet tarball did not extract an executable binary at '$extracted_path'"
-  run_cmd install -D -m 0755 "$extracted_path" "$(regreet_binary_path)"
-  assert_release_binary_dependencies "$(regreet_binary_path)" "regreet"
+  run_cmd install -D -m 0755 "$target_dir/release/regreet" "$(regreet_binary_path)"
+  assert_binary_dependencies "$(regreet_binary_path)" "regreet"
   "$(regreet_binary_path)" --version >/dev/null 2>&1 || die "installed regreet binary failed the --version self-test"
+
+  provenance="$(cat <<EOF
+REGREET_GIT_URL="$REGREET_GIT_URL"
+REGREET_COMMIT_SHA="$REGREET_COMMIT_SHA"
+REGREET_RUST_TOOLCHAIN="$REGREET_RUST_TOOLCHAIN"
+REGREET_RUSTC_VERSION="$(rust_version_output "$rust_state_root" "$REGREET_RUST_TOOLCHAIN")"
+REGREET_CARGO_VERSION="$(cargo_version_output "$rust_state_root" "$REGREET_RUST_TOOLCHAIN")"
+REGREET_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+EOF
+)"
+  write_source_provenance "$(regreet_provenance_path)" "$provenance"
+
   trap - RETURN
-  run_cmd rm -rf -- "$tmpdir"
+  cleanup_source_checkout "$work_root"
 }
 
 install_regreet_support_dirs() {
@@ -356,8 +361,8 @@ install_regreet_wallpaper() {
   run_cmd install -D -m 0644 "$wallpaper_source_path" "$(regreet_wallpaper_target_path)"
 }
 
-install_regreet_files() {
-  install_regreet_release
+install_regreet_runtime_files() {
+  require_file "$(regreet_binary_path)"
   install_regreet_support_dirs
   install_regreet_wallpaper
   render_template_to_file "$(config_system_template_path "greetd/config.toml")" "/etc/greetd/config.toml" 0644
@@ -375,8 +380,8 @@ install_root_files() {
   ensure_greeter_runtime_dirs
   render_template_to_file "$(config_system_template_path "pam.d/greetd")" "/etc/pam.d/greetd" 0644
   render_template_to_file "$(config_system_template_path "pam.d/greetd-greeter")" "/etc/pam.d/greetd-greeter" 0644
-  remove_regreet_support_files
-  install_regreet_files
+  remove_regreet_runtime_files
+  install_regreet_runtime_files
   render_template_to_file "$(config_system_template_path "usr/share/wayland-sessions/labwc.desktop")" "/usr/share/wayland-sessions/labwc.desktop" 0644
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-session-start")" "/usr/local/bin/labwc-session-start" 0755
   render_template_to_file "$(config_system_template_path "usr/local/bin/labwc-session")" "/usr/local/bin/labwc-session" 0755
@@ -481,7 +486,6 @@ enable_system_services_only() {
   run_cmd systemctl daemon-reload
   run_cmd systemctl set-default graphical.target
   run_cmd systemctl enable greetd.service
-  run_cmd systemctl enable seatd.service
   run_cmd systemctl enable NetworkManager.service
   if systemctl cat NetworkManager-dispatcher.service >/dev/null 2>&1; then
     run_cmd systemctl enable NetworkManager-dispatcher.service
@@ -591,15 +595,13 @@ nuke_all_state() {
   remove_if_present "/usr/local/bin/labwc-workspace-send"
   remove_if_present "/usr/local/bin/labwc-workspace-state"
   remove_if_present "/usr/local/bin/labwc-workspace-status"
+  remove_regreet_runtime_files
   remove_if_present "$(regreet_binary_path)"
+  remove_if_present "$(regreet_provenance_path)"
   remove_if_present "/usr/share/wayland-sessions/labwc.desktop"
   remove_if_present "/etc/pam.d/greetd"
   remove_if_present "/etc/pam.d/greetd-greeter"
   remove_if_present "/etc/greetd/config.toml"
-  remove_if_present "$(regreet_config_path)"
-  remove_if_present "$(regreet_css_path)"
-  remove_if_present "$(greeter_labwc_config_dir)"
-  remove_if_present "$(greeter_wallpaper_dir)"
   systemctl disable "$(wireguard_import_service_name)" >/dev/null 2>&1 || true
   systemctl disable labwc-vpn-default-off.service >/dev/null 2>&1 || true
   remove_if_present "/etc/systemd/system/labwc-wireguard-import.service"
@@ -621,7 +623,9 @@ nuke_all_state() {
 
   log_info "removing greeter cache and greeter user"
   remove_if_present "/var/lib/greetd/greeter"
+  remove_if_present "/var/lib/regreet"
   remove_if_present "/var/log/regreet"
+  remove_if_present "$(regreet_rust_state_root)"
   if getent passwd greeter >/dev/null 2>&1; then
     userdel greeter >/dev/null 2>&1 || true
   fi

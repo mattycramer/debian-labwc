@@ -19,7 +19,6 @@ readonly SID_PACKAGES=(
   polkitd
   pkexec
   pinentry-gtk2
-  seatd
   swaybg
   swayidle
   swaylock
@@ -41,6 +40,8 @@ readonly SID_PACKAGES=(
   libspa-0.2-libcamera
   wireplumber
   rtkit
+  dbus
+  dbus-daemon
   dbus-user-session
   libgtk-4-1
   greetd
@@ -89,6 +90,7 @@ readonly SID_PACKAGES=(
   fontconfig
   fonts-noto-color-emoji
   fonts-symbola
+  desktop-file-utils
   nwg-look
   papirus-icon-theme
   qt6ct
@@ -120,7 +122,46 @@ readonly SID_PACKAGES=(
   btop
   ncdu
   fzf
-)
+  git
+  build-essential
+  pkg-config
+  pkgconf
+  clang
+  lld
+  cargo
+  rustc
+  cmake
+  ninja-build
+  meson
+  extra-cmake-modules
+  gettext
+  bindgen
+  python3-docutils
+  libgtk-4-dev
+  libglib2.0-dev
+  libpango1.0-dev
+  libgdk-pixbuf-2.0-dev
+  libgraphene-1.0-dev
+  libcairo2-dev
+  libxml2-dev
+  libsecret-1-dev
+  libkf6config-dev
+  libkf6coreaddons-dev
+  libkf6crash-dev
+  libkf6dbusaddons-dev
+  libkf6i18n-dev
+  libkf6itemmodels-dev
+  libkirigami-dev
+  kirigami-addons-dev
+  qt6-base-dev
+  qt6-base-dev-tools
+  qt6-declarative-dev
+  qt6-declarative-dev-tools
+  qt6-svg-dev
+  qt6-tools-dev
+  qt6-tools-dev-tools
+  qt6-l10n-tools
+  )
 
 readonly GRAPHICS_PACKAGES=(
   bash-completion

@@ -1,6 +1,6 @@
 SHELL := /usr/bin/env bash
 
-.PHONY: help doctor detect install render enable extras reconfigure print-env nuke
+.PHONY: help doctor detect install render build-sources enable verify reconfigure print-env nuke
 
 help:
 	@printf '%s\n' \
@@ -8,11 +8,12 @@ help:
 	  '  help        Show this message' \
 	  '  doctor      Validate platform assumptions' \
 	  '  detect      Detect user, GPU, and outputs into .env' \
-	  '  install     Run doctor, detect, packages, render, enable, extras' \
+	  '  install     Run doctor, detect, packages, render, build-sources, enable, verify' \
 	  '  render      Render configs from .env' \
+	  '  build-sources Fetch, patch, build, and install regreet, labwc-tweaks, and keepsecret from source' \
 	  '  enable      Install root-owned files and enable services' \
-	  '  extras      Install optional pinned GitHub release extras' \
-	  '  reconfigure Run detect, render, enable' \
+	  '  verify      Verify installed source builds, greeter wiring, and session activation contracts' \
+	  '  reconfigure Run detect, render, build-sources, enable, verify' \
 	  '  print-env   Print effective env values' \
 	  '  nuke        Remove generated state and disable installed wiring'
 
@@ -28,16 +29,21 @@ install:
 render:
 	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase render; else sudo bash ./install.sh --phase render; fi
 
+build-sources:
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase build-sources; else sudo bash ./install.sh --phase build-sources; fi
+
 enable:
 	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase enable; else sudo bash ./install.sh --phase enable; fi
 
-extras:
-	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase extras; else sudo bash ./install.sh --phase extras; fi
+verify:
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase verify; else sudo bash ./install.sh --phase verify; fi
 
 reconfigure:
 	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase detect; else sudo bash ./install.sh --phase detect; fi
 	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase render; else sudo bash ./install.sh --phase render; fi
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase build-sources; else sudo bash ./install.sh --phase build-sources; fi
 	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase enable; else sudo bash ./install.sh --phase enable; fi
+	@if [ "$$(id -u)" -eq 0 ]; then bash ./install.sh --phase verify; else sudo bash ./install.sh --phase verify; fi
 
 print-env:
 	@bash ./install.sh --phase print-env

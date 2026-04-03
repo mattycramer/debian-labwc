@@ -11,6 +11,21 @@ readonly DBUS_RUNTIME_PACKAGES=(
   dbus
   dbus-daemon
   dbus-user-session
+  git
+  bindgen
+  build-essential
+  clang
+  gzip
+  jq
+  libapparmor-dev
+  libclang-dev
+  libexpat1-dev
+  libsystemd-dev
+  lld
+  meson
+  ninja-build
+  pkgconf
+  python3-docutils
   libapparmor1
   libexpat1
   libsystemd0

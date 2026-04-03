@@ -47,15 +47,10 @@ wait_for_system_bus() {
   return 1
 }
 
-update_dbus_activation_environment() {
+collect_dbus_activation_vars() {
   dbus_vars=""
   dbus_var_name=""
   dbus_var_value=""
-  dbus_attempt=1
-  dbus_max_attempts=10
-  if ! command -v /usr/bin/dbus-update-activation-environment >/dev/null 2>&1; then
-    return 0
-  fi
   for dbus_var_name in "$@"; do
     eval "dbus_var_value=\${$dbus_var_name+x}"
     [ "$dbus_var_value" = "x" ] || continue
@@ -65,28 +60,47 @@ update_dbus_activation_environment() {
       dbus_vars="$dbus_var_name"
     fi
   done
+  printf '%s\n' "$dbus_vars"
+}
+
+update_dbus_activation_environment() {
+  dbus_vars="$(collect_dbus_activation_vars "$@")"
+  dbus_attempt=1
+  dbus_max_attempts=10
+  if ! command -v /usr/bin/dbus-update-activation-environment >/dev/null 2>&1; then
+    return 0
+  fi
   [ -n "$dbus_vars" ] || return 0
 
-  systemd_user_env_ready() {
-    command -v /usr/bin/systemctl >/dev/null 2>&1 || return 1
-    /usr/bin/systemctl --user show-environment >/dev/null 2>&1
-  }
+  while [ "$dbus_attempt" -le "$dbus_max_attempts" ]; do
+    # shellcheck disable=SC2086
+    if /usr/bin/dbus-update-activation-environment $dbus_vars >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+    dbus_attempt=$((dbus_attempt + 1))
+  done
+
+  printf '%s\n' "WARN: dbus activation environment sync failed after ${dbus_max_attempts} attempts." >&2
+  return 0
+}
+
+update_systemd_activation_environment() {
+  dbus_vars="$(collect_dbus_activation_vars "$@")"
+  dbus_attempt=1
+  dbus_max_attempts=10
+  if ! command -v /usr/bin/dbus-update-activation-environment >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! command -v /usr/bin/systemctl >/dev/null 2>&1; then
+    return 0
+  fi
+  [ -n "$dbus_vars" ] || return 0
 
   while [ "$dbus_attempt" -le "$dbus_max_attempts" ]; do
-    if [ "${LABWC_SESSION_BUS_MODE:-}" = "private" ]; then
+    if /usr/bin/systemctl --user show-environment >/dev/null 2>&1; then
       # shellcheck disable=SC2086
-      if /usr/bin/dbus-update-activation-environment $dbus_vars >/dev/null 2>&1; then
-        return 0
-      fi
-    else
-      if systemd_user_env_ready; then
-        # shellcheck disable=SC2086
-        if /usr/bin/dbus-update-activation-environment --systemd $dbus_vars >/dev/null 2>&1; then
-          return 0
-        fi
-      fi
-      # shellcheck disable=SC2086
-      if /usr/bin/dbus-update-activation-environment $dbus_vars >/dev/null 2>&1; then
+      if /usr/bin/dbus-update-activation-environment --systemd $dbus_vars >/dev/null 2>&1; then
         return 0
       fi
     fi
@@ -94,7 +108,7 @@ update_dbus_activation_environment() {
     dbus_attempt=$((dbus_attempt + 1))
   done
 
-  printf '%s\n' "WARN: dbus activation environment sync failed after ${dbus_max_attempts} attempts." >&2
+  printf '%s\n' "WARN: systemd activation environment sync failed after ${dbus_max_attempts} attempts." >&2
   return 0
 }
 
@@ -117,6 +131,34 @@ start_bg_once swaybg swaybg -i "@BACKGROUND_WALLPAPER_PATH@" -m "@WALLPAPER_MODE
 wait_for_session_bus || true
 wait_for_system_bus || true
 update_dbus_activation_environment \
+  WAYLAND_DISPLAY \
+  DISPLAY \
+  XDG_CURRENT_DESKTOP \
+  XDG_SESSION_TYPE \
+  XDG_SESSION_DESKTOP \
+  DESKTOP_SESSION \
+  XCURSOR_THEME \
+  XCURSOR_SIZE \
+  GDK_BACKEND \
+  CLUTTER_BACKEND \
+  SDL_VIDEODRIVER \
+  _JAVA_AWT_WM_NONREPARENTING \
+  GTK_A11Y \
+  NO_AT_BRIDGE \
+  MOZ_ENABLE_WAYLAND \
+  MOZ_WEBRENDER \
+  LIBVA_DRIVER_NAME \
+  LIBVA_DRI_DRIVER_NAME \
+  QT_QPA_PLATFORMTHEME \
+  QT_AUTO_SCREEN_SCALE_FACTOR \
+  WLR_NO_HARDWARE_CURSOR \
+  PASSWORD_STORE \
+  ELECTRON_OZONE_PLATFORM_HINT \
+  QT_QPA_PLATFORM \
+  QT_WAYLAND_DISABLE_WINDOWDECORATION \
+  GPG_TTY \
+  SSH_AUTH_SOCK
+update_systemd_activation_environment \
   WAYLAND_DISPLAY \
   DISPLAY \
   DBUS_SESSION_BUS_ADDRESS \

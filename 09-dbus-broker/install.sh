@@ -78,9 +78,13 @@ phase_doctor() {
   require_command grep
   require_command id
   require_command install
+  require_command git
   require_command journalctl
+  require_command jq
+  require_command meson
   require_command mktemp
   require_command mv
+  require_command ninja
   require_command python3
   require_command readlink
   require_command rm
@@ -117,9 +121,12 @@ phase_render() {
   phase_doctor
   load_env_file
   validate_env_settings
-  prepare_release_payload
-  install_release_payload
+  trap 'cleanup_build_workspace' RETURN
+  prepare_source_build
+  install_source_build
   render_managed_units
+  trap - RETURN
+  cleanup_build_workspace
 }
 
 phase_enable() {

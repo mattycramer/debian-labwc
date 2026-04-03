@@ -45,7 +45,6 @@ fi
 
 if wait_for_broker_user_bus; then
   clear_session_bus_environment
-  export LABWC_SESSION_BUS_MODE=systemd
   export DBUS_SESSION_BUS_ADDRESS="unix:path=${runtime_bus_path}"
   exec /usr/local/bin/labwc-session
 fi

@@ -5,13 +5,13 @@ SHELL := /usr/bin/env bash
 help:
 	@printf '%s\n' \
 	  '09-dbus-broker targets:' \
-	  '  doctor    Validate host prerequisites for compiled dbus-broker deployment on Debian trixie' \
+	  '  doctor    Validate host prerequisites for source-built dbus-broker deployment on Debian trixie' \
 	  '  detect    Detect invoking user and current system/user dbus.service fragments into .env' \
 	  '  install   Run doctor, detect, packages, render, enable, and verify' \
-	  '  packages  Install runtime dependencies with apt -t sid' \
-	  '  render    Download, verify, extract, and install the pinned compiled release, unit overrides, and D-Bus compatibility aliases' \
+	  '  packages  Install runtime and source-build dependencies with apt -t sid' \
+	  '  render    Fetch, patch, build, and install dbus-broker from the pinned source commit, then render unit overrides and D-Bus compatibility aliases' \
 	  '  enable    Reload systemd and stage the managed broker units for next reboot/login without restarting the current buses' \
-	  '  verify    Verify provenance, installed files, unit overrides, compatibility aliases, and broker-backed or staged runtime state' \
+	  '  verify    Verify source-build provenance, installed files, unit overrides, compatibility aliases, and broker-backed or staged runtime state' \
 	  '  nuke      Remove managed unit overrides and unmanaged artifacts, keep package-owned files, and stage fallback dbus.service units without restarting active buses' \
 	  '  print-env Show effective environment values and detected state in 09-dbus-broker/.env'
 

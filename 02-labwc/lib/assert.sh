@@ -31,3 +31,15 @@ require_file() {
 require_dir() {
   [[ -d "$1" ]] || die "missing directory: $1"
 }
+
+require_commit_sha() {
+  local value="$1"
+  [[ "$value" =~ ^[0-9a-f]{40}$ ]] || die "invalid commit sha: '$value'"
+}
+
+require_https_url() {
+  local label="$1"
+  local value="$2"
+  [[ "$value" == https://* ]] || die "$label must be an https URL, found '$value'"
+  [[ "$value" != *" "* ]] || die "$label must not contain spaces, found '$value'"
+}

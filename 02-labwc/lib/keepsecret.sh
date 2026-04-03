@@ -5,59 +5,75 @@ readonly KEEPSECRET_DESKTOP_PATH="/usr/local/share/applications/org.kde.keepsecr
 readonly KEEPSECRET_APPDATA_PATH="/usr/local/share/metainfo/org.kde.keepsecret.metainfo.xml"
 readonly KEEPSECRET_ICON_PATH="/usr/local/share/icons/hicolor/scalable/apps/org.kde.keepsecret.svg"
 readonly KEEPSECRET_LOGGING_CATEGORIES_PATH="/usr/local/share/qlogging-categories6/keepsecret.categories"
-readonly KEEPSECRET_TMP_ROOT_PREFIX="/tmp/labwc-keepsecret"
 readonly KEEPSECRET_MANIFEST_DIR="/var/lib/labwc-session"
 readonly KEEPSECRET_MANIFEST_PATH="${KEEPSECRET_MANIFEST_DIR}/keepsecret-install-manifest.txt"
-
-keepsecret_work_root() {
-  printf '%s\n' "$KEEPSECRET_TMP_ROOT_PREFIX"
-}
+readonly KEEPSECRET_PROVENANCE_PATH="${KEEPSECRET_MANIFEST_DIR}/keepsecret-build.env"
 
 validate_keepsecret_settings() {
-  [[ "${GITHUB_KEEPSECRET_TAG:-}" =~ ^[A-Za-z0-9._-]+$ ]] || {
-    die "GITHUB_KEEPSECRET_TAG must contain only alnum, dot, underscore, or dash, found '${GITHUB_KEEPSECRET_TAG:-}'"
-  }
-  [[ "${GITHUB_KEEPSECRET_URL:-}" =~ ^https://github\.com/[^/]+/[^/]+/releases/download/${GITHUB_KEEPSECRET_TAG}/[^/?#]+\.tar\.gz$ ]] || {
-    die "GITHUB_KEEPSECRET_URL must be a GitHub release tarball for tag '${GITHUB_KEEPSECRET_TAG}', found '${GITHUB_KEEPSECRET_URL:-}'"
-  }
-  [[ "${GITHUB_KEEPSECRET_TARBALL_SHA:-}" =~ ^[0-9a-f]{64}$ ]] || {
-    die "GITHUB_KEEPSECRET_TARBALL_SHA must be a 64 character lowercase hex sha256, found '${GITHUB_KEEPSECRET_TARBALL_SHA:-}'"
-  }
-  [[ "${GITHUB_KEEPSECRET_COMMIT_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || {
-    die "GITHUB_KEEPSECRET_COMMIT_SHA must be a 40 character lowercase hex commit sha, found '${GITHUB_KEEPSECRET_COMMIT_SHA:-}'"
-  }
+  require_https_url "KEEPSECRET_GIT_URL" "${KEEPSECRET_GIT_URL:-}"
+  require_commit_sha "${KEEPSECRET_COMMIT_SHA:-}"
+}
+
+verify_keepsecret_stage() {
+  local stage_root="$1"
+  local root="${stage_root%/}/usr/local"
+
+  require_file "$root/bin/keepsecret"
+  require_file "$root/share/applications/org.kde.keepsecret.desktop"
+  require_file "$root/share/metainfo/org.kde.keepsecret.metainfo.xml"
+  require_file "$root/share/icons/hicolor/scalable/apps/org.kde.keepsecret.svg"
+  require_file "$root/share/qlogging-categories6/keepsecret.categories"
 }
 
 install_keepsecret() {
-  local work_root tarball_path extract_root
+  local work_root repo_dir build_dir stage_root provenance
 
   validate_keepsecret_settings
-  work_root="$(keepsecret_work_root)"
-  tarball_path="${work_root}/keepsecret.tar.gz"
-  extract_root="${work_root}/extract"
+  work_root="$(fetch_source_checkout "keepsecret" "$KEEPSECRET_GIT_URL" "$KEEPSECRET_COMMIT_SHA")"
+  repo_dir="$work_root/source"
+  build_dir="$work_root/build"
+  stage_root="$work_root/stage"
 
-  [[ "$work_root" == /tmp/* ]] || die "keepsecret work root must stay under /tmp: $work_root"
+  trap 'cleanup_source_checkout "$work_root"' RETURN
+
+  log_info "building keepsecret from ${KEEPSECRET_COMMIT_SHA}"
+  run_cmd cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
+    -D CMAKE_BUILD_TYPE=Release \
+    -D CMAKE_INSTALL_PREFIX=/usr/local
+  run_cmd cmake --build "$build_dir" --verbose
+  run_cmd env DESTDIR="$stage_root" cmake --install "$build_dir" --prefix /usr/local
+  verify_keepsecret_stage "$stage_root"
+
   remove_keepsecret_install
-  remove_if_present "$work_root"
-  run_cmd install -d -m 0755 "$work_root"
-
-  log_info "installing keepsecret ${GITHUB_KEEPSECRET_TAG} (${GITHUB_KEEPSECRET_COMMIT_SHA})"
-  download_release_tarball "keepsecret" "$GITHUB_KEEPSECRET_URL" "$GITHUB_KEEPSECRET_TARBALL_SHA" "$tarball_path"
-  extract_release_payload_tree "keepsecret" "$tarball_path" "usr/local" "$extract_root"
-  install_release_payload_tree "$extract_root" "$KEEPSECRET_MANIFEST_PATH"
-  assert_release_binary_dependencies "$KEEPSECRET_BIN_PATH" "keepsecret"
+  install_staged_tree "$stage_root" "$KEEPSECRET_MANIFEST_PATH"
+  assert_binary_dependencies "$KEEPSECRET_BIN_PATH" "keepsecret"
+  require_file "$KEEPSECRET_DESKTOP_PATH"
+  require_file "$KEEPSECRET_APPDATA_PATH"
+  require_file "$KEEPSECRET_ICON_PATH"
+  require_file "$KEEPSECRET_LOGGING_CATEGORIES_PATH"
   if command -v update-desktop-database >/dev/null 2>&1; then
     run_cmd update-desktop-database /usr/local/share/applications >/dev/null 2>&1 || true
   fi
-  remove_if_present "$work_root"
+
+  provenance="$(cat <<EOF
+KEEPSECRET_GIT_URL="$KEEPSECRET_GIT_URL"
+KEEPSECRET_COMMIT_SHA="$KEEPSECRET_COMMIT_SHA"
+KEEPSECRET_PATCH_SERIES="patches/release/series"
+KEEPSECRET_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+EOF
+)"
+  write_source_provenance "$KEEPSECRET_PROVENANCE_PATH" "$provenance"
+
+  trap - RETURN
+  cleanup_source_checkout "$work_root"
 }
 
 remove_keepsecret_install() {
-  remove_release_manifest_install "$KEEPSECRET_MANIFEST_PATH"
+  remove_manifest_install "$KEEPSECRET_MANIFEST_PATH"
   remove_if_present "$KEEPSECRET_BIN_PATH"
   remove_if_present "$KEEPSECRET_DESKTOP_PATH"
   remove_if_present "$KEEPSECRET_APPDATA_PATH"
   remove_if_present "$KEEPSECRET_ICON_PATH"
   remove_if_present "$KEEPSECRET_LOGGING_CATEGORIES_PATH"
-  remove_if_present "$(keepsecret_work_root)"
+  remove_if_present "$KEEPSECRET_PROVENANCE_PATH"
 }

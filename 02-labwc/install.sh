@@ -23,16 +23,18 @@ source "$SCRIPT_DIR/lib/detect.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/render.sh"
 # shellcheck disable=SC1091
-source "$SCRIPT_DIR/lib/services.sh"
+source "$SCRIPT_DIR/lib/source_build.sh"
 # shellcheck disable=SC1091
-source "$SCRIPT_DIR/lib/release_payload.sh"
+source "$SCRIPT_DIR/lib/services.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/tweaks.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/keepsecret.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/verify.sh"
 usage() {
   cat <<'EOF'
-Usage: ./install.sh --phase doctor|detect|packages|render|enable|extras|print-env|nuke|all [--yes]
+Usage: ./install.sh --phase doctor|detect|packages|render|build-sources|enable|verify|print-env|nuke|all [--yes]
 EOF
 }
 
@@ -228,6 +230,18 @@ phase_doctor() {
   require_command usermod
 }
 
+phase_source_build_doctor() {
+  require_command git
+  require_command curl
+  require_command cargo
+  require_command rustc
+  require_command cmake
+  require_command ninja
+  require_command pkg-config
+  require_command ldd
+  require_command grep
+}
+
 phase_detect() {
   log_info "phase: detect"
   phase_doctor
@@ -251,17 +265,6 @@ phase_render() {
   render_all_configs
 }
 
-phase_release_doctor() {
-  require_command curl
-  require_command tar
-  require_command sha256sum
-  require_command mktemp
-  require_command find
-  require_command stat
-  require_command ldd
-  require_command grep
-}
-
 phase_enable() {
   log_info "phase: enable"
   phase_doctor
@@ -277,13 +280,22 @@ phase_enable() {
   enable_all_services "$ENV_FILE"
 }
 
-phase_extras() {
-  log_info "phase: extras"
+phase_build_sources() {
+  log_info "phase: build-sources"
   phase_doctor
-  phase_release_doctor
+  phase_source_build_doctor
   load_env_file
+  install_regreet_binary
   install_labwc_tweaks
   install_keepsecret
+}
+
+phase_verify() {
+  log_info "phase: verify"
+  phase_doctor
+  phase_source_build_doctor
+  load_env_file
+  verify_install
 }
 
 phase_print_env() {
@@ -308,8 +320,9 @@ main() {
     detect) phase_detect ;;
     packages) phase_packages ;;
     render) phase_render ;;
+    build-sources) phase_build_sources ;;
     enable) phase_enable ;;
-    extras) phase_extras ;;
+    verify) phase_verify ;;
     print-env) phase_print_env ;;
     nuke) phase_nuke ;;
     all)
@@ -317,8 +330,9 @@ main() {
       phase_detect
       phase_packages
       phase_render
+      phase_build_sources
       phase_enable
-      phase_extras
+      phase_verify
       ;;
     *)
       die "unsupported phase: $PHASE"

@@ -16,9 +16,9 @@ verify_paths() {
   [[ -x "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-session" ]] || die "dbus-broker-session is not executable"
   require_file "$DBUS_BROKER_INSTALL_MAN_DIR/dbus-broker.1"
   require_file "$DBUS_BROKER_INSTALL_MAN_DIR/dbus-broker-launch.1"
-  require_file "$DBUS_BROKER_INSTALL_SHARE_DIR/release-verification.txt"
-  require_file "$DBUS_BROKER_INSTALL_SHARE_DIR/subprojects.lock"
-  require_file "$DBUS_BROKER_RELEASE_PROVENANCE_PATH"
+  require_file "$DBUS_BROKER_BUILD_PROVENANCE_PATH"
+  require_file "$DBUS_BROKER_BUILD_VERIFICATION_PATH"
+  require_file "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH"
   require_file "$DBUS_BROKER_SYSTEM_UNIT_PATH"
   require_file "$DBUS_BROKER_USER_UNIT_PATH"
 }
@@ -30,16 +30,31 @@ verify_launcher_binary_contract() {
 }
 
 verify_provenance_file() {
-  grep -F "DBUS_BROKER_TAG=\"$DBUS_BROKER_TAG\"" "$DBUS_BROKER_RELEASE_PROVENANCE_PATH" >/dev/null || die "provenance file missing DBUS_BROKER_TAG"
-  grep -F "DBUS_BROKER_COMMIT_SHA=\"$DBUS_BROKER_COMMIT_SHA\"" "$DBUS_BROKER_RELEASE_PROVENANCE_PATH" >/dev/null || die "provenance file missing DBUS_BROKER_COMMIT_SHA"
-  grep -F "DBUS_BROKER_TARBALL_SHA256=\"$DBUS_BROKER_TARBALL_SHA256\"" "$DBUS_BROKER_RELEASE_PROVENANCE_PATH" >/dev/null || die "provenance file missing DBUS_BROKER_TARBALL_SHA256"
-  grep -F "DBUS_BROKER_TARBALL_URL=\"$DBUS_BROKER_TARBALL_URL\"" "$DBUS_BROKER_RELEASE_PROVENANCE_PATH" >/dev/null || die "provenance file missing DBUS_BROKER_TARBALL_URL"
+  grep -F "DBUS_BROKER_GIT_URL=\"$DBUS_BROKER_GIT_URL\"" "$DBUS_BROKER_BUILD_PROVENANCE_PATH" >/dev/null || {
+    die "provenance file missing DBUS_BROKER_GIT_URL"
+  }
+  grep -F "DBUS_BROKER_COMMIT_SHA=\"$DBUS_BROKER_COMMIT_SHA\"" "$DBUS_BROKER_BUILD_PROVENANCE_PATH" >/dev/null || {
+    die "provenance file missing DBUS_BROKER_COMMIT_SHA"
+  }
+  grep -F "DBUS_BROKER_RUST_TOOLCHAIN=\"$DBUS_BROKER_RUST_TOOLCHAIN\"" "$DBUS_BROKER_BUILD_PROVENANCE_PATH" >/dev/null || {
+    die "provenance file missing DBUS_BROKER_RUST_TOOLCHAIN"
+  }
+}
+
+verify_build_manifest() {
+  grep -F "Meson args:" "$DBUS_BROKER_BUILD_VERIFICATION_PATH" >/dev/null || {
+    die "build verification file is missing the Meson argument section"
+  }
 }
 
 verify_unit_content() {
-  grep -F "ExecStart=${DBUS_BROKER_INSTALL_BIN_DIR}/dbus-broker-launch --scope system" "$DBUS_BROKER_SYSTEM_UNIT_PATH" >/dev/null || die "system unit does not point at managed dbus-broker-launch --scope system"
-  grep -F "ExecStart=${DBUS_BROKER_INSTALL_BIN_DIR}/dbus-broker-launch --scope user" "$DBUS_BROKER_USER_UNIT_PATH" >/dev/null || die "user unit does not point at managed dbus-broker-launch --scope user"
-  systemd-analyze verify "$DBUS_BROKER_SYSTEM_UNIT_PATH" "$DBUS_BROKER_USER_UNIT_PATH"
+  grep -F "ExecStart=${DBUS_BROKER_INSTALL_BIN_DIR}/dbus-broker-launch --scope system" "$DBUS_BROKER_SYSTEM_UNIT_PATH" >/dev/null || {
+    die "system unit does not point at managed dbus-broker-launch --scope system"
+  }
+  grep -F "ExecStart=${DBUS_BROKER_INSTALL_BIN_DIR}/dbus-broker-launch --scope user" "$DBUS_BROKER_USER_UNIT_PATH" >/dev/null || {
+    die "user unit does not point at managed dbus-broker-launch --scope user"
+  }
+  systemd-analyze verify "$DBUS_BROKER_SYSTEM_UNIT_PATH" "$DBUS_BROKER_USER_UNIT_PATH" >/dev/null
 }
 
 verify_session_service_alias() {
@@ -47,7 +62,9 @@ verify_session_service_alias() {
   local source_path="$2"
   [[ -f "$source_path" ]] || return 0
   [[ -L "$alias_path" ]] || die "missing D-Bus compatibility alias: $alias_path"
-  [[ "$(readlink -f "$alias_path")" == "$(readlink -f "$source_path")" ]] || die "D-Bus compatibility alias '$alias_path' does not point at '$source_path'"
+  [[ "$(readlink -f "$alias_path")" == "$(readlink -f "$source_path")" ]] || {
+    die "D-Bus compatibility alias '$alias_path' does not point at '$source_path'"
+  }
 }
 
 verify_session_service_aliases() {
@@ -78,7 +95,9 @@ normalize_runtime_exe_path() {
 verify_system_runtime() {
   local fragment_path main_pid exe_path normalized_exe_path
   fragment_path="$(systemctl show -p FragmentPath --value dbus.service)"
-  [[ "$fragment_path" == "$DBUS_BROKER_SYSTEM_UNIT_PATH" ]] || die "system dbus.service fragment mismatch: expected '$DBUS_BROKER_SYSTEM_UNIT_PATH', got '${fragment_path:-unknown}'"
+  [[ "$fragment_path" == "$DBUS_BROKER_SYSTEM_UNIT_PATH" ]] || {
+    die "system dbus.service fragment mismatch: expected '$DBUS_BROKER_SYSTEM_UNIT_PATH', got '${fragment_path:-unknown}'"
+  }
 
   main_pid="$(systemctl show -p MainPID --value dbus.service)"
   [[ "$main_pid" =~ ^[0-9]+$ ]] || die "system dbus.service MainPID is not numeric: '$main_pid'"
@@ -141,7 +160,6 @@ verify_labwc_session_compatibility() {
     grep -F "LABWC_UPDATE_ACTIVATION_ENV=0" "$session_wrapper" >/dev/null || {
       die "labwc-session wrapper lost the managed dbus activation contract"
     }
-
     [[ -x "$session_entry" ]] || die "missing executable broker-aware labwc session entrypoint: $session_entry"
     grep -F 'DBUS_SESSION_BUS_ADDRESS=' "$session_entry" >/dev/null || {
       die "labwc session entrypoint lost broker-backed user-bus export"
@@ -149,7 +167,6 @@ verify_labwc_session_compatibility() {
     grep -F 'refusing to fall back to dbus-run-session' "$session_entry" >/dev/null || {
       die "labwc session entrypoint lost the broker-only no-fallback contract"
     }
-
     [[ -f "$session_desktop" ]] || die "missing labwc desktop session file: $session_desktop"
     awk -F= '
       $1 == "Exec" {
@@ -163,19 +180,14 @@ verify_labwc_session_compatibility() {
     ' "$session_desktop" >/dev/null || {
       die "labwc desktop session no longer uses the broker-aware session entrypoint"
     }
-
     [[ -f "$session_autostart" ]] || {
       die "missing labwc autostart script for managed dbus activation handoff: $session_autostart"
     }
-
-    grep -F "dbus-update-activation-environment" "$session_autostart" >/dev/null || {
-      die "labwc autostart lost dbus activation-environment handoff"
-    }
-    grep -F -- "--systemd" "$session_autostart" >/dev/null || {
+    grep -F "dbus-update-activation-environment --systemd" "$session_autostart" >/dev/null || {
       die "labwc autostart lost dbus/systemd activation-environment handoff"
     }
-    grep -F "DBUS_SESSION_BUS_ADDRESS" "$session_autostart" >/dev/null || {
-      die "labwc autostart no longer exports DBUS_SESSION_BUS_ADDRESS into the activation environment"
+    grep -F "dbus-update-activation-environment \$dbus_vars" "$session_autostart" >/dev/null || {
+      die "labwc autostart lost plain D-Bus activation-environment handoff"
     }
   fi
 }
@@ -185,6 +197,7 @@ verify_install() {
   verify_paths
   verify_launcher_binary_contract
   verify_provenance_file
+  verify_build_manifest
   verify_unit_content
   verify_session_service_aliases
   verify_system_runtime

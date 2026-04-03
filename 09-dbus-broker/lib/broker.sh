@@ -7,33 +7,28 @@ fi
 
 readonly DBUS_BROKER_SESSION_SERVICE_ALIAS_DIR="/usr/local/share/dbus-1/services"
 
-github_api_json() {
-  local url="$1"
-  retry_cmd 3 curl --fail --location --max-time 30 --silent --show-error "$url"
-}
-
-github_json_field() {
-  local json_input="$1"
-  local python_code="$2"
-  printf '%s' "$json_input" | python3 -c "$python_code" 2>/dev/null || true
-}
-
 init_broker_runtime_paths() {
-  local tarball_name
-  tarball_name="$(basename -- "$DBUS_BROKER_TARBALL_URL")"
-  require_safe_token "tarball filename" "$tarball_name"
-
-  DBUS_BROKER_CACHE_TARBALL="${DBUS_BROKER_TMP_DIR%/}/$tarball_name"
-  DBUS_BROKER_EXTRACT_DIR="${DBUS_BROKER_STATE_DIR%/}/extract"
   DBUS_BROKER_BACKUP_DIR="${DBUS_BROKER_STATE_DIR%/}/backups"
-  DBUS_BROKER_RELEASE_PROVENANCE_PATH="${DBUS_BROKER_INSTALL_SHARE_DIR%/}/release.env"
+  DBUS_BROKER_CARGO_HOME="${DBUS_BROKER_STATE_DIR%/}/cargo"
+  DBUS_BROKER_RUSTUP_HOME="${DBUS_BROKER_STATE_DIR%/}/rustup"
+  DBUS_BROKER_LEGACY_PROVENANCE_PATH="${DBUS_BROKER_INSTALL_SHARE_DIR%/}/release.env"
+  DBUS_BROKER_LEGACY_VERIFICATION_PATH="${DBUS_BROKER_INSTALL_SHARE_DIR%/}/release-verification.txt"
+  DBUS_BROKER_BUILD_PROVENANCE_PATH="${DBUS_BROKER_INSTALL_SHARE_DIR%/}/source-build.env"
+  DBUS_BROKER_BUILD_VERIFICATION_PATH="${DBUS_BROKER_INSTALL_SHARE_DIR%/}/source-build-verification.txt"
+  DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH="${DBUS_BROKER_INSTALL_SHARE_DIR%/}/subprojects.lock"
+  DBUS_BROKER_WORK_ROOT=""
+  DBUS_BROKER_REPO_DIR=""
+  DBUS_BROKER_BUILD_DIR=""
+  DBUS_BROKER_STAGE_DIR=""
+  DBUS_BROKER_SUBPROJECTS_LOCK_PATH=""
 }
 
 validate_env_settings() {
-  require_https_url "DBUS_BROKER_TARBALL_URL" "$DBUS_BROKER_TARBALL_URL"
-  require_safe_token "DBUS_BROKER_TAG" "$DBUS_BROKER_TAG"
-  require_sha256_hex "$DBUS_BROKER_TARBALL_SHA256"
+  require_https_url "DBUS_BROKER_GIT_URL" "$DBUS_BROKER_GIT_URL"
   require_commit_sha "$DBUS_BROKER_COMMIT_SHA"
+  [[ "$DBUS_BROKER_RUST_TOOLCHAIN" =~ ^nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || {
+    die "DBUS_BROKER_RUST_TOOLCHAIN must be a dated nightly, found '$DBUS_BROKER_RUST_TOOLCHAIN'"
+  }
 
   require_absolute_path "DBUS_BROKER_INSTALL_BIN_DIR" "$DBUS_BROKER_INSTALL_BIN_DIR"
   require_absolute_path "DBUS_BROKER_INSTALL_MAN_DIR" "$DBUS_BROKER_INSTALL_MAN_DIR"
@@ -53,11 +48,9 @@ validate_env_settings() {
   require_path_prefix "DBUS_BROKER_STATE_DIR" "$DBUS_BROKER_STATE_DIR" "/var/lib"
   require_path_prefix "DBUS_BROKER_TMP_DIR" "$DBUS_BROKER_TMP_DIR" "/tmp"
 
-  [[ "$DBUS_BROKER_TARBALL_URL" == *.tar.gz ]] || die "DBUS_BROKER_TARBALL_URL must point to a .tar.gz asset"
-  [[ "$DBUS_BROKER_TARBALL_URL" == *"/${DBUS_BROKER_TAG}/"* ]] || die "DBUS_BROKER_TARBALL_URL must include DBUS_BROKER_TAG in release path"
-  [[ "$DBUS_BROKER_INSTALL_BIN_DIR" == "/usr/bin" ]] || die "DBUS_BROKER_INSTALL_BIN_DIR must be '/usr/bin' because this compiled dbus-broker-launch executes /usr/bin/dbus-broker"
-  [[ "$DBUS_BROKER_INSTALL_MAN_DIR" == "/usr/share/man/man1" ]] || die "DBUS_BROKER_INSTALL_MAN_DIR must be '/usr/share/man/man1' for this managed layout"
-  [[ "$DBUS_BROKER_INSTALL_SHARE_DIR" == "/usr/share/dbus-broker" ]] || die "DBUS_BROKER_INSTALL_SHARE_DIR must be '/usr/share/dbus-broker' for this managed layout"
+  [[ "$DBUS_BROKER_INSTALL_BIN_DIR" == "/usr/bin" ]] || die "DBUS_BROKER_INSTALL_BIN_DIR must be '/usr/bin'"
+  [[ "$DBUS_BROKER_INSTALL_MAN_DIR" == "/usr/share/man/man1" ]] || die "DBUS_BROKER_INSTALL_MAN_DIR must be '/usr/share/man/man1'"
+  [[ "$DBUS_BROKER_INSTALL_SHARE_DIR" == "/usr/share/dbus-broker" ]] || die "DBUS_BROKER_INSTALL_SHARE_DIR must be '/usr/share/dbus-broker'"
   [[ "$(basename -- "$DBUS_BROKER_SYSTEM_UNIT_PATH")" == "dbus.service" ]] || die "DBUS_BROKER_SYSTEM_UNIT_PATH must target dbus.service"
   [[ "$(basename -- "$DBUS_BROKER_USER_UNIT_PATH")" == "dbus.service" ]] || die "DBUS_BROKER_USER_UNIT_PATH must target dbus.service"
 
@@ -75,8 +68,8 @@ write_root_file() {
 
 ensure_runtime_directories() {
   run_cmd install -d -m 0755 "$DBUS_BROKER_STATE_DIR"
-  run_cmd install -d -m 0755 "$DBUS_BROKER_EXTRACT_DIR"
   run_cmd install -d -m 0700 "$DBUS_BROKER_BACKUP_DIR"
+  run_cmd install -d -m 0755 "$DBUS_BROKER_INSTALL_SHARE_DIR"
 }
 
 backup_key_for_path() {
@@ -174,114 +167,146 @@ install_session_service_aliases() {
   install_session_service_alias "org.freedesktop.thumbnails.Thumbnailer1.service" "/usr/share/dbus-1/services/org.xfce.Tumbler.Thumbnailer1.service"
 }
 
-verify_release_tag_commit() {
-  local owner repo ref_api tag_api release_api release_json ref_json tag_json asset_name digest
-  local object_type object_sha ref_commit tag_depth
-  owner="$(printf '%s' "$DBUS_BROKER_TARBALL_URL" | awk -F/ '{print $4}')"
-  repo="$(printf '%s' "$DBUS_BROKER_TARBALL_URL" | awk -F/ '{print $5}')"
-  [[ -n "$owner" && -n "$repo" ]] || die "could not derive github owner/repo from DBUS_BROKER_TARBALL_URL"
-
-  ref_api="https://api.github.com/repos/${owner}/${repo}/git/ref/tags/${DBUS_BROKER_TAG}"
-  release_api="https://api.github.com/repos/${owner}/${repo}/releases/tags/${DBUS_BROKER_TAG}"
-  ref_json="$(github_api_json "$ref_api")" || die "failed to resolve git tag ref from GitHub API"
-  release_json="$(github_api_json "$release_api")" || die "failed to resolve release metadata from GitHub API"
-
-  object_type="$(github_json_field "$ref_json" 'import json,sys; print(json.load(sys.stdin)["object"]["type"])')"
-  object_sha="$(github_json_field "$ref_json" 'import json,sys; print(json.load(sys.stdin)["object"]["sha"])')"
-  [[ -n "$object_type" && -n "$object_sha" ]] || die "could not parse git tag object from GitHub API response"
-
-  ref_commit="$object_sha"
-  tag_depth=0
-  while [[ "$object_type" == "tag" ]]; do
-    tag_api="https://api.github.com/repos/${owner}/${repo}/git/tags/${object_sha}"
-    tag_json="$(github_api_json "$tag_api")" || die "failed to resolve annotated git tag object from GitHub API"
-    object_type="$(github_json_field "$tag_json" 'import json,sys; print(json.load(sys.stdin)["object"]["type"])')"
-    object_sha="$(github_json_field "$tag_json" 'import json,sys; print(json.load(sys.stdin)["object"]["sha"])')"
-    [[ -n "$object_type" && -n "$object_sha" ]] || die "could not parse annotated git tag object from GitHub API response"
-    ref_commit="$object_sha"
-    tag_depth=$((tag_depth + 1))
-    ((tag_depth <= 4)) || die "git tag resolution exceeded maximum depth while resolving '$DBUS_BROKER_TAG'"
-  done
-
-  [[ "$object_type" == "commit" ]] || die "git tag '$DBUS_BROKER_TAG' did not resolve to a commit object, found '$object_type'"
-  [[ "$ref_commit" == "$DBUS_BROKER_COMMIT_SHA" ]] || die "tag commit mismatch: expected '$DBUS_BROKER_COMMIT_SHA', got '$ref_commit'"
-
-  asset_name="$(basename -- "$DBUS_BROKER_TARBALL_URL")"
-  digest="$(printf '%s' "$release_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); asset_name=sys.argv[1]; assets=data.get("assets",[]); matched=[a for a in assets if a.get("name")==asset_name]; print((matched[0].get("digest","") if matched else ""))' "$asset_name" 2>/dev/null || true)"
-  [[ -n "$digest" ]] || die "release asset '$asset_name' not found in GitHub release metadata"
-  [[ "$digest" == "sha256:${DBUS_BROKER_TARBALL_SHA256}" ]] || die "release digest mismatch for '$asset_name': expected 'sha256:${DBUS_BROKER_TARBALL_SHA256}', got '$digest'"
+normalize_git_url() {
+  local url="$1"
+  url="${url%/}"
+  url="${url%.git}"
+  printf '%s\n' "$url"
 }
 
-download_release_tarball() {
-  run_cmd install -d -m 0755 "$DBUS_BROKER_TMP_DIR"
-  retry_cmd 3 curl --fail --location --max-time 180 --silent --show-error \
-    --output "$DBUS_BROKER_CACHE_TARBALL" "$DBUS_BROKER_TARBALL_URL" || die "failed to download compiled dbus-broker tarball"
+verify_checkout_remote() {
+  local repo_dir="$1"
+  local expected_url="$2"
+  local actual_url
+
+  actual_url="$(git -C "$repo_dir" remote get-url origin)"
+  [[ "$(normalize_git_url "$actual_url")" == "$(normalize_git_url "$expected_url")" ]] || {
+    die "unexpected git remote for $repo_dir: expected '$expected_url', got '$actual_url'"
+  }
 }
 
-verify_release_tarball_sha() {
-  local actual_sha
-  require_file "$DBUS_BROKER_CACHE_TARBALL"
-  actual_sha="$(sha256sum "$DBUS_BROKER_CACHE_TARBALL" | awk '{print $1}')"
-  [[ "$actual_sha" == "$DBUS_BROKER_TARBALL_SHA256" ]] || die "tarball sha mismatch: expected '$DBUS_BROKER_TARBALL_SHA256', got '$actual_sha'"
+apply_patch_series_if_present() {
+  local repo_dir="$1"
+  local series_path="$repo_dir/patches/release/series"
+  local series_entry patch_path
+
+  [[ -f "$series_path" ]] || return 0
+
+  while IFS= read -r series_entry; do
+    series_entry="${series_entry%%#*}"
+    series_entry="${series_entry#"${series_entry%%[![:space:]]*}"}"
+    series_entry="${series_entry%"${series_entry##*[![:space:]]}"}"
+    [[ -n "$series_entry" ]] || continue
+
+    patch_path="$repo_dir/$series_entry"
+    if [[ ! -f "$patch_path" ]]; then
+      patch_path="$repo_dir/patches/release/$series_entry"
+    fi
+    [[ -f "$patch_path" ]] || die "missing release patch referenced by $series_path: $series_entry"
+
+    if git -C "$repo_dir" apply --check "$patch_path" >/dev/null 2>&1; then
+      run_cmd git -C "$repo_dir" apply "$patch_path"
+      continue
+    fi
+
+    git -C "$repo_dir" apply --reverse --check "$patch_path" >/dev/null 2>&1 || {
+      die "release patch '$series_entry' is neither applicable nor already applied in $repo_dir"
+    }
+  done <"$series_path"
 }
 
-verify_tarball_manifest() {
-  local entry
-  local -a expected_entries=(
-    "./"
-    "./usr/"
-    "./usr/bin/"
-    "./usr/bin/dbus-broker"
-    "./usr/bin/dbus-broker-launch"
-    "./usr/bin/dbus-broker-session"
-    "./usr/lib/"
-    "./usr/lib/systemd/"
-    "./usr/lib/systemd/catalog/"
-    "./usr/lib/systemd/catalog/dbus-broker-launch.catalog"
-    "./usr/lib/systemd/catalog/dbus-broker.catalog"
-    "./usr/lib/systemd/system/"
-    "./usr/lib/systemd/system/dbus-broker.service"
-    "./usr/lib/systemd/user/"
-    "./usr/lib/systemd/user/dbus-broker.service"
-    "./usr/share/"
-    "./usr/share/dbus-broker/"
-    "./usr/share/dbus-broker/release-verification.txt"
-    "./usr/share/dbus-broker/subprojects.lock"
-    "./usr/share/man/"
-    "./usr/share/man/man1/"
-    "./usr/share/man/man1/dbus-broker-launch.1"
-    "./usr/share/man/man1/dbus-broker.1"
-  )
-  local expected_text
+ensure_rustup_toolchain() {
+  local toolchain="$1"
+  local rustup_bin init_script
 
-  expected_text="$(printf '%s\n' "${expected_entries[@]}")"
-  while IFS= read -r entry; do
-    [[ -n "$entry" ]] || continue
-    [[ "$entry" == ./* ]] || die "tarball entry must stay relative, found '$entry'"
-    [[ "$entry" != */../* && "$entry" != ../* && "$entry" != */.. && "$entry" != *"/./"* ]] || die "tarball entry contains traversal segments: '$entry'"
-    printf '%s\n' "$expected_text" | grep -Fx -- "$entry" >/dev/null || die "unexpected tarball entry: '$entry'"
-  done < <(tar -tf "$DBUS_BROKER_CACHE_TARBALL")
+  [[ "$toolchain" =~ ^nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || {
+    die "DBUS_BROKER_RUST_TOOLCHAIN must be a dated nightly, found '$toolchain'"
+  }
+
+  run_cmd install -d -m 0755 "$DBUS_BROKER_CARGO_HOME" "$DBUS_BROKER_RUSTUP_HOME"
+  rustup_bin="$DBUS_BROKER_CARGO_HOME/bin/rustup"
+
+  if [[ ! -x "$rustup_bin" ]]; then
+    init_script="$(mktemp "/tmp/dbus-broker-rustup.XXXXXX.sh")"
+    retry_cmd 3 curl --fail --location --max-time 180 --silent --show-error \
+      -o "$init_script" "https://sh.rustup.rs"
+    run_cmd chmod 0755 "$init_script"
+    run_cmd env CARGO_HOME="$DBUS_BROKER_CARGO_HOME" RUSTUP_HOME="$DBUS_BROKER_RUSTUP_HOME" sh "$init_script" -y --profile minimal --default-toolchain none
+    run_cmd rm -f -- "$init_script"
+  fi
+
+  run_cmd env CARGO_HOME="$DBUS_BROKER_CARGO_HOME" RUSTUP_HOME="$DBUS_BROKER_RUSTUP_HOME" "$rustup_bin" toolchain install "$toolchain" --profile minimal
 }
 
-extract_release_tarball() {
-  run_cmd rm -rf -- "$DBUS_BROKER_EXTRACT_DIR"
-  run_cmd install -d -m 0755 "$DBUS_BROKER_EXTRACT_DIR"
-  run_cmd tar -xf "$DBUS_BROKER_CACHE_TARBALL" -C "$DBUS_BROKER_EXTRACT_DIR" --no-same-owner --no-same-permissions
+run_with_rust_toolchain() {
+  env \
+    CARGO_HOME="$DBUS_BROKER_CARGO_HOME" \
+    RUSTUP_HOME="$DBUS_BROKER_RUSTUP_HOME" \
+    PATH="$DBUS_BROKER_CARGO_HOME/bin:$PATH" \
+    RUSTUP_TOOLCHAIN="$DBUS_BROKER_RUST_TOOLCHAIN" \
+    "$@"
 }
 
-require_release_layout() {
+dbus_broker_meson_args() {
+  cat <<'EOF'
+--buildtype=release
+--prefix=/usr
+--warnlevel=2
+-Dapparmor=true
+-Daudit=false
+-Ddocs=true
+-Ddoctest=false
+-Dlauncher=true
+-Dreference-test=false
+-Dselinux=false
+-Dtests=false
+EOF
+}
+
+record_subproject_manifest() {
+  local repo_dir="$1"
+  local manifest_path="$2"
+  local wrap_path subproject_path subproject_name remote revision
+
+  : >"$manifest_path"
+  while IFS= read -r wrap_path; do
+    [[ -n "$wrap_path" ]] || continue
+    subproject_name="$(basename "${wrap_path%.wrap}")"
+    subproject_path="$repo_dir/subprojects/$subproject_name"
+    if [[ -d "$subproject_path/.git" ]]; then
+      remote="$(git -C "$subproject_path" remote get-url origin 2>/dev/null || printf '%s' 'unknown')"
+      revision="$(git -C "$subproject_path" rev-parse HEAD 2>/dev/null || printf '%s' 'unknown')"
+      printf '%s\t%s\t%s\n' "$subproject_name" "$remote" "$revision" >>"$manifest_path"
+    else
+      printf '%s\t%s\t%s\n' "$subproject_name" "wrap-only" "$(basename "$wrap_path")" >>"$manifest_path"
+    fi
+  done < <(find "$repo_dir/subprojects" -maxdepth 1 -type f -name '*.wrap' | LC_ALL=C sort)
+}
+
+cleanup_build_workspace() {
+  if [[ -n "${DBUS_BROKER_WORK_ROOT:-}" ]]; then
+    [[ "$DBUS_BROKER_WORK_ROOT" == /tmp/* ]] || die "refusing to remove unexpected dbus-broker work root: $DBUS_BROKER_WORK_ROOT"
+    run_cmd rm -rf -- "$DBUS_BROKER_WORK_ROOT"
+  fi
+  DBUS_BROKER_WORK_ROOT=""
+  DBUS_BROKER_REPO_DIR=""
+  DBUS_BROKER_BUILD_DIR=""
+  DBUS_BROKER_STAGE_DIR=""
+  DBUS_BROKER_SUBPROJECTS_LOCK_PATH=""
+}
+
+require_stage_layout() {
+  local stage_root="$1"
   local -a required_paths=(
-    "$DBUS_BROKER_EXTRACT_DIR/usr/bin/dbus-broker"
-    "$DBUS_BROKER_EXTRACT_DIR/usr/bin/dbus-broker-launch"
-    "$DBUS_BROKER_EXTRACT_DIR/usr/bin/dbus-broker-session"
-    "$DBUS_BROKER_EXTRACT_DIR/usr/lib/systemd/system/dbus-broker.service"
-    "$DBUS_BROKER_EXTRACT_DIR/usr/lib/systemd/user/dbus-broker.service"
-    "$DBUS_BROKER_EXTRACT_DIR/usr/lib/systemd/catalog/dbus-broker.catalog"
-    "$DBUS_BROKER_EXTRACT_DIR/usr/lib/systemd/catalog/dbus-broker-launch.catalog"
-    "$DBUS_BROKER_EXTRACT_DIR/usr/share/man/man1/dbus-broker.1"
-    "$DBUS_BROKER_EXTRACT_DIR/usr/share/man/man1/dbus-broker-launch.1"
-    "$DBUS_BROKER_EXTRACT_DIR/usr/share/dbus-broker/release-verification.txt"
-    "$DBUS_BROKER_EXTRACT_DIR/usr/share/dbus-broker/subprojects.lock"
+    "$stage_root/usr/bin/dbus-broker"
+    "$stage_root/usr/bin/dbus-broker-launch"
+    "$stage_root/usr/bin/dbus-broker-session"
+    "$stage_root/usr/lib/systemd/system/dbus-broker.service"
+    "$stage_root/usr/lib/systemd/user/dbus-broker.service"
+    "$stage_root/usr/lib/systemd/catalog/dbus-broker.catalog"
+    "$stage_root/usr/lib/systemd/catalog/dbus-broker-launch.catalog"
+    "$stage_root/usr/share/man/man1/dbus-broker.1"
+    "$stage_root/usr/share/man/man1/dbus-broker-launch.1"
   )
   local path
   for path in "${required_paths[@]}"; do
@@ -289,47 +314,116 @@ require_release_layout() {
   done
 }
 
-prepare_release_payload() {
-  verify_release_tag_commit
-  ensure_runtime_directories
-  download_release_tarball
-  verify_release_tarball_sha
-  verify_tarball_manifest
-  extract_release_tarball
-  require_release_layout
-  log_info "release payload prepared at '$DBUS_BROKER_EXTRACT_DIR'"
+assert_stage_binary_dependencies() {
+  local stage_root="$1"
+  local binary_path missing_output
+  local -a binaries=(
+    "$stage_root/usr/bin/dbus-broker"
+    "$stage_root/usr/bin/dbus-broker-launch"
+    "$stage_root/usr/bin/dbus-broker-session"
+  )
+
+  for binary_path in "${binaries[@]}"; do
+    missing_output="$(ldd "$binary_path" 2>&1 | awk '/not found/ {print}')"
+    [[ -z "$missing_output" ]] || {
+      die "staged dbus-broker binary has unresolved shared-library dependencies:
+$missing_output"
+    }
+  done
 }
 
-install_release_payload() {
+prepare_source_build() {
+  local meson_args_file
+  local -a meson_args=()
+
+  cleanup_build_workspace
+  ensure_runtime_directories
+  ensure_rustup_toolchain "$DBUS_BROKER_RUST_TOOLCHAIN"
+
+  DBUS_BROKER_WORK_ROOT="$(mktemp -d "${DBUS_BROKER_TMP_DIR%/}/dbus-broker.XXXXXX")"
+  DBUS_BROKER_REPO_DIR="$DBUS_BROKER_WORK_ROOT/source"
+  DBUS_BROKER_BUILD_DIR="$DBUS_BROKER_WORK_ROOT/build"
+  DBUS_BROKER_STAGE_DIR="$DBUS_BROKER_WORK_ROOT/stage"
+  DBUS_BROKER_SUBPROJECTS_LOCK_PATH="$DBUS_BROKER_WORK_ROOT/subprojects.lock"
+
+  retry_cmd 3 git clone --quiet --filter=blob:none "$DBUS_BROKER_GIT_URL" "$DBUS_BROKER_REPO_DIR"
+  retry_cmd 3 git -C "$DBUS_BROKER_REPO_DIR" fetch --quiet --depth 1 origin "$DBUS_BROKER_COMMIT_SHA"
+  run_cmd git -C "$DBUS_BROKER_REPO_DIR" checkout --quiet --detach "$DBUS_BROKER_COMMIT_SHA"
+  verify_checkout_remote "$DBUS_BROKER_REPO_DIR" "$DBUS_BROKER_GIT_URL"
+  [[ "$(git -C "$DBUS_BROKER_REPO_DIR" rev-parse HEAD)" == "$DBUS_BROKER_COMMIT_SHA" ]] || {
+    die "dbus-broker checkout did not resolve to expected commit '$DBUS_BROKER_COMMIT_SHA'"
+  }
+  apply_patch_series_if_present "$DBUS_BROKER_REPO_DIR"
+
+  run_with_rust_toolchain bash -lc '
+    set -euo pipefail
+    cd "$1"
+    meson subprojects download
+  ' bash "$DBUS_BROKER_REPO_DIR"
+  record_subproject_manifest "$DBUS_BROKER_REPO_DIR" "$DBUS_BROKER_SUBPROJECTS_LOCK_PATH"
+
+  meson_args_file="$(mktemp "${DBUS_BROKER_WORK_ROOT%/}/meson-args.XXXXXX")"
+  dbus_broker_meson_args | sed '/^[[:space:]]*$/d' >"$meson_args_file"
+  while IFS= read -r meson_arg; do
+    [[ -n "$meson_arg" ]] || continue
+    meson_args+=("$meson_arg")
+  done <"$meson_args_file"
+  run_cmd rm -f -- "$meson_args_file"
+
+  run_with_rust_toolchain meson setup "$DBUS_BROKER_BUILD_DIR" "$DBUS_BROKER_REPO_DIR" "${meson_args[@]}"
+  run_with_rust_toolchain meson compile -C "$DBUS_BROKER_BUILD_DIR"
+  run_cmd env DESTDIR="$DBUS_BROKER_STAGE_DIR" meson install -C "$DBUS_BROKER_BUILD_DIR" --no-rebuild
+  require_stage_layout "$DBUS_BROKER_STAGE_DIR"
+  assert_stage_binary_dependencies "$DBUS_BROKER_STAGE_DIR"
+}
+
+install_source_build() {
+  local provenance verification
+
+  [[ -n "${DBUS_BROKER_STAGE_DIR:-}" ]] || die "dbus-broker staged tree is not prepared"
+
   run_cmd install -d -m 0755 "$DBUS_BROKER_INSTALL_BIN_DIR"
   run_cmd install -d -m 0755 "$DBUS_BROKER_INSTALL_MAN_DIR"
   run_cmd install -d -m 0755 "$DBUS_BROKER_INSTALL_SHARE_DIR"
   run_cmd install -d -m 0755 "$DBUS_BROKER_INSTALL_CATALOG_DIR"
 
-  install_managed_file 0755 "$DBUS_BROKER_EXTRACT_DIR/usr/bin/dbus-broker" "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker"
-  install_managed_file 0755 "$DBUS_BROKER_EXTRACT_DIR/usr/bin/dbus-broker-launch" "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-launch"
-  install_managed_file 0755 "$DBUS_BROKER_EXTRACT_DIR/usr/bin/dbus-broker-session" "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-session"
+  install_managed_file 0755 "$DBUS_BROKER_STAGE_DIR/usr/bin/dbus-broker" "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker"
+  install_managed_file 0755 "$DBUS_BROKER_STAGE_DIR/usr/bin/dbus-broker-launch" "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-launch"
+  install_managed_file 0755 "$DBUS_BROKER_STAGE_DIR/usr/bin/dbus-broker-session" "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-session"
 
-  install_managed_file 0644 "$DBUS_BROKER_EXTRACT_DIR/usr/share/man/man1/dbus-broker.1" "$DBUS_BROKER_INSTALL_MAN_DIR/dbus-broker.1"
-  install_managed_file 0644 "$DBUS_BROKER_EXTRACT_DIR/usr/share/man/man1/dbus-broker-launch.1" "$DBUS_BROKER_INSTALL_MAN_DIR/dbus-broker-launch.1"
+  install_managed_file 0644 "$DBUS_BROKER_STAGE_DIR/usr/share/man/man1/dbus-broker.1" "$DBUS_BROKER_INSTALL_MAN_DIR/dbus-broker.1"
+  install_managed_file 0644 "$DBUS_BROKER_STAGE_DIR/usr/share/man/man1/dbus-broker-launch.1" "$DBUS_BROKER_INSTALL_MAN_DIR/dbus-broker-launch.1"
+  install_managed_file 0644 "$DBUS_BROKER_STAGE_DIR/usr/lib/systemd/catalog/dbus-broker.catalog" "$DBUS_BROKER_INSTALL_CATALOG_DIR/dbus-broker.catalog"
+  install_managed_file 0644 "$DBUS_BROKER_STAGE_DIR/usr/lib/systemd/catalog/dbus-broker-launch.catalog" "$DBUS_BROKER_INSTALL_CATALOG_DIR/dbus-broker-launch.catalog"
 
-  install_managed_file 0644 "$DBUS_BROKER_EXTRACT_DIR/usr/share/dbus-broker/release-verification.txt" "$DBUS_BROKER_INSTALL_SHARE_DIR/release-verification.txt"
-  install_managed_file 0644 "$DBUS_BROKER_EXTRACT_DIR/usr/share/dbus-broker/subprojects.lock" "$DBUS_BROKER_INSTALL_SHARE_DIR/subprojects.lock"
-  install_managed_file 0644 "$DBUS_BROKER_EXTRACT_DIR/usr/lib/systemd/catalog/dbus-broker.catalog" "$DBUS_BROKER_INSTALL_CATALOG_DIR/dbus-broker.catalog"
-  install_managed_file 0644 "$DBUS_BROKER_EXTRACT_DIR/usr/lib/systemd/catalog/dbus-broker-launch.catalog" "$DBUS_BROKER_INSTALL_CATALOG_DIR/dbus-broker-launch.catalog"
-
-  local provenance
   provenance="$(cat <<EOF
-DBUS_BROKER_TAG="$DBUS_BROKER_TAG"
+DBUS_BROKER_GIT_URL="$DBUS_BROKER_GIT_URL"
 DBUS_BROKER_COMMIT_SHA="$DBUS_BROKER_COMMIT_SHA"
-DBUS_BROKER_TARBALL_SHA256="$DBUS_BROKER_TARBALL_SHA256"
-DBUS_BROKER_TARBALL_URL="$DBUS_BROKER_TARBALL_URL"
+DBUS_BROKER_RUST_TOOLCHAIN="$DBUS_BROKER_RUST_TOOLCHAIN"
+DBUS_BROKER_RUSTC_VERSION="$(run_with_rust_toolchain rustc --version)"
+DBUS_BROKER_CARGO_VERSION="$(run_with_rust_toolchain cargo --version)"
+DBUS_BROKER_MESON_VERSION="$(meson --version)"
+DBUS_BROKER_BINDGEN_VERSION="$(bindgen --version)"
 DBUS_BROKER_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 EOF
 )"
-  backup_existing_path "$DBUS_BROKER_RELEASE_PROVENANCE_PATH"
-  write_root_file "$DBUS_BROKER_RELEASE_PROVENANCE_PATH" 0644 "$provenance"
+  backup_existing_path "$DBUS_BROKER_BUILD_PROVENANCE_PATH"
+  write_root_file "$DBUS_BROKER_BUILD_PROVENANCE_PATH" 0644 "$provenance"
+  remove_if_present "$DBUS_BROKER_LEGACY_PROVENANCE_PATH"
 
+  verification="$(cat <<EOF
+Build directory: $DBUS_BROKER_BUILD_DIR
+Source directory: $DBUS_BROKER_REPO_DIR
+Meson args:
+$(dbus_broker_meson_args)
+EOF
+)"
+  backup_existing_path "$DBUS_BROKER_BUILD_VERIFICATION_PATH"
+  write_root_file "$DBUS_BROKER_BUILD_VERIFICATION_PATH" 0644 "$verification"
+  remove_if_present "$DBUS_BROKER_LEGACY_VERIFICATION_PATH"
+
+  backup_existing_path "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH"
+  run_cmd install -m 0644 "$DBUS_BROKER_SUBPROJECTS_LOCK_PATH" "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH"
   run_cmd journalctl --update-catalog >/dev/null 2>&1 || true
 }
 
@@ -343,7 +437,7 @@ strip_install_section() {
 
 render_system_bus_unit() {
   local source unit_content
-  source="$DBUS_BROKER_EXTRACT_DIR/usr/lib/systemd/system/dbus-broker.service"
+  source="$DBUS_BROKER_STAGE_DIR/usr/lib/systemd/system/dbus-broker.service"
   unit_content="$(
     strip_install_section "$source" | sed "s#^ExecStart=.*#ExecStart=${DBUS_BROKER_INSTALL_BIN_DIR}/dbus-broker-launch --scope system#"
   )"
@@ -353,7 +447,7 @@ render_system_bus_unit() {
 
 render_user_bus_unit() {
   local source unit_content
-  source="$DBUS_BROKER_EXTRACT_DIR/usr/lib/systemd/user/dbus-broker.service"
+  source="$DBUS_BROKER_STAGE_DIR/usr/lib/systemd/user/dbus-broker.service"
   unit_content="$(
     strip_install_section "$source" | sed "s#^ExecStart=.*#ExecStart=${DBUS_BROKER_INSTALL_BIN_DIR}/dbus-broker-launch --scope user#"
   )"
@@ -362,6 +456,7 @@ render_user_bus_unit() {
 }
 
 render_managed_units() {
+  [[ -n "${DBUS_BROKER_STAGE_DIR:-}" ]] || die "dbus-broker staged tree is not prepared"
   render_system_bus_unit
   render_user_bus_unit
   install_session_service_aliases
@@ -411,8 +506,7 @@ remove_unmanaged_artifact() {
 }
 
 remove_broker_install() {
-  local fallback_fragment
-  local alias_path
+  local fallback_fragment alias_path
 
   restore_backed_up_path "$DBUS_BROKER_SYSTEM_UNIT_PATH" || remove_if_present "$DBUS_BROKER_SYSTEM_UNIT_PATH"
   restore_backed_up_path "$DBUS_BROKER_USER_UNIT_PATH" || remove_if_present "$DBUS_BROKER_USER_UNIT_PATH"
@@ -421,9 +515,11 @@ remove_broker_install() {
   restore_backed_up_path "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-session" || remove_unmanaged_artifact "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-session"
   restore_backed_up_path "$DBUS_BROKER_INSTALL_MAN_DIR/dbus-broker.1" || remove_unmanaged_artifact "$DBUS_BROKER_INSTALL_MAN_DIR/dbus-broker.1"
   restore_backed_up_path "$DBUS_BROKER_INSTALL_MAN_DIR/dbus-broker-launch.1" || remove_unmanaged_artifact "$DBUS_BROKER_INSTALL_MAN_DIR/dbus-broker-launch.1"
-  restore_backed_up_path "$DBUS_BROKER_INSTALL_SHARE_DIR/release-verification.txt" || remove_unmanaged_artifact "$DBUS_BROKER_INSTALL_SHARE_DIR/release-verification.txt"
-  restore_backed_up_path "$DBUS_BROKER_INSTALL_SHARE_DIR/subprojects.lock" || remove_unmanaged_artifact "$DBUS_BROKER_INSTALL_SHARE_DIR/subprojects.lock"
-  restore_backed_up_path "$DBUS_BROKER_RELEASE_PROVENANCE_PATH" || remove_unmanaged_artifact "$DBUS_BROKER_RELEASE_PROVENANCE_PATH"
+  restore_backed_up_path "$DBUS_BROKER_LEGACY_PROVENANCE_PATH" || remove_unmanaged_artifact "$DBUS_BROKER_LEGACY_PROVENANCE_PATH"
+  restore_backed_up_path "$DBUS_BROKER_LEGACY_VERIFICATION_PATH" || remove_unmanaged_artifact "$DBUS_BROKER_LEGACY_VERIFICATION_PATH"
+  restore_backed_up_path "$DBUS_BROKER_BUILD_PROVENANCE_PATH" || remove_unmanaged_artifact "$DBUS_BROKER_BUILD_PROVENANCE_PATH"
+  restore_backed_up_path "$DBUS_BROKER_BUILD_VERIFICATION_PATH" || remove_unmanaged_artifact "$DBUS_BROKER_BUILD_VERIFICATION_PATH"
+  restore_backed_up_path "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH" || remove_unmanaged_artifact "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH"
   restore_backed_up_path "$DBUS_BROKER_INSTALL_CATALOG_DIR/dbus-broker.catalog" || remove_unmanaged_artifact "$DBUS_BROKER_INSTALL_CATALOG_DIR/dbus-broker.catalog"
   restore_backed_up_path "$DBUS_BROKER_INSTALL_CATALOG_DIR/dbus-broker-launch.catalog" || remove_unmanaged_artifact "$DBUS_BROKER_INSTALL_CATALOG_DIR/dbus-broker-launch.catalog"
   while IFS= read -r alias_path; do
@@ -435,8 +531,10 @@ remove_broker_install() {
     "$(dbus_service_alias_path "org.freedesktop.thumbnails.Cache1.service")" \
     "$(dbus_service_alias_path "org.freedesktop.thumbnails.Manager1.service")" \
     "$(dbus_service_alias_path "org.freedesktop.thumbnails.Thumbnailer1.service")")
-  remove_if_present "$DBUS_BROKER_CACHE_TARBALL"
-  remove_if_present "$DBUS_BROKER_EXTRACT_DIR"
+
+  cleanup_build_workspace
+  remove_if_present "$DBUS_BROKER_CARGO_HOME"
+  remove_if_present "$DBUS_BROKER_RUSTUP_HOME"
   remove_if_present "$DBUS_BROKER_BACKUP_DIR"
   run_cmd rmdir --ignore-fail-on-non-empty "$DBUS_BROKER_STATE_DIR" >/dev/null 2>&1 || true
 
