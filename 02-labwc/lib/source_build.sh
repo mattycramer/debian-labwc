@@ -26,7 +26,7 @@ run_logged_command() {
 
   if command -v tee >/dev/null 2>&1; then
     set +e
-    "$@" 2>&1 | tee -a "$log_path"
+    "$@" 2>&1 | tee -a "$log_path" >&2
     rc=${PIPESTATUS[0]}
     set -e
   else
