@@ -297,7 +297,7 @@ native_ldflags() {
 }
 
 native_rustflags() {
-  printf '%s\n' "-C target-cpu=native -C opt-level=3 -C codegen-units=1 -C lto=thin -C strip=symbols"
+  printf '%s\n' "-C target-cpu=native -C opt-level=3 -C codegen-units=1 -C strip=symbols"
 }
 
 rust_toolchain_bin_dir() {
