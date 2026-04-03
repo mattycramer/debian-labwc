@@ -60,6 +60,15 @@ verify_greeter_contract() {
   grep -F 'dbus-run-session -- /usr/bin/labwc' "/usr/local/bin/labwc-greeter-session" >/dev/null || {
     die "greeter session wrapper lost the managed dbus-run-session greeter contract"
   }
+  grep -F 'export WAYLAND_DISPLAY="$display_name"' "/usr/local/bin/labwc-greeter-regreet" >/dev/null || {
+    die "greeter launcher no longer exports the resolved WAYLAND_DISPLAY"
+  }
+  grep -F 'wait_for_wayland_socket "$display_name"' "/usr/local/bin/labwc-greeter-regreet" >/dev/null || {
+    die "greeter launcher lost the managed Wayland socket readiness wait"
+  }
+  grep -F 'sleep 1' "/usr/local/bin/labwc-greeter-regreet" >/dev/null || {
+    die "greeter launcher lost the managed post-socket startup delay"
+  }
   grep -F 'LABWC_UPDATE_ACTIVATION_ENV=1' "/etc/greetd/config.toml" >/dev/null || {
     die "greetd config lost the managed activation-environment contract"
   }
