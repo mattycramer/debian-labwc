@@ -154,7 +154,7 @@ prompt_install_method() {
 
   [[ -t 0 && -t 1 ]] || die "LABWC_INSTALL_METHOD is unset in $ENV_FILE and no interactive terminal is available to choose source or artifact install mode"
   while true; do
-    IFS= read -r -p "Do you want to build from source? [Y/n] " answer
+    IFS= read -r -p "Do you want to compile and install keepsecret, labwc-tweaks, and regreet from source? [Y/n] " answer
     case "${answer:-Y}" in
       Y|y|yes|YES)
         printf '%s\n' "source"
@@ -177,12 +177,13 @@ ensure_install_method_in_env() {
   install_method_prompt_required_for_phase || return 0
   [[ -f "$ENV_FILE" ]] || die "missing env file: $ENV_FILE"
 
-  selected_method="$(current_install_method)"
   if [[ "$PHASE" == "all" ]]; then
     selected_method="$(prompt_install_method)"
     write_env_value "LABWC_INSTALL_METHOD" "$selected_method"
     return 0
   fi
+
+  selected_method="$(current_install_method)"
   if [[ -n "$selected_method" ]]; then
     return 0
   fi
