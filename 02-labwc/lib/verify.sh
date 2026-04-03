@@ -152,7 +152,7 @@ verify_kirigami_runtime_install() {
     die "Kirigami runtime provenance does not record expected pinned version"
   }
 
-  qml_qmldir="$(find /usr/local -path '*/qt6/qml/org/kde/kirigami/qmldir' -type f | LC_ALL=C sort | head -n 1)"
+  qml_qmldir="$(find /usr/local -type f \( -path '*/qt6/qml/org/kde/kirigami/qmldir' -o -path '*/qml/org/kde/kirigami/qmldir' \) | LC_ALL=C sort | head -n 1)"
   [[ -n "$qml_qmldir" ]] || die "Kirigami runtime install is missing the org.kde.kirigami qmldir under /usr/local"
   runtime_library="$(find /usr/local -type f \( -name 'libKirigami*.so*' -o -name 'libKF6Kirigami*.so*' \) | LC_ALL=C sort | head -n 1)"
   [[ -n "$runtime_library" ]] || die "Kirigami runtime install is missing shared libraries under /usr/local"
@@ -245,11 +245,19 @@ verify_session_activation_contract() {
   local session_wrapper="/usr/local/bin/labwc-session"
   local session_autostart="$LABWC_TARGET_HOME/.config/labwc/autostart"
   local session_environment="$LABWC_TARGET_HOME/.config/labwc/environment"
+  local profile_path="$LABWC_TARGET_HOME/.profile"
+  local bashrc_path="$LABWC_TARGET_HOME/.bashrc"
+  local zprofile_path="$LABWC_TARGET_HOME/.zprofile"
+  local zshrc_path="$LABWC_TARGET_HOME/.zshrc"
 
   require_file "$session_entry"
   require_file "$session_wrapper"
   require_file "$session_autostart"
   require_file "$session_environment"
+  require_file "$profile_path"
+  require_file "$bashrc_path"
+  require_file "$zprofile_path"
+  require_file "$zshrc_path"
   grep -F 'refusing to fall back to dbus-run-session' "$session_entry" >/dev/null || {
     die "labwc-session-start lost the broker-only no-fallback contract"
   }
@@ -269,6 +277,21 @@ verify_session_activation_contract() {
   grep -F 'QT_PLUGIN_PATH=/usr/local/lib/x86_64-linux-gnu/qt6/plugins' "$session_environment" >/dev/null || {
     die "labwc session environment lost the managed /usr/local Qt plugin path precedence"
   }
+  grep -F '.config/system/profile.d/00-build-env.sh' "$profile_path" >/dev/null || {
+    die ".profile lost the managed 00-system environment source hook"
+  }
+  grep -F 'path_prepend_unique' "$profile_path" >/dev/null || {
+    die ".profile lost the managed PATH deduplication helper"
+  }
+  if grep -Eq '(^|[[:space:]])export[[:space:]]+PATH=' "$bashrc_path"; then
+    die ".bashrc must not export PATH; PATH belongs in .profile only"
+  fi
+  if grep -Eq '(^|[[:space:]])export[[:space:]]+PATH=' "$zprofile_path"; then
+    die ".zprofile must not export PATH; PATH belongs in .profile only"
+  fi
+  if grep -Eq '(^|[[:space:]])export[[:space:]]+PATH=' "$zshrc_path"; then
+    die ".zshrc must not export PATH; PATH belongs in .profile only"
+  fi
 }
 
 verify_structured_config_files() {

@@ -14,7 +14,6 @@ verify_packages() {
 verify_paths() {
   require_file "$TIMESHIFT_CONFIG_PATH"
   require_file "$TIMESHIFT_WRAPPER_PATH"
-  require_file "$TIMESHIFT_LEGACY_LAUNCHER_PATH"
   require_file "$TIMESHIFT_DESKTOP_OVERRIDE_PATH"
   require_file "$GRUB_BTRFS_CONFIG_PATH"
   require_file "$GRUB_BTRFS_SCRIPT_PATH"
@@ -35,6 +34,11 @@ verify_detection() {
   [[ -n "$MAINTENANCE_ROOT_BTRFS_SOURCE" ]] || die "missing detected root Btrfs source"
   [[ -n "$MAINTENANCE_ROOT_BTRFS_UUID" ]] || die "missing detected root Btrfs UUID"
   [[ -n "$MAINTENANCE_ROOT_BTRFS_KERNEL_FLAGS" ]] || die "missing derived root Btrfs kernel flags"
+  if [[ "$(findmnt -rn -T /pool -o FSTYPE 2>/dev/null || true)" == "btrfs" ]]; then
+    printf '%s\n' "$MAINTENANCE_BTRFS_MOUNTPOINT_LIST" | tr ':' '\n' | grep -Fx '/pool' >/dev/null || {
+      die "detected Btrfs mountpoints are missing /pool"
+    }
+  fi
 }
 
 verify_timeshift_config() {
@@ -50,7 +54,6 @@ verify_timeshift_config() {
   [[ ! -f "$TIMESHIFT_DESKTOP_SOURCE_PATH" ]] || die "packaged Timeshift desktop entry should be removed in favor of the managed override"
   grep -F 'Exec=/usr/local/bin/timeshift-gtk' "$TIMESHIFT_DESKTOP_OVERRIDE_PATH" >/dev/null || die "managed Timeshift desktop override is not pointing at the privileged launcher"
   grep -F 'exec pkexec env "${env_args[@]}" /usr/bin/timeshift-gtk "$@"' "$TIMESHIFT_WRAPPER_PATH" >/dev/null || die "Timeshift wrapper is not launching timeshift-gtk through pkexec"
-  [[ "$(readlink -f "$TIMESHIFT_LEGACY_LAUNCHER_PATH")" == "$TIMESHIFT_WRAPPER_PATH" ]] || die "legacy Timeshift launcher does not resolve to the managed wrapper"
   desktop-file-validate "$TIMESHIFT_DESKTOP_OVERRIDE_PATH"
 }
 
@@ -63,6 +66,9 @@ verify_grub_btrfs_config() {
   grep -F 'ExecStart=/usr/local/bin/grub-btrfsd --syslog --timeshift-auto' "$GRUB_BTRFS_SERVICE_PATH" >/dev/null || die "grub-btrfsd service missing timeshift-auto mode"
   grep -F 'grub-btrfs.cfg' "$GRUB_CFG_PATH" >/dev/null || die "grub.cfg does not source grub-btrfs.cfg"
   grep -F 'custom.cfg' "$GRUB_CFG_PATH" >/dev/null || die "grub.cfg no longer sources custom.cfg"
+  grep -F 'var/lib/containerd' "$GRUB_BTRFS_CONFIG_PATH" >/dev/null || die "grub-btrfs config missing containerd ignore path"
+  grep -F 'var/lib/libvirt/images' "$GRUB_BTRFS_CONFIG_PATH" >/dev/null || die "grub-btrfs config missing libvirt images ignore path"
+  grep -F 'var/lib/machines' "$GRUB_BTRFS_CONFIG_PATH" >/dev/null || die "grub-btrfs config missing machines ignore path"
   [[ -x /etc/grub.d/41_custom ]] || die "stock /etc/grub.d/41_custom is missing or not executable"
 }
 

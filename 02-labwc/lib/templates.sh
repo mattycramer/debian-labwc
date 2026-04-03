@@ -28,6 +28,7 @@ render_template_content() {
   local gpu_launch_script="$LABWC_TARGET_HOME/.config/waybar/scripts/gpu-launch.sh"
   local kanshi_internal_profile="${KANSHI_INTERNAL_PROFILE:-}"
   local kanshi_external_clause="${KANSHI_EXTERNAL_CLAUSE:-}"
+  local migrated_path_snippet="${MIGRATED_PATH_SNIPPET:-}"
 
   [[ -f "$template_path" ]] || die "missing config template: $template_path"
 
@@ -76,6 +77,7 @@ EOF
     TEMPLATE_GPU_LAUNCH_SCRIPT="$gpu_launch_script" \
     TEMPLATE_KANSHI_INTERNAL_PROFILE="$kanshi_internal_profile" \
     TEMPLATE_KANSHI_EXTERNAL_CLAUSE="$kanshi_external_clause" \
+    TEMPLATE_MIGRATED_PATH_SNIPPET="$migrated_path_snippet" \
     TEMPLATE_INTEL_MEDIA_ENV="$intel_media_env" \
     TEMPLATE_GREETD_VT="${LABWC_GREETD_VT:-}" \
     TEMPLATE_SESSION_WRAPPER="/usr/local/bin/labwc-session" \
@@ -120,6 +122,7 @@ replacements = {
     "@GPU_LAUNCH_SCRIPT@": os.environ.get("TEMPLATE_GPU_LAUNCH_SCRIPT", ""),
     "@KANSHI_INTERNAL_PROFILE@": os.environ.get("TEMPLATE_KANSHI_INTERNAL_PROFILE", ""),
     "@KANSHI_EXTERNAL_CLAUSE@": os.environ.get("TEMPLATE_KANSHI_EXTERNAL_CLAUSE", ""),
+    "@MIGRATED_PATH_SNIPPET@": os.environ.get("TEMPLATE_MIGRATED_PATH_SNIPPET", ""),
     "@INTEL_MEDIA_ENV@": os.environ.get("TEMPLATE_INTEL_MEDIA_ENV", ""),
     "@GREETD_VT@": os.environ.get("TEMPLATE_GREETD_VT", ""),
     "@SESSION_WRAPPER@": os.environ.get("TEMPLATE_SESSION_WRAPPER", ""),

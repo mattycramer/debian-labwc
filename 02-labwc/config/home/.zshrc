@@ -1,11 +1,8 @@
 # Managed by labwc
-umask 022
-export PATH="/data/usr/local/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
-export EDITOR=nano
-export VISUAL=nano
-export HISTSIZE=10000
-export HISTFILESIZE=20000
-SAVEHIST="${HISTFILESIZE}"
+[[ -o interactive ]] || return 0
+
+HISTSIZE=10000
+SAVEHIST=20000
 export CLICOLOR=1
 export LS_COLORS='di=1;38;2;125;211;252:ln=1;38;2;109;196;237:so=38;2;148;210;189:pi=38;2;246;189;96:ex=1;38;2;148;210;189:bd=1;38;2;255;180;162:cd=1;38;2;255;180;162:su=37;41:sg=30;43:tw=30;42:ow=30;43:*.tar=38;2;196;181;253:*.tgz=38;2;196;181;253:*.gz=38;2;196;181;253:*.zip=38;2;196;181;253:*.xz=38;2;196;181;253:*.zst=38;2;196;181;253:*.bz2=38;2;196;181;253:*.7z=38;2;196;181;253:*.jpg=38;2;246;189;96:*.jpeg=38;2;246;189;96:*.png=38;2;246;189;96:*.gif=38;2;246;189;96:*.webp=38;2;246;189;96:*.svg=38;2;246;189;96:*.mp3=38;2;196;181;253:*.flac=38;2;196;181;253:*.wav=38;2;196;181;253:*.mp4=38;2;196;181;253:*.mkv=38;2;196;181;253:*.mov=38;2;196;181;253'
 
@@ -13,8 +10,10 @@ alias ls='ls --color=auto --group-directories-first'
 alias ll='ls --color=auto --group-directories-first -alFh'
 alias la='ls --color=auto --group-directories-first -A'
 
+zcompdump_path="${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompdump-${ZSH_VERSION}"
+mkdir -p "${zcompdump_path%/*}"
 autoload -Uz compinit
-compinit
+compinit -d "$zcompdump_path"
 
 if [[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]]; then
   source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
@@ -64,4 +63,8 @@ fi
 
 if command -v starship >/dev/null 2>&1; then
   eval "$(starship init zsh)"
+fi
+
+if [[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]]; then
+  source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 fi

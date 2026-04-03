@@ -54,7 +54,7 @@ verify_kirigami_runtime_stage() {
   local qml_qmldir=""
   local runtime_library=""
 
-  qml_qmldir="$(find "$stage_root/usr/local" -path '*/qt6/qml/org/kde/kirigami/qmldir' -type f | LC_ALL=C sort | head -n 1)"
+  qml_qmldir="$(find "$stage_root/usr/local" -type f \( -path '*/qt6/qml/org/kde/kirigami/qmldir' -o -path '*/qml/org/kde/kirigami/qmldir' \) | LC_ALL=C sort | head -n 1)"
   [[ -n "$qml_qmldir" ]] || die "Kirigami runtime stage is missing the org.kde.kirigami qmldir"
   runtime_library="$(find "$stage_root/usr/local" -type f \( -name 'libKirigami*.so*' -o -name 'libKF6Kirigami*.so*' \) | LC_ALL=C sort | head -n 1)"
   [[ -n "$runtime_library" ]] || die "Kirigami runtime stage is missing a shared library payload"
@@ -93,6 +93,7 @@ build_kirigami_prefix() {
   cmake_prefix_path="$ecm_prefix"
   ecm_dir="$ecm_prefix/share/ECM/cmake"
   validate_kirigami_source_tree "$repo_dir"
+  run_cmd rm -rf -- "$work_root/stage"
 
   trap 'cleanup_source_checkout "$ecm_work_root"' RETURN
 

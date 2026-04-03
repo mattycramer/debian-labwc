@@ -104,6 +104,7 @@ readonly SID_RUNTIME_PACKAGES=(
   adwaita-qt6
   zsh
   zsh-autosuggestions
+  zsh-syntax-highlighting
   starship
   fonts-material-design-icons-iconfont
   fonts-weather-icons

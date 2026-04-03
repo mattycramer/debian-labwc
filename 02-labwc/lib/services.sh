@@ -687,6 +687,11 @@ nuke_all_state() {
   remove_labwc_tweaks_install
   remove_keepsecret_install
   remove_managed_wireguard_profiles
+  remove_persistent_build_workspace "regreet"
+  remove_persistent_build_workspace "labwc-tweaks"
+  remove_persistent_build_workspace "keepsecret"
+  remove_persistent_build_workspace "kirigami"
+  remove_persistent_build_workspace "extra-cmake-modules"
 
   log_info "removing target user systemd user unit links"
   disable_target_user_unit pipewire.service

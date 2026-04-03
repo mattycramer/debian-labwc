@@ -2,9 +2,49 @@
 
 readonly LABWC_SOURCE_BUILD_STATE_DIR="/var/lib/labwc-session"
 readonly LABWC_BUILD_LOG_DIR="/var/log/labwc-build"
+readonly LABWC_PERSISTENT_BUILD_ROOT="/pool/builds/labwc"
 
 prepare_build_log_dir() {
   run_cmd install -d -m 0755 "$LABWC_BUILD_LOG_DIR"
+}
+
+ensure_persistent_build_root() {
+  run_cmd install -d -m 0755 /pool /pool/builds "$LABWC_PERSISTENT_BUILD_ROOT"
+}
+
+persistent_component_work_root() {
+  local component_name="$1"
+  require_safe_token "persistent build component" "$component_name"
+  printf '%s/%s\n' "$LABWC_PERSISTENT_BUILD_ROOT" "$component_name"
+}
+
+prepare_persistent_component_work_root() {
+  local component_name="$1"
+  local work_root=""
+
+  ensure_persistent_build_root
+  work_root="$(persistent_component_work_root "$component_name")"
+  if [[ -n "${LABWC_TARGET_USER:-}" && "${LABWC_TARGET_USER}" != "root" ]]; then
+    run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_GROUP" "$work_root"
+    run_cmd chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_GROUP" "$work_root"
+  else
+    run_cmd install -d -m 0755 "$work_root"
+  fi
+  printf '%s\n' "$work_root"
+}
+
+run_git_in_checkout() {
+  local repo_dir="$1"
+  shift
+
+  if declare -F run_target_user_command >/dev/null 2>&1 \
+    && [[ -n "${LABWC_TARGET_USER:-}" ]] \
+    && [[ "${LABWC_TARGET_USER}" != "root" ]]; then
+    run_target_user_command -- git -C "$repo_dir" "$@"
+    return 0
+  fi
+
+  run_cmd git -C "$repo_dir" "$@"
 }
 
 build_log_path() {
@@ -208,7 +248,7 @@ verify_checkout_remote() {
   local expected_url="$2"
   local actual_url
 
-  actual_url="$(git -C "$repo_dir" remote get-url origin)"
+  actual_url="$(run_git_in_checkout "$repo_dir" remote get-url origin)"
   [[ "$(normalize_git_url "$actual_url")" == "$(normalize_git_url "$expected_url")" ]] || {
     die "unexpected git remote for $repo_dir: expected '$expected_url', got '$actual_url'"
   }
@@ -234,12 +274,12 @@ apply_patch_series_if_present() {
     fi
     [[ -f "$patch_path" ]] || die "missing release patch referenced by $series_path: $series_entry"
 
-    if git -C "$repo_dir" apply --check "$patch_path" >/dev/null 2>&1; then
-      run_cmd git -C "$repo_dir" apply "$patch_path"
+    if run_git_in_checkout "$repo_dir" apply --check "$patch_path" >/dev/null 2>&1; then
+      run_git_in_checkout "$repo_dir" apply "$patch_path"
       continue
     fi
 
-    git -C "$repo_dir" apply --reverse --check "$patch_path" >/dev/null 2>&1 || {
+    run_git_in_checkout "$repo_dir" apply --reverse --check "$patch_path" >/dev/null 2>&1 || {
       die "release patch '$series_entry' is neither applicable nor already applied in $repo_dir"
     }
   done <"$series_path"
@@ -250,34 +290,53 @@ fetch_source_checkout() {
   local source_url="$2"
   local commit_sha="$3"
   local log_path="${4:-}"
-  local work_root repo_dir
+  local work_root repo_dir current_url
 
   require_https_url "${repo_name} source url" "$source_url"
   require_commit_sha "$commit_sha"
 
-  work_root="$(mktemp -d "/tmp/${repo_name}.XXXXXX")"
+  work_root="$(prepare_persistent_component_work_root "$repo_name")"
   repo_dir="$work_root/source"
+
+  if [[ -e "$repo_dir" && ! -d "$repo_dir/.git" ]]; then
+    run_cmd rm -rf -- "$repo_dir" "$work_root/build" "$work_root/stage" "$work_root/target" "$work_root/prefix"
+  fi
+
+  if [[ -d "$repo_dir/.git" ]]; then
+    current_url="$(run_git_in_checkout "$repo_dir" remote get-url origin 2>/dev/null || true)"
+    if [[ -z "$current_url" || "$(normalize_git_url "$current_url")" != "$(normalize_git_url "$source_url")" ]]; then
+      run_cmd rm -rf -- "$repo_dir" "$work_root/build" "$work_root/stage" "$work_root/target" "$work_root/prefix"
+    fi
+  fi
+
+  if [[ ! -d "$repo_dir/.git" ]]; then
+    if declare -F run_target_user_command >/dev/null 2>&1 \
+      && [[ -n "${LABWC_TARGET_USER:-}" ]] \
+      && [[ "${LABWC_TARGET_USER}" != "root" ]]; then
+      retry_cmd 3 run_target_user_command -- git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
+    elif [[ -n "$log_path" ]]; then
+      retry_cmd 3 run_logged_command "$log_path" git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
+    else
+      retry_cmd 3 git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
+    fi
+  fi
 
   if declare -F run_target_user_command >/dev/null 2>&1 \
     && [[ -n "${LABWC_TARGET_USER:-}" ]] \
     && [[ "${LABWC_TARGET_USER}" != "root" ]]; then
-    run_cmd chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_GROUP" "$work_root"
-    retry_cmd 3 run_target_user_command -- git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
     retry_cmd 3 run_target_user_command -- git -C "$repo_dir" fetch --quiet --depth 1 origin "$commit_sha"
     run_target_user_command -- git -C "$repo_dir" checkout --quiet --detach "$commit_sha"
   else
     if [[ -n "$log_path" ]]; then
-      retry_cmd 3 run_logged_command "$log_path" git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
       retry_cmd 3 run_logged_command "$log_path" git -C "$repo_dir" fetch --quiet --depth 1 origin "$commit_sha"
       run_logged_command "$log_path" git -C "$repo_dir" checkout --quiet --detach "$commit_sha"
     else
-      retry_cmd 3 git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
       retry_cmd 3 git -C "$repo_dir" fetch --quiet --depth 1 origin "$commit_sha"
       run_cmd git -C "$repo_dir" checkout --quiet --detach "$commit_sha"
     fi
   fi
   verify_checkout_remote "$repo_dir" "$source_url"
-  [[ "$(git -C "$repo_dir" rev-parse HEAD)" == "$commit_sha" ]] || {
+  [[ "$(run_git_in_checkout "$repo_dir" rev-parse HEAD)" == "$commit_sha" ]] || {
     die "${repo_name} checkout did not resolve to expected commit '$commit_sha'"
   }
 
@@ -289,12 +348,26 @@ fetch_source_checkout() {
 cleanup_source_checkout() {
   local work_root="$1"
   [[ -n "$work_root" ]] || return 0
+  if [[ "$work_root" == "$LABWC_PERSISTENT_BUILD_ROOT/"* ]]; then
+    return 0
+  fi
   [[ "$work_root" == /tmp/* ]] || die "refusing to remove unexpected source checkout path: $work_root"
   run_cmd rm -rf -- "$work_root"
 }
 
 ensure_source_state_dir() {
   run_cmd install -d -m 0755 "$LABWC_SOURCE_BUILD_STATE_DIR"
+}
+
+remove_persistent_build_workspace() {
+  local component_name="$1"
+  local work_root=""
+
+  work_root="$(persistent_component_work_root "$component_name")"
+  [[ "$work_root" == "$LABWC_PERSISTENT_BUILD_ROOT/"* ]] || die "refusing to remove unexpected persistent build root: $work_root"
+  if [[ -e "$work_root" ]]; then
+    run_cmd rm -rf -- "$work_root"
+  fi
 }
 
 native_cflags() {

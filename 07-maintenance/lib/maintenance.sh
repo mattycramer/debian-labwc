@@ -10,7 +10,6 @@ readonly TIMESHIFT_DESKTOP_SOURCE_PATH="/usr/share/applications/timeshift-gtk.de
 readonly TIMESHIFT_DESKTOP_OVERRIDE_DIR="/usr/local/share/applications"
 readonly TIMESHIFT_DESKTOP_OVERRIDE_PATH="/usr/local/share/applications/timeshift-gtk.desktop"
 readonly TIMESHIFT_WRAPPER_PATH="/usr/local/bin/timeshift-gtk"
-readonly TIMESHIFT_LEGACY_LAUNCHER_PATH="/usr/local/bin/timeshift-launcher"
 readonly GRUB_BTRFS_CONFIG_DIR="/etc/default/grub-btrfs"
 readonly GRUB_BTRFS_CONFIG_PATH="/etc/default/grub-btrfs/config"
 readonly GRUB_BTRFS_SCRIPT_PATH="/etc/grub.d/41_snapshots-btrfs"
@@ -186,9 +185,8 @@ env_args=(
 
 exec pkexec env "${env_args[@]}" /usr/bin/timeshift-gtk "$@"
 EOF
-)"
+  )"
   write_root_file "$TIMESHIFT_WRAPPER_PATH" 0755 "$content"
-  run_cmd ln -sfn "$TIMESHIFT_WRAPPER_PATH" "$TIMESHIFT_LEGACY_LAUNCHER_PATH"
 }
 
 render_btrfsmaintenance_config() {
@@ -233,7 +231,7 @@ GRUB_BTRFS_GBTRFS_DIRNAME="/boot/grub"
 GRUB_BTRFS_GBTRFS_SEARCH_DIRNAME="\${prefix}"
 GRUB_BTRFS_SNAPSHOT_KERNEL_PARAMETERS="${snapshot_kernel_parameters}"
 GRUB_BTRFS_IGNORE_SPECIFIC_PATH=("@")
-GRUB_BTRFS_IGNORE_PREFIX_PATH=("var/lib/docker" "@var/lib/docker" "@/var/lib/docker" "var/lib/containers" "@var/lib/containers" "@/var/lib/containers")
+GRUB_BTRFS_IGNORE_PREFIX_PATH=("var/lib/docker" "@var/lib/docker" "@/var/lib/docker" "var/lib/containers" "@var/lib/containers" "@/var/lib/containers" "var/lib/containerd" "@var/lib/containerd" "@/var/lib/containerd" "var/lib/libvirt/images" "@var/lib/libvirt/images" "@/var/lib/libvirt/images" "var/lib/machines" "@var/lib/machines" "@/var/lib/machines")
 EOF
 )"
   run_cmd install -d -m 0755 "$GRUB_BTRFS_CONFIG_DIR"
@@ -292,7 +290,7 @@ EOF
 }
 
 render_all_configs() {
-  run_cmd rm -f -- "$TIMESHIFT_WRAPPER_PATH" "$TIMESHIFT_LEGACY_LAUNCHER_PATH"
+  run_cmd rm -f -- "$TIMESHIFT_WRAPPER_PATH"
   render_timeshift_config
   render_timeshift_wrapper
   render_timeshift_desktop_override
@@ -340,7 +338,7 @@ remove_maintenance_install() {
   restore_unit_state "btrfs-trim.timer" "STATE_BTRFS_TRIM_TIMER"
   restore_unit_state "btrfsmaintenance-refresh.path" "STATE_BTRFS_REFRESH_PATH"
 
-  run_cmd rm -f -- "$GRUB_BTRFS_SCRIPT_PATH" "$GRUB_BTRFS_DAEMON_PATH" "$GRUB_BTRFS_SERVICE_PATH" "$GRUB_BTRFS_CONFIG_PATH" "$TIMESHIFT_CONFIG_PATH" "$TIMESHIFT_DESKTOP_OVERRIDE_PATH" "$TIMESHIFT_WRAPPER_PATH" "$TIMESHIFT_LEGACY_LAUNCHER_PATH" "$BTRFSMAINT_CONFIG_PATH"
+  run_cmd rm -f -- "$GRUB_BTRFS_SCRIPT_PATH" "$GRUB_BTRFS_DAEMON_PATH" "$GRUB_BTRFS_SERVICE_PATH" "$GRUB_BTRFS_CONFIG_PATH" "$TIMESHIFT_CONFIG_PATH" "$TIMESHIFT_DESKTOP_OVERRIDE_PATH" "$TIMESHIFT_WRAPPER_PATH" "$BTRFSMAINT_CONFIG_PATH"
   run_cmd rm -f -- "$BTRFS_SCRUB_DROPIN_PATH" "$BTRFS_BALANCE_DROPIN_PATH"
   run_cmd rmdir --ignore-fail-on-non-empty "$BTRFS_SCRUB_DROPIN_DIR" >/dev/null 2>&1 || true
   run_cmd rmdir --ignore-fail-on-non-empty "$BTRFS_BALANCE_DROPIN_DIR" >/dev/null 2>&1 || true

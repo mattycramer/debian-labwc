@@ -5,6 +5,15 @@ if ! declare -F render_template_content >/dev/null 2>&1; then
   source "$SCRIPT_DIR/lib/templates.sh"
 fi
 
+if ! declare -F remove_if_present >/dev/null 2>&1; then
+  remove_if_present() {
+    local path="$1"
+    if [[ -e "$path" || -L "$path" ]]; then
+      run_cmd rm -rf -- "$path"
+    fi
+  }
+fi
+
 render_user_file() {
   local destination="$1"
   local content="$2"
@@ -129,12 +138,109 @@ render_home_dirs() {
 }
 
 render_shell_startup_files() {
+  migrate_path_exports_to_profile
   render_home_template_file ".bashrc"
   render_home_template_file ".profile"
   render_home_template_file ".zshrc"
   render_home_template_file ".zprofile"
   render_home_template_file ".config/starship.toml"
   render_home_template_file ".nanorc"
+}
+
+strip_path_exports_from_file() {
+  local path="$1"
+  [[ -f "$path" ]] || return 0
+
+  python3 - "$path" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+path = Path(sys.argv[1])
+lines = path.read_text(encoding="utf-8").splitlines()
+pattern = re.compile(r"^\s*(?:export\s+)?PATH\s*=")
+filtered = [line for line in lines if not pattern.match(line)]
+content = "\n".join(filtered)
+if content:
+    content += "\n"
+path.write_text(content, encoding="utf-8")
+PY
+}
+
+collect_path_migration_content() {
+  python3 - "$@" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+assignment_re = re.compile(r'^\s*(?:export\s+)?PATH\s*=\s*(.+?)\s*$')
+trailing_export_re = re.compile(r';\s*export\s+PATH\s*(?:[#].*)?$')
+
+segments = []
+seen = set()
+
+def normalize_rhs(rhs: str) -> str:
+    rhs = trailing_export_re.sub('', rhs).strip()
+    if len(rhs) >= 2 and rhs[0] == rhs[-1] and rhs[0] in {'"', "'"}:
+        rhs = rhs[1:-1]
+    return rhs
+
+for raw_path in sys.argv[1:]:
+    path = Path(raw_path)
+    if not path.is_file():
+        continue
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        match = assignment_re.match(line)
+        if not match:
+            continue
+        rhs = normalize_rhs(match.group(1))
+        for entry in rhs.split(':'):
+            entry = entry.strip()
+            if not entry:
+                continue
+            if 'PATH' in entry and ('$PATH' in entry or '${PATH' in entry):
+                continue
+            if entry in seen:
+                continue
+            seen.add(entry)
+            segments.append(entry)
+
+if not segments:
+    raise SystemExit(0)
+
+print('# Managed by labwc: migrated PATH entries from existing shell startup files.')
+for entry in reversed(segments):
+    escaped = entry.replace('\\', '\\\\').replace('"', '\\"').replace('`', '\\`')
+    print(f'path_prepend_unique "{escaped}"')
+PY
+}
+
+migrate_path_exports_to_profile() {
+  local migration_content=""
+  local path
+  local -a candidate_paths=(
+    "$LABWC_TARGET_HOME/.bashrc"
+    "$LABWC_TARGET_HOME/.bash_profile"
+    "$LABWC_TARGET_HOME/.bash_login"
+    "$LABWC_TARGET_HOME/.zprofile"
+    "$LABWC_TARGET_HOME/.zshrc"
+    "$LABWC_TARGET_HOME/.zshenv"
+  )
+  local -a existing_paths=()
+
+  for path in "${candidate_paths[@]}"; do
+    [[ -f "$path" ]] || continue
+    existing_paths+=("$path")
+  done
+
+  if ((${#existing_paths[@]} > 0)); then
+    migration_content="$(collect_path_migration_content "${existing_paths[@]}" || true)"
+    for path in "${existing_paths[@]}"; do
+      strip_path_exports_from_file "$path"
+    done
+  fi
+
+  MIGRATED_PATH_SNIPPET="$migration_content"
 }
 
 render_xfce_helpers() {

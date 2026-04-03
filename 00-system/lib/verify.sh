@@ -26,6 +26,17 @@ assert_tree_has_no_root_owned_entries() {
   [[ -z "$first_match" ]] || die "root-owned content remains under $path: $first_match"
 }
 
+assert_nocow_attribute() {
+  local path="$1"
+  local fs_type attrs
+
+  require_dir "$path"
+  fs_type="$(path_fs_type "$path" 2>/dev/null || true)"
+  [[ "$fs_type" == "btrfs" ]] || die "expected btrfs for nodatacow path $path, found '${fs_type:-unknown}'"
+  attrs="$(lsattr -d "$path" 2>/dev/null | awk '{print $1}')"
+  [[ "$attrs" == *C* ]] || die "nodatacow attribute is missing on $path"
+}
+
 verify_path_is_nested_under_any() {
   local path="$1"
   local root
@@ -38,7 +49,8 @@ verify_path_is_nested_under_any() {
 }
 
 verify_system_path_permissions() {
-  local spec path owner_token group_token mode owner group
+  local spec path owner_token group_token mode owner group scope nocow
+  local -a verified_tree_roots=()
 
   for spec in "${SYSTEM_DATA_PATH_SPECS[@]}"; do
     IFS='|' read -r path owner_token group_token mode <<<"$spec"
@@ -46,16 +58,32 @@ verify_system_path_permissions() {
     group="$(resolve_path_principal "$group_token")"
     assert_directory_state "$path" "$owner" "$group" "$mode"
   done
+
+  for spec in "${SYSTEM_POOL_PATH_SPECS[@]}"; do
+    IFS='|' read -r path owner_token group_token mode scope nocow <<<"$spec"
+    owner="$(resolve_path_principal "$owner_token")"
+    group="$(resolve_path_principal "$group_token")"
+    assert_directory_state "$path" "$owner" "$group" "$mode"
+    if [[ "$scope" == "tree" ]]; then
+      if ! verify_path_is_nested_under_any "$path" "${verified_tree_roots[@]}"; then
+        assert_tree_has_no_root_owned_entries "$path"
+        verified_tree_roots+=("$path")
+      fi
+    fi
+    if [[ "$nocow" == "yes" ]]; then
+      assert_nocow_attribute "$path"
+    fi
+  done
 }
 
 verify_home_permissions() {
-  local spec relative_path mode scope path
+  local spec relative_path mode scope nocow path
   local -a verified_tree_roots=()
 
   assert_directory_state "$SYSTEM_TARGET_HOME" "$SYSTEM_TARGET_USER" "$SYSTEM_TARGET_GROUP" "$SYSTEM_HOME_MODE"
 
   for spec in "${SYSTEM_HOME_DIR_SPECS[@]}"; do
-    IFS='|' read -r relative_path mode scope <<<"$spec"
+    IFS='|' read -r relative_path mode scope nocow <<<"$spec"
     path="$SYSTEM_TARGET_HOME/$relative_path"
     assert_directory_state "$path" "$SYSTEM_TARGET_USER" "$SYSTEM_TARGET_GROUP" "$mode"
     if [[ "$scope" == "tree" ]]; then
@@ -64,6 +92,9 @@ verify_home_permissions() {
       fi
       assert_tree_has_no_root_owned_entries "$path"
       verified_tree_roots+=("$path")
+    fi
+    if [[ "$nocow" == "yes" ]]; then
+      assert_nocow_attribute "$path"
     fi
   done
 }
@@ -92,5 +123,6 @@ verify_install() {
   verify_mount_targets
   verify_system_path_permissions
   verify_home_permissions
+  verify_home_environment
   log_info "verification completed"
 }

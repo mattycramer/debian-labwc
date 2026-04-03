@@ -16,6 +16,22 @@ prepare_build_log_dir() {
   run_cmd install -d -m 0755 "$DBUS_BROKER_BUILD_LOG_DIR"
 }
 
+ensure_broker_build_root() {
+  run_cmd install -d -m 0755 "$(dirname "$DBUS_BROKER_TMP_DIR")" "$DBUS_BROKER_TMP_DIR"
+}
+
+persistent_broker_work_root() {
+  printf '%s/dbus-broker\n' "$DBUS_BROKER_TMP_DIR"
+}
+
+prepare_persistent_broker_work_root() {
+  local work_root=""
+  ensure_broker_build_root
+  work_root="$(persistent_broker_work_root)"
+  run_cmd install -d -m 0755 "$work_root"
+  printf '%s\n' "$work_root"
+}
+
 run_logged_command() {
   local log_path="$1"
   shift
@@ -50,8 +66,7 @@ init_broker_runtime_paths() {
   [[ -n "${DBUS_BROKER_STATE_DIR:-}" ]] || die "DBUS_BROKER_STATE_DIR must be set before initializing broker runtime paths"
   DBUS_BROKER_BACKUP_DIR="${DBUS_BROKER_STATE_DIR%/}/backups"
   DBUS_BROKER_TOOLCHAIN_BIN_DIR="${DBUS_BROKER_STATE_DIR%/}/toolchain-bin"
-  DBUS_BROKER_LEGACY_PROVENANCE_PATH="${DBUS_BROKER_INSTALL_SHARE_DIR%/}/release.env"
-  DBUS_BROKER_LEGACY_VERIFICATION_PATH="${DBUS_BROKER_INSTALL_SHARE_DIR%/}/release-verification.txt"
+  DBUS_BROKER_ARTIFACT_RELEASE_VERIFICATION_PATH="${DBUS_BROKER_INSTALL_SHARE_DIR%/}/artifact-release-verification.txt"
   DBUS_BROKER_BUILD_PROVENANCE_PATH="${DBUS_BROKER_INSTALL_SHARE_DIR%/}/source-build.env"
   DBUS_BROKER_BUILD_VERIFICATION_PATH="${DBUS_BROKER_INSTALL_SHARE_DIR%/}/source-build-verification.txt"
   DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH="${DBUS_BROKER_INSTALL_SHARE_DIR%/}/subprojects.lock"
@@ -157,7 +172,7 @@ validate_env_settings() {
   require_path_prefix "DBUS_BROKER_SYSTEM_UNIT_PATH" "$DBUS_BROKER_SYSTEM_UNIT_PATH" "/etc/systemd/system"
   require_path_prefix "DBUS_BROKER_USER_UNIT_PATH" "$DBUS_BROKER_USER_UNIT_PATH" "/etc/systemd/user"
   require_path_prefix "DBUS_BROKER_STATE_DIR" "$DBUS_BROKER_STATE_DIR" "/var/lib"
-  require_path_prefix "DBUS_BROKER_TMP_DIR" "$DBUS_BROKER_TMP_DIR" "/tmp"
+  require_path_prefix "DBUS_BROKER_TMP_DIR" "$DBUS_BROKER_TMP_DIR" "/pool/builds"
 
   [[ "$DBUS_BROKER_INSTALL_BIN_DIR" == "/usr/bin" ]] || die "DBUS_BROKER_INSTALL_BIN_DIR must be '/usr/bin'"
   [[ "$DBUS_BROKER_INSTALL_MAN_DIR" == "/usr/share/man/man1" ]] || die "DBUS_BROKER_INSTALL_MAN_DIR must be '/usr/share/man/man1'"
@@ -397,6 +412,15 @@ record_subproject_manifest() {
 
 cleanup_build_workspace() {
   if [[ -n "${DBUS_BROKER_WORK_ROOT:-}" ]]; then
+    if [[ "$DBUS_BROKER_WORK_ROOT" == "$(persistent_broker_work_root)" ]]; then
+      DBUS_BROKER_WORK_ROOT=""
+      DBUS_BROKER_REPO_DIR=""
+      DBUS_BROKER_BUILD_DIR=""
+      DBUS_BROKER_STAGE_DIR=""
+      DBUS_BROKER_ARTIFACT_TARBALL_PATH=""
+      DBUS_BROKER_SUBPROJECTS_LOCK_PATH=""
+      return 0
+    fi
     [[ "$DBUS_BROKER_WORK_ROOT" == /tmp/* ]] || die "refusing to remove unexpected dbus-broker work root: $DBUS_BROKER_WORK_ROOT"
     run_cmd rm -rf -- "$DBUS_BROKER_WORK_ROOT"
   fi
@@ -448,7 +472,7 @@ $missing_output"
 prepare_source_build() {
   local meson_args_file
   local -a meson_args=()
-  local cflags cxxflags ldflags rustflags
+  local cflags cxxflags ldflags rustflags current_url
 
   cleanup_build_workspace
   ensure_runtime_directories
@@ -458,13 +482,25 @@ prepare_source_build() {
   ldflags="$(native_ldflags)"
   rustflags="$(native_rustflags)"
 
-  DBUS_BROKER_WORK_ROOT="$(mktemp -d "${DBUS_BROKER_TMP_DIR%/}/dbus-broker.XXXXXX")"
+  DBUS_BROKER_WORK_ROOT="$(prepare_persistent_broker_work_root)"
   DBUS_BROKER_REPO_DIR="$DBUS_BROKER_WORK_ROOT/source"
   DBUS_BROKER_BUILD_DIR="$DBUS_BROKER_WORK_ROOT/build"
   DBUS_BROKER_STAGE_DIR="$DBUS_BROKER_WORK_ROOT/stage"
   DBUS_BROKER_SUBPROJECTS_LOCK_PATH="$DBUS_BROKER_WORK_ROOT/subprojects.lock"
+  run_cmd rm -rf -- "$DBUS_BROKER_STAGE_DIR"
 
-  retry_cmd 3 run_logged_command "$(dbus_broker_build_log_path)" git clone --quiet --filter=blob:none "$DBUS_BROKER_GIT_URL" "$DBUS_BROKER_REPO_DIR"
+  if [[ -e "$DBUS_BROKER_REPO_DIR" && ! -d "$DBUS_BROKER_REPO_DIR/.git" ]]; then
+    run_cmd rm -rf -- "$DBUS_BROKER_REPO_DIR" "$DBUS_BROKER_BUILD_DIR" "$DBUS_BROKER_STAGE_DIR" "$DBUS_BROKER_SUBPROJECTS_LOCK_PATH"
+  fi
+  if [[ -d "$DBUS_BROKER_REPO_DIR/.git" ]]; then
+    current_url="$(git -C "$DBUS_BROKER_REPO_DIR" remote get-url origin 2>/dev/null || true)"
+    if [[ -z "$current_url" || "$(normalize_git_url "$current_url")" != "$(normalize_git_url "$DBUS_BROKER_GIT_URL")" ]]; then
+      run_cmd rm -rf -- "$DBUS_BROKER_REPO_DIR" "$DBUS_BROKER_BUILD_DIR" "$DBUS_BROKER_STAGE_DIR" "$DBUS_BROKER_SUBPROJECTS_LOCK_PATH"
+    fi
+  fi
+  if [[ ! -d "$DBUS_BROKER_REPO_DIR/.git" ]]; then
+    retry_cmd 3 run_logged_command "$(dbus_broker_build_log_path)" git clone --quiet --filter=blob:none "$DBUS_BROKER_GIT_URL" "$DBUS_BROKER_REPO_DIR"
+  fi
   retry_cmd 3 run_logged_command "$(dbus_broker_build_log_path)" git -C "$DBUS_BROKER_REPO_DIR" fetch --quiet --depth 1 origin "$DBUS_BROKER_COMMIT_SHA"
   run_logged_command "$(dbus_broker_build_log_path)" git -C "$DBUS_BROKER_REPO_DIR" checkout --quiet --detach "$DBUS_BROKER_COMMIT_SHA"
   verify_checkout_remote "$DBUS_BROKER_REPO_DIR" "$DBUS_BROKER_GIT_URL"
@@ -556,10 +592,9 @@ DBUS_BROKER_BINDGEN_VERSION="$(bindgen --version)"
 DBUS_BROKER_BUILD_LOG="$(dbus_broker_build_log_path)"
 DBUS_BROKER_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 EOF
-)"
+  )"
   backup_existing_path "$DBUS_BROKER_BUILD_PROVENANCE_PATH"
   write_root_file "$DBUS_BROKER_BUILD_PROVENANCE_PATH" 0644 "$provenance"
-  remove_if_present "$DBUS_BROKER_LEGACY_PROVENANCE_PATH"
 
   verification="$(cat <<EOF
 Build directory: $DBUS_BROKER_BUILD_DIR
@@ -570,7 +605,6 @@ EOF
 )"
   backup_existing_path "$DBUS_BROKER_BUILD_VERIFICATION_PATH"
   write_root_file "$DBUS_BROKER_BUILD_VERIFICATION_PATH" 0644 "$verification"
-  remove_if_present "$DBUS_BROKER_LEGACY_VERIFICATION_PATH"
 
   backup_existing_path "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH"
   run_cmd install -m 0644 "$DBUS_BROKER_SUBPROJECTS_LOCK_PATH" "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH"
@@ -581,9 +615,10 @@ prepare_artifact_install() {
   cleanup_build_workspace
   ensure_runtime_directories
 
-  DBUS_BROKER_WORK_ROOT="$(mktemp -d "${DBUS_BROKER_TMP_DIR%/}/dbus-broker.XXXXXX")"
+  DBUS_BROKER_WORK_ROOT="$(prepare_persistent_broker_work_root)"
   DBUS_BROKER_STAGE_DIR="$DBUS_BROKER_WORK_ROOT/stage"
   DBUS_BROKER_ARTIFACT_TARBALL_PATH="$DBUS_BROKER_WORK_ROOT/dbus-broker-artifact.tar.gz"
+  run_cmd rm -rf -- "$DBUS_BROKER_STAGE_DIR"
 
   retry_cmd 3 run_logged_command "$(dbus_broker_build_log_path)" \
     curl --fail --location --max-time 60 --silent --show-error -o "$DBUS_BROKER_ARTIFACT_TARBALL_PATH" "$DBUS_BROKER_TARBALL_URL"
@@ -626,25 +661,24 @@ DBUS_BROKER_COMMIT_SHA="$DBUS_BROKER_COMMIT_SHA"
 DBUS_BROKER_BUILD_LOG="$(dbus_broker_build_log_path)"
 DBUS_BROKER_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 EOF
-)"
+  )"
   backup_existing_path "$DBUS_BROKER_BUILD_PROVENANCE_PATH"
   write_root_file "$DBUS_BROKER_BUILD_PROVENANCE_PATH" 0644 "$provenance"
-  remove_if_present "$DBUS_BROKER_LEGACY_PROVENANCE_PATH"
 
   verification="$(cat <<EOF
 Artifact URL: $DBUS_BROKER_TARBALL_URL
 Artifact SHA256: $(normalize_sha256_value "$DBUS_BROKER_TARBALL_SHA")
 Artifact Commit Tag: $DBUS_BROKER_COMMIT_TAG
 Artifact Commit SHA: $DBUS_BROKER_COMMIT_SHA
-Artifact Release Verification Path: $DBUS_BROKER_LEGACY_VERIFICATION_PATH
+Artifact Release Verification Path: $DBUS_BROKER_ARTIFACT_RELEASE_VERIFICATION_PATH
 EOF
 )"
   backup_existing_path "$DBUS_BROKER_BUILD_VERIFICATION_PATH"
   write_root_file "$DBUS_BROKER_BUILD_VERIFICATION_PATH" 0644 "$verification"
 
   artifact_release_verification_path="$DBUS_BROKER_STAGE_DIR/usr/share/dbus-broker/release-verification.txt"
-  backup_existing_path "$DBUS_BROKER_LEGACY_VERIFICATION_PATH"
-  run_cmd install -D -m 0644 "$artifact_release_verification_path" "$DBUS_BROKER_LEGACY_VERIFICATION_PATH"
+  backup_existing_path "$DBUS_BROKER_ARTIFACT_RELEASE_VERIFICATION_PATH"
+  run_cmd install -D -m 0644 "$artifact_release_verification_path" "$DBUS_BROKER_ARTIFACT_RELEASE_VERIFICATION_PATH"
 
   backup_existing_path "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH"
   run_cmd install -m 0644 "$DBUS_BROKER_SUBPROJECTS_LOCK_PATH" "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH"
@@ -739,8 +773,7 @@ remove_broker_install() {
   restore_backed_up_path "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-session" || remove_unmanaged_artifact "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-session"
   restore_backed_up_path "$DBUS_BROKER_INSTALL_MAN_DIR/dbus-broker.1" || remove_unmanaged_artifact "$DBUS_BROKER_INSTALL_MAN_DIR/dbus-broker.1"
   restore_backed_up_path "$DBUS_BROKER_INSTALL_MAN_DIR/dbus-broker-launch.1" || remove_unmanaged_artifact "$DBUS_BROKER_INSTALL_MAN_DIR/dbus-broker-launch.1"
-  restore_backed_up_path "$DBUS_BROKER_LEGACY_PROVENANCE_PATH" || remove_unmanaged_artifact "$DBUS_BROKER_LEGACY_PROVENANCE_PATH"
-  restore_backed_up_path "$DBUS_BROKER_LEGACY_VERIFICATION_PATH" || remove_unmanaged_artifact "$DBUS_BROKER_LEGACY_VERIFICATION_PATH"
+  restore_backed_up_path "$DBUS_BROKER_ARTIFACT_RELEASE_VERIFICATION_PATH" || remove_unmanaged_artifact "$DBUS_BROKER_ARTIFACT_RELEASE_VERIFICATION_PATH"
   restore_backed_up_path "$DBUS_BROKER_BUILD_PROVENANCE_PATH" || remove_unmanaged_artifact "$DBUS_BROKER_BUILD_PROVENANCE_PATH"
   restore_backed_up_path "$DBUS_BROKER_BUILD_VERIFICATION_PATH" || remove_unmanaged_artifact "$DBUS_BROKER_BUILD_VERIFICATION_PATH"
   restore_backed_up_path "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH" || remove_unmanaged_artifact "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH"
@@ -757,6 +790,7 @@ remove_broker_install() {
     "$(dbus_service_alias_path "org.freedesktop.thumbnails.Thumbnailer1.service")")
 
   cleanup_build_workspace
+  remove_if_present "$(persistent_broker_work_root)"
   remove_if_present "$DBUS_BROKER_TOOLCHAIN_BIN_DIR"
   remove_if_present "$DBUS_BROKER_BACKUP_DIR"
   run_cmd rmdir --ignore-fail-on-non-empty "$DBUS_BROKER_STATE_DIR" >/dev/null 2>&1 || true

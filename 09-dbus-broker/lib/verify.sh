@@ -20,7 +20,7 @@ verify_paths() {
   require_file "$DBUS_BROKER_BUILD_VERIFICATION_PATH"
   require_file "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH"
   if [[ "${DBUS_BROKER_INSTALL_METHOD:-}" == "artifact" ]]; then
-    require_file "$DBUS_BROKER_LEGACY_VERIFICATION_PATH"
+    require_file "$DBUS_BROKER_ARTIFACT_RELEASE_VERIFICATION_PATH"
   fi
   require_file "$DBUS_BROKER_SYSTEM_UNIT_PATH"
   require_file "$DBUS_BROKER_USER_UNIT_PATH"
@@ -82,7 +82,7 @@ verify_build_manifest() {
       grep -F "Artifact SHA256: $(normalize_sha256_value "$DBUS_BROKER_TARBALL_SHA")" "$DBUS_BROKER_BUILD_VERIFICATION_PATH" >/dev/null || {
         die "artifact verification file is missing the expected tarball sha"
       }
-      grep -F "## dbus-broker" "$DBUS_BROKER_LEGACY_VERIFICATION_PATH" >/dev/null || {
+      grep -F "## dbus-broker" "$DBUS_BROKER_ARTIFACT_RELEASE_VERIFICATION_PATH" >/dev/null || {
         die "release verification file is missing the expected dbus-broker marker"
       }
       ;;

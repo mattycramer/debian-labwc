@@ -81,6 +81,7 @@ install_labwc_tweaks() {
   cflags="$(native_cflags)"
   cxxflags="$(native_cxxflags)"
   ldflags="$(native_ldflags)"
+  run_cmd rm -rf -- "$stage_root"
 
   trap 'cleanup_source_checkout "$work_root"' RETURN
 

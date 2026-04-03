@@ -39,6 +39,7 @@ build_ecm_prefix() {
   build_dir="$work_root/build"
   prefix_dir="$work_root/prefix"
   validate_ecm_source_tree "$repo_dir"
+  run_cmd rm -rf -- "$prefix_dir"
 
   run_logged_command "$log_path" cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
     -D CMAKE_BUILD_TYPE=Release \

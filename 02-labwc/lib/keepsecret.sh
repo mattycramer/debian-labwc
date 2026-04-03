@@ -61,6 +61,7 @@ install_keepsecret() {
   ecm_dir="$ecm_prefix/share/ECM/cmake"
   cmake_prefix_env="${kirigami_prefix}:${ecm_prefix}"
   cmake_prefix_arg="${kirigami_prefix};${ecm_prefix}"
+  run_cmd rm -rf -- "$stage_root"
 
   trap 'cleanup_source_checkout "$work_root"; cleanup_source_checkout "$kirigami_work_root"; cleanup_source_checkout "$ecm_work_root"' RETURN
 

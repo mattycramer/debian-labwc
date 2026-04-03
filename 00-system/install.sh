@@ -23,6 +23,8 @@ source "$SCRIPT_DIR/lib/mount_units.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/permissions.sh"
 # shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/home_env.sh"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/secureboot.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/sudoers.sh"
@@ -95,6 +97,8 @@ run_preflight_checks() {
   require_command id
   require_command install
   require_command journalctl
+  require_command chattr
+  require_command lsattr
   require_command lsblk
   require_command mktemp
   require_command modinfo
@@ -133,6 +137,7 @@ phase_permissions() {
   apply_system_account_policies
   apply_system_path_permissions
   apply_home_permissions
+  apply_home_environment
 }
 
 phase_secureboot() {
@@ -168,6 +173,7 @@ phase_nuke() {
   remove_managed_secure_boot
   remove_managed_mount_units
   remove_managed_sudoers
+  remove_home_environment
   log_warn "directory ownership and permissions are intentionally left in place"
 }
 
