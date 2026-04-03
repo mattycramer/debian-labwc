@@ -199,8 +199,62 @@ verify_session_activation_contract() {
   }
 }
 
+verify_structured_config_files() {
+  local -a config_files=(
+    "/etc/greetd/config.toml"
+    "/etc/greetd/regreet.toml"
+    "/etc/labwc-greeter/rc.xml"
+    "/usr/share/wayland-sessions/labwc.desktop"
+    "$LABWC_TARGET_HOME/.config/labwc/rc.xml"
+    "$LABWC_TARGET_HOME/.config/labwc/menu.xml"
+    "$LABWC_TARGET_HOME/.config/Thunar/uca.xml"
+    "$LABWC_TARGET_HOME/.config/waybar/config.jsonc"
+  )
+  local config_path
+
+  for config_path in "${config_files[@]}"; do
+    require_file "$config_path"
+  done
+
+  python3 - "${config_files[@]}" <<'PY'
+from pathlib import Path
+import configparser
+import json
+import re
+import sys
+import tomllib
+import xml.etree.ElementTree as ET
+
+allowed_literals = {"@DEFAULT_AUDIO_SINK@"}
+
+for raw_path in sys.argv[1:]:
+    path = Path(raw_path)
+    text = path.read_text(encoding="utf-8")
+    unresolved = {
+        token
+        for token in re.findall(r"@[A-Z0-9_]+@", text)
+        if token not in allowed_literals
+    }
+    if unresolved:
+        raise SystemExit(
+            f"{path} still contains unresolved placeholders: {', '.join(sorted(unresolved))}"
+        )
+
+    if path.suffix == ".toml":
+        tomllib.loads(text)
+    elif path.suffix == ".xml":
+        ET.fromstring(text)
+    elif path.suffix == ".desktop":
+        parser = configparser.ConfigParser(interpolation=None, strict=False)
+        parser.read_string(text)
+    elif path.name == "config.jsonc":
+        json.loads(text)
+PY
+}
+
 verify_shell_and_units() {
   dash -n "$LABWC_TARGET_HOME/.config/labwc/autostart"
+  sh -n "/etc/labwc-greeter/autostart"
   sh -n "/usr/local/bin/labwc-greeter-session"
   sh -n "/usr/local/bin/labwc-greeter-regreet"
   sh -n "/usr/local/bin/labwc-session-start"
@@ -216,6 +270,7 @@ verify_install() {
   verify_keepsecret_install
   verify_greeter_contract
   verify_session_activation_contract
+  verify_structured_config_files
   verify_shell_and_units
   log_info "verification completed"
 }
