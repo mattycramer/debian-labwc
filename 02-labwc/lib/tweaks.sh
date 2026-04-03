@@ -86,8 +86,8 @@ install_labwc_tweaks() {
 
   log_info "building labwc-tweaks from ${LABWC_TWEAKS_COMMIT_SHA}"
   run_logged_command "$log_path" env \
-    CC=clang \
-    CXX=clang++ \
+    CC="$(llvm_clang_bin)" \
+    CXX="$(llvm_clangxx_bin)" \
     CFLAGS="$cflags" \
     CXXFLAGS="$cxxflags" \
     LDFLAGS="$ldflags" \

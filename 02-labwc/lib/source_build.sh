@@ -254,14 +254,23 @@ fetch_source_checkout() {
   work_root="$(mktemp -d "/tmp/${repo_name}.XXXXXX")"
   repo_dir="$work_root/source"
 
-  if [[ -n "$log_path" ]]; then
-    retry_cmd 3 run_logged_command "$log_path" git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
-    retry_cmd 3 run_logged_command "$log_path" git -C "$repo_dir" fetch --quiet --depth 1 origin "$commit_sha"
-    run_logged_command "$log_path" git -C "$repo_dir" checkout --quiet --detach "$commit_sha"
+  if declare -F run_target_user_command >/dev/null 2>&1 \
+    && [[ -n "${LABWC_TARGET_USER:-}" ]] \
+    && [[ "${LABWC_TARGET_USER}" != "root" ]]; then
+    run_cmd chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$work_root"
+    retry_cmd 3 run_target_user_command -- git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
+    retry_cmd 3 run_target_user_command -- git -C "$repo_dir" fetch --quiet --depth 1 origin "$commit_sha"
+    run_target_user_command -- git -C "$repo_dir" checkout --quiet --detach "$commit_sha"
   else
-    retry_cmd 3 git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
-    retry_cmd 3 git -C "$repo_dir" fetch --quiet --depth 1 origin "$commit_sha"
-    run_cmd git -C "$repo_dir" checkout --quiet --detach "$commit_sha"
+    if [[ -n "$log_path" ]]; then
+      retry_cmd 3 run_logged_command "$log_path" git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
+      retry_cmd 3 run_logged_command "$log_path" git -C "$repo_dir" fetch --quiet --depth 1 origin "$commit_sha"
+      run_logged_command "$log_path" git -C "$repo_dir" checkout --quiet --detach "$commit_sha"
+    else
+      retry_cmd 3 git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
+      retry_cmd 3 git -C "$repo_dir" fetch --quiet --depth 1 origin "$commit_sha"
+      run_cmd git -C "$repo_dir" checkout --quiet --detach "$commit_sha"
+    fi
   fi
   verify_checkout_remote "$repo_dir" "$source_url"
   [[ "$(git -C "$repo_dir" rev-parse HEAD)" == "$commit_sha" ]] || {

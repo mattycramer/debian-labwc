@@ -4,6 +4,9 @@ readonly SID_SUITE="sid"
 readonly SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
 readonly SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
 readonly DEBIAN_ARCHIVE_KEYRING_PATH="/usr/share/keyrings/debian-archive-keyring.gpg"
+readonly LLVM_APT_BASE_URL="https://apt.llvm.org"
+readonly LLVM_APT_KEY_PATH="/etc/apt/keyrings/apt.llvm.org.asc"
+readonly LLVM_APT_SOURCES_PATH="/etc/apt/sources.list.d/llvm-toolchain.sources"
 readonly SID_RUNTIME_PACKAGES=(
   labwc
   kanshi
@@ -132,15 +135,13 @@ readonly SID_RUNTIME_PACKAGES=(
 
 readonly SID_SOURCE_BUILD_PACKAGES=(
   build-essential
+  appstream
   pkg-config
   pkgconf
-  clang
-  lld
   rustup
   cmake
   ninja-build
   meson
-  extra-cmake-modules
   gettext
   bindgen
   python3-docutils
@@ -156,14 +157,17 @@ readonly SID_SOURCE_BUILD_PACKAGES=(
   libkf6coreaddons-dev
   libkf6crash-dev
   libkf6dbusaddons-dev
+  libkf6iconthemes-dev
   libkf6i18n-dev
   libkf6itemmodels-dev
-  libkirigami-dev
   kirigami-addons-dev
+  libkf6qqc2desktopstyle-dev
   qt6-base-dev
+  qt6-base-private-dev
   qt6-base-dev-tools
   qt6-declarative-dev
   qt6-declarative-dev-tools
+  qt6-shadertools-dev
   qt6-svg-dev
   qt6-tools-dev
   qt6-tools-dev-tools
@@ -202,6 +206,85 @@ retry_cmd() {
   done
 }
 
+llvm_upstream_candidate_majors() {
+  if [[ -n "${LABWC_LLVM_UPSTREAM_MAJOR:-}" ]]; then
+    printf '%s\n' "$LABWC_LLVM_UPSTREAM_MAJOR"
+    return 0
+  fi
+  printf '%s\n' 23 22 21 20
+}
+
+llvm_upstream_major() {
+  local codename major code url
+
+  if [[ -n "${LABWC_LLVM_RESOLVED_MAJOR:-}" ]]; then
+    printf '%s\n' "$LABWC_LLVM_RESOLVED_MAJOR"
+    return 0
+  fi
+
+  codename="$(
+    . /etc/os-release
+    printf '%s' "${VERSION_CODENAME:-}"
+  )"
+  [[ -n "$codename" ]] || die "could not determine Debian codename for LLVM upstream repo"
+
+  while IFS= read -r major; do
+    [[ "$major" =~ ^[0-9]+$ ]] || die "LABWC_LLVM_UPSTREAM_MAJOR must be numeric, found '$major'"
+    url="${LLVM_APT_BASE_URL}/${codename}/dists/llvm-toolchain-${codename}-${major}/Release"
+    code="$(curl --location --silent --output /dev/null --write-out '%{http_code}' --max-time 20 "$url" || true)"
+    if [[ "$code" == "200" ]]; then
+      LABWC_LLVM_RESOLVED_MAJOR="$major"
+      printf '%s\n' "$LABWC_LLVM_RESOLVED_MAJOR"
+      return 0
+    fi
+  done < <(llvm_upstream_candidate_majors)
+
+  die "could not determine a published LLVM upstream major for ${codename}"
+}
+
+llvm_clang_bin() {
+  printf '%s\n' "clang-$(llvm_upstream_major)"
+}
+
+llvm_clangxx_bin() {
+  printf '%s\n' "clang++-$(llvm_upstream_major)"
+}
+
+llvm_upstream_packages() {
+  local major
+  major="$(llvm_upstream_major)"
+  printf '%s\n' \
+    "clang-${major}" \
+    "lld-${major}" \
+    "libomp-${major}-dev"
+}
+
+ensure_llvm_upstream_repository() {
+  local codename major content
+
+  codename="$(
+    . /etc/os-release
+    printf '%s' "${VERSION_CODENAME:-}"
+  )"
+  major="$(llvm_upstream_major)"
+
+  run_cmd install -d -m 0755 /etc/apt/keyrings
+  run_cmd curl --fail --location --max-time 20 --silent --show-error \
+    -o "$LLVM_APT_KEY_PATH" \
+    "${LLVM_APT_BASE_URL}/llvm-snapshot.gpg.key"
+
+  content="$(cat <<EOF
+Types: deb
+Architectures: amd64
+Signed-By: ${LLVM_APT_KEY_PATH}
+URIs: ${LLVM_APT_BASE_URL}/${codename}/
+Suites: llvm-toolchain-${codename}-${major}
+Components: main
+EOF
+)"
+  printf '%s\n' "$content" >"$LLVM_APT_SOURCES_PATH"
+}
+
 apt_yes_args() {
   if [[ "${ASSUME_YES:-1}" -eq 1 ]]; then
     printf '%s\n' "-y"
@@ -210,6 +293,9 @@ apt_yes_args() {
 
 apt_update() {
   log_info "updating apt metadata"
+  if [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]]; then
+    ensure_llvm_upstream_repository
+  fi
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
@@ -257,7 +343,27 @@ install_requested_packages() {
   if ((${#build_package_list[@]} > 0)); then
     log_info "installing source-build package set from sid"
     run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${build_package_list[@]}"
+    mapfile -t build_package_list < <(llvm_upstream_packages)
+    log_info "installing upstream LLVM toolchain packages"
+    run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${build_package_list[@]}"
   fi
   log_info "installing graphics package set from sid"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${graphics_package_list[@]}"
+}
+
+remove_source_build_packages() {
+  local -a apt_args=()
+  local -a cleanup_package_list=()
+  local package_name
+
+  [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]] || return 0
+  mapfile -t apt_args < <(apt_yes_args)
+  cleanup_package_list=("${SID_SOURCE_BUILD_PACKAGES[@]}")
+  while IFS= read -r package_name; do
+    [[ -n "$package_name" ]] || continue
+    cleanup_package_list+=("$package_name")
+  done < <(llvm_upstream_packages)
+
+  log_info "removing source-build tooling packages after successful install"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt purge --autoremove "${apt_args[@]}" "${cleanup_package_list[@]}"
 }

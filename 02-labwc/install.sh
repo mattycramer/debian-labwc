@@ -25,6 +25,10 @@ source "$SCRIPT_DIR/lib/render.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/source_build.sh"
 # shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/ecm.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/kirigami.sh"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/services.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/tweaks.sh"
@@ -329,9 +333,9 @@ phase_doctor() {
 
 phase_source_build_doctor() {
   require_command git
-  require_command clang
-  require_command clang++
-  require_command ld.lld
+  require_command appstreamcli
+  require_command "$(llvm_clang_bin)"
+  require_command "$(llvm_clangxx_bin)"
   require_command rustup
   require_command cmake
   require_command ninja
@@ -399,9 +403,6 @@ phase_verify() {
   log_info "phase: verify"
   phase_doctor
   load_env_file
-  if install_method_is_source; then
-    phase_source_build_doctor
-  fi
   verify_install
 }
 
@@ -441,6 +442,7 @@ main() {
       phase_build_sources
       phase_enable
       phase_verify
+      remove_source_build_packages
       ;;
     *)
       die "unsupported phase: $PHASE"

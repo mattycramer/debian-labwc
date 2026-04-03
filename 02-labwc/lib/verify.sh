@@ -126,6 +126,33 @@ verify_keepsecret_install() {
   assert_binary_dependencies "$KEEPSECRET_BIN_PATH" "keepsecret"
 }
 
+verify_kirigami_runtime_install() {
+  local qml_qmldir=""
+  local runtime_library=""
+
+  [[ "${LABWC_INSTALL_METHOD:-}" == "source" ]] || return 0
+
+  require_file "$KIRIGAMI_RUNTIME_PROVENANCE_PATH"
+  grep -F "KIRIGAMI_REPO_URL=\"$KIRIGAMI_REPO_URL\"" "$KIRIGAMI_RUNTIME_PROVENANCE_PATH" >/dev/null || {
+    die "Kirigami runtime provenance does not record expected repo URL"
+  }
+  grep -F "KIRIGAMI_REPO_COMMIT=\"$KIRIGAMI_REPO_COMMIT\"" "$KIRIGAMI_RUNTIME_PROVENANCE_PATH" >/dev/null || {
+    die "Kirigami runtime provenance does not record expected commit"
+  }
+  grep -F "KIRIGAMI_VERSION=\"$KIRIGAMI_VERSION\"" "$KIRIGAMI_RUNTIME_PROVENANCE_PATH" >/dev/null || {
+    die "Kirigami runtime provenance does not record expected pinned version"
+  }
+
+  qml_qmldir="$(find /usr/local -path '*/qt6/qml/org/kde/kirigami/qmldir' -type f | LC_ALL=C sort | head -n 1)"
+  [[ -n "$qml_qmldir" ]] || die "Kirigami runtime install is missing the org.kde.kirigami qmldir under /usr/local"
+  runtime_library="$(find /usr/local -type f \( -name 'libKirigami*.so*' -o -name 'libKF6Kirigami*.so*' \) | LC_ALL=C sort | head -n 1)"
+  [[ -n "$runtime_library" ]] || die "Kirigami runtime install is missing shared libraries under /usr/local"
+
+  if find /usr/local -path '*/cmake/KF6Kirigami*' -o -path '*/include/KF6/Kirigami*' | grep -q .; then
+    die "Kirigami development artifacts were left installed under /usr/local"
+  fi
+}
+
 verify_greeter_contract() {
   require_file "/etc/greetd/config.toml"
   require_file "/usr/local/bin/labwc-greeter-session"
@@ -187,10 +214,12 @@ verify_session_activation_contract() {
   local session_entry="/usr/local/bin/labwc-session-start"
   local session_wrapper="/usr/local/bin/labwc-session"
   local session_autostart="$LABWC_TARGET_HOME/.config/labwc/autostart"
+  local session_environment="$LABWC_TARGET_HOME/.config/labwc/environment"
 
   require_file "$session_entry"
   require_file "$session_wrapper"
   require_file "$session_autostart"
+  require_file "$session_environment"
   grep -F 'refusing to fall back to dbus-run-session' "$session_entry" >/dev/null || {
     die "labwc-session-start lost the broker-only no-fallback contract"
   }
@@ -202,6 +231,12 @@ verify_session_activation_contract() {
   }
   grep -F 'dbus-update-activation-environment $dbus_vars' "$session_autostart" >/dev/null || {
     die "labwc autostart lost the explicit D-Bus activation-environment handoff"
+  }
+  grep -F '/usr/local/lib/x86_64-linux-gnu/qt6/qml' "$session_environment" >/dev/null || {
+    die "labwc session environment lost the managed /usr/local Qt QML import precedence"
+  }
+  grep -F 'QT_PLUGIN_PATH=/usr/local/lib/x86_64-linux-gnu/qt6/plugins' "$session_environment" >/dev/null || {
+    die "labwc session environment lost the managed /usr/local Qt plugin path precedence"
   }
 }
 
@@ -274,6 +309,7 @@ verify_install() {
   verify_regreet_install
   verify_labwc_tweaks_install
   verify_keepsecret_install
+  verify_kirigami_runtime_install
   verify_greeter_contract
   verify_session_activation_contract
   verify_structured_config_files

@@ -344,9 +344,10 @@ install_regreet_binary() {
   log_info "building regreet from ${REGREET_COMMIT_SHA} with ${REGREET_RUST_TOOLCHAIN}"
   run_logged_command "$log_path" \
     env PATH="$(rust_toolchain_bin_dir "$rust_state_root"):$PATH" \
+      CC="$(llvm_clang_bin)" \
+      CXX="$(llvm_clangxx_bin)" \
       RUSTFLAGS="$rust_flags" \
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
-      CARGO_PROFILE_RELEASE_LTO=thin \
       GREETD_CONFIG_DIR=/etc/greetd \
       STATE_DIR=/var/lib/regreet \
       LOG_DIR=/var/log/regreet \
@@ -669,6 +670,7 @@ nuke_all_state() {
   systemctl disable labwc-vpn-default-off.service >/dev/null 2>&1 || true
   remove_if_present "/etc/systemd/system/labwc-wireguard-import.service"
   remove_if_present "/etc/systemd/system/labwc-vpn-default-off.service"
+  remove_kirigami_runtime_install
   remove_labwc_tweaks_install
   remove_keepsecret_install
   remove_managed_wireguard_profiles

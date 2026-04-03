@@ -40,8 +40,10 @@ verify_keepsecret_stage() {
 
 install_keepsecret() {
   local work_root repo_dir build_dir stage_root provenance log_path cflags cxxflags ldflags
+  local kirigami_work_root kirigami_prefix cmake_prefix_path kirigami_provenance
 
   validate_keepsecret_settings
+  validate_kirigami_settings
   log_path="$(build_log_path "keepsecret-build")"
   work_root="$(fetch_source_checkout "keepsecret" "$KEEPSECRET_GIT_URL" "$KEEPSECRET_COMMIT_SHA" "$log_path")"
   repo_dir="$work_root/source"
@@ -50,16 +52,20 @@ install_keepsecret() {
   cflags="$(native_cflags)"
   cxxflags="$(native_cxxflags)"
   ldflags="$(native_ldflags)"
+  kirigami_work_root="$(build_kirigami_prefix)"
+  kirigami_prefix="$kirigami_work_root/stage/usr/local"
+  cmake_prefix_path="$kirigami_prefix"
 
-  trap 'cleanup_source_checkout "$work_root"' RETURN
+  trap 'cleanup_source_checkout "$work_root"; cleanup_source_checkout "$kirigami_work_root"' RETURN
 
   log_info "building keepsecret from ${KEEPSECRET_COMMIT_SHA}"
   run_logged_command "$log_path" env \
-    CC=clang \
-    CXX=clang++ \
+    CC="$(llvm_clang_bin)" \
+    CXX="$(llvm_clangxx_bin)" \
     CFLAGS="$cflags" \
     CXXFLAGS="$cxxflags" \
     LDFLAGS="$ldflags" \
+    CMAKE_PREFIX_PATH="$cmake_prefix_path" \
     cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
       -D CMAKE_BUILD_TYPE=Release \
       -D CMAKE_INSTALL_PREFIX=/usr/local \
@@ -67,10 +73,29 @@ install_keepsecret() {
       -D CMAKE_CXX_FLAGS="$cxxflags" \
       -D CMAKE_EXE_LINKER_FLAGS="$ldflags" \
       -D CMAKE_SHARED_LINKER_FLAGS="$ldflags" \
+      -D CMAKE_PREFIX_PATH="$cmake_prefix_path" \
       -D CMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
   run_logged_command "$log_path" cmake --build "$build_dir" --verbose
   run_logged_command "$log_path" env DESTDIR="$stage_root" cmake --install "$build_dir" --prefix /usr/local
   verify_keepsecret_stage "$stage_root"
+
+  kirigami_provenance="$(cat <<EOF
+KIRIGAMI_REPO_URL="$KIRIGAMI_REPO_URL"
+KIRIGAMI_REPO_COMMIT="$KIRIGAMI_REPO_COMMIT"
+KIRIGAMI_VERSION="$KIRIGAMI_VERSION"
+KEEPSECRET_KIRIGAMI_MIN_VERSION="$KEEPSECRET_KIRIGAMI_MIN_VERSION"
+KIRIGAMI_REQUIRED_QT_VERSION="$KIRIGAMI_REQUIRED_QT_VERSION"
+ECM_REPO_URL="$ECM_REPO_URL"
+ECM_REPO_COMMIT="$ECM_REPO_COMMIT"
+ECM_VERSION="$ECM_VERSION"
+LABWC_LLVM_UPSTREAM_MAJOR="$LABWC_LLVM_UPSTREAM_MAJOR"
+LABWC_LLVM_UPSTREAM_VERSION="$LABWC_LLVM_UPSTREAM_VERSION"
+KIRIGAMI_BUILD_LOG="$(build_log_path "$KIRIGAMI_BUILD_LOG_NAME")"
+KIRIGAMI_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+EOF
+)"
+  remove_kirigami_runtime_install
+  install_kirigami_runtime_stage "$kirigami_work_root/stage" "$kirigami_provenance"
 
   remove_keepsecret_install
   install_staged_tree "$stage_root" "$KEEPSECRET_MANIFEST_PATH"
@@ -87,6 +112,9 @@ install_keepsecret() {
 KEEPSECRET_GIT_URL="$KEEPSECRET_GIT_URL"
 KEEPSECRET_COMMIT_SHA="$KEEPSECRET_COMMIT_SHA"
 KEEPSECRET_INSTALL_METHOD="source"
+KIRIGAMI_REPO_URL="$KIRIGAMI_REPO_URL"
+KIRIGAMI_REPO_COMMIT="$KIRIGAMI_REPO_COMMIT"
+KEEPSECRET_CMAKE_PREFIX_PATH="$cmake_prefix_path"
 KEEPSECRET_PATCH_SERIES="patches/release/series"
 KEEPSECRET_CFLAGS="$cflags"
 KEEPSECRET_CXXFLAGS="$cxxflags"
@@ -99,6 +127,7 @@ EOF
 
   trap - RETURN
   cleanup_source_checkout "$work_root"
+  cleanup_source_checkout "$kirigami_work_root"
 }
 
 install_keepsecret_artifact() {
