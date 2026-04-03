@@ -8,26 +8,26 @@ fi
 render_user_file() {
   local destination="$1"
   local content="$2"
-  run_cmd install -D -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" /dev/null "$destination"
+  run_cmd install -D -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_GROUP" /dev/null "$destination"
   printf '%s' "$content" >"$destination"
-  run_cmd chown "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$destination"
+  run_cmd chown "$LABWC_TARGET_USER:$LABWC_TARGET_GROUP" "$destination"
 }
 
 render_user_private_file() {
   local destination="$1"
   local content="$2"
-  run_cmd install -D -m 0600 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" /dev/null "$destination"
+  run_cmd install -D -m 0600 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_GROUP" /dev/null "$destination"
   printf '%s' "$content" >"$destination"
-  run_cmd chown "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$destination"
+  run_cmd chown "$LABWC_TARGET_USER:$LABWC_TARGET_GROUP" "$destination"
   run_cmd chmod 0600 "$destination"
 }
 
 render_user_script() {
   local destination="$1"
   local content="$2"
-  run_cmd install -D -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" /dev/null "$destination"
+  run_cmd install -D -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_GROUP" /dev/null "$destination"
   printf '%s' "$content" >"$destination"
-  run_cmd chown "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$destination"
+  run_cmd chown "$LABWC_TARGET_USER:$LABWC_TARGET_GROUP" "$destination"
   run_cmd chmod 0755 "$destination"
 }
 
@@ -101,13 +101,12 @@ lock_wallpaper_target_path() {
 }
 
 ensure_user_base_dirs() {
-  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
+  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_GROUP" \
     "$LABWC_TARGET_HOME/.config" \
     "$LABWC_TARGET_HOME/.local" \
     "$LABWC_TARGET_HOME/.local/bin" \
     "$LABWC_TARGET_HOME/.local/share" \
     "$LABWC_TARGET_HOME/.local/state"
-  run_cmd chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.config" "$LABWC_TARGET_HOME/.local"
 }
 
 render_home_dirs() {
@@ -123,7 +122,7 @@ render_home_dirs() {
   )
   local dir
   for dir in "${dirs[@]}"; do
-    run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$dir"
+    run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_GROUP" "$dir"
   done
   render_home_template_file ".config/user-dirs.dirs"
   render_home_template_file ".config/user-dirs.locale"
@@ -336,11 +335,11 @@ render_wireplumber() {
 
 install_wallpaper() {
   local wallpaper_source_path wallpaper_name
-  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.local/share/labwc-session"
+  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_GROUP" "$LABWC_TARGET_HOME/.local/share/labwc-session"
   while IFS= read -r wallpaper_source_path; do
     [[ -n "$wallpaper_source_path" ]] || continue
     wallpaper_name="$(basename "$wallpaper_source_path")"
-    run_cmd install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$wallpaper_source_path" "$LABWC_TARGET_HOME/.local/share/labwc-session/$wallpaper_name"
+    run_cmd install -m 0644 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_GROUP" "$wallpaper_source_path" "$LABWC_TARGET_HOME/.local/share/labwc-session/$wallpaper_name"
   done < <(find "$SCRIPT_DIR/wallpaper" -maxdepth 1 -type f | LC_ALL=C sort)
   require_file "$(background_wallpaper_target_path)"
   require_file "$(lock_wallpaper_target_path)"
@@ -349,7 +348,7 @@ install_wallpaper() {
 render_all_configs() {
   local config_root="$LABWC_TARGET_HOME/.config"
   ensure_user_base_dirs
-  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" \
+  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_GROUP" \
     "$config_root/labwc" \
     "$config_root/waybar" \
     "$config_root/waybar/scripts" \
@@ -372,7 +371,7 @@ render_all_configs() {
     "$config_root/systemd/user/xdg-desktop-portal-wlr.service.d" \
     "$config_root/systemd/user" \
     "$config_root"
-  run_cmd install -d -m 0700 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.gnupg"
+  run_cmd install -d -m 0700 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_GROUP" "$LABWC_TARGET_HOME/.gnupg"
 
   render_home_dirs
   render_shell_startup_files
@@ -405,5 +404,4 @@ render_all_configs() {
   render_gammastep
   render_wireplumber
   render_portals
-  run_cmd chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$LABWC_TARGET_HOME/.config" "$LABWC_TARGET_HOME/.local"
 }

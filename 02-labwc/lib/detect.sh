@@ -16,6 +16,17 @@ detect_target_user() {
   LABWC_TARGET_USER="$candidate"
   LABWC_TARGET_HOME="$(getent passwd "$candidate" | awk -F: '{print $6}')"
   [[ -n "$LABWC_TARGET_HOME" ]] || die "could not determine home for '$candidate'"
+  LABWC_TARGET_GROUP="$(resolve_target_group "$candidate")"
+}
+
+resolve_target_group() {
+  local user_name="$1"
+  local group_name=""
+
+  [[ -n "$user_name" ]] || die "cannot resolve target group without a user name"
+  group_name="$(id -gn "$user_name" 2>/dev/null || true)"
+  [[ -n "$group_name" ]] || die "could not determine primary group for '$user_name'"
+  printf '%s\n' "$group_name"
 }
 
 detect_gpu_vendor() {
@@ -105,6 +116,7 @@ write_autogen_block() {
 $AUTOGEN_BEGIN
 LABWC_TARGET_USER="$LABWC_TARGET_USER"
 LABWC_TARGET_HOME="$LABWC_TARGET_HOME"
+LABWC_TARGET_GROUP="$LABWC_TARGET_GROUP"
 LABWC_HAS_INTEL_GPU="$LABWC_HAS_INTEL_GPU"
 LABWC_INTERNAL_OUTPUT="$LABWC_INTERNAL_OUTPUT"
 LABWC_EXTERNAL_OUTPUT="$LABWC_EXTERNAL_OUTPUT"

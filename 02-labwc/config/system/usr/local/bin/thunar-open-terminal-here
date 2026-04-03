@@ -15,6 +15,10 @@ if [[ -n "$selected_path" ]]; then
 fi
 
 [[ -d "$target_dir" ]] || exit 1
-command -v foot >/dev/null 2>&1 || exit 1
-
-exec foot --working-directory "$target_dir"
+if command -v foot >/dev/null 2>&1; then
+  exec foot --working-directory "$target_dir"
+fi
+if command -v kitty >/dev/null 2>&1; then
+  exec kitty --directory "$target_dir"
+fi
+exit 1

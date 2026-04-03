@@ -18,9 +18,11 @@ run_logged_command() {
   local rc=0
 
   prepare_build_log_dir
-  printf '[%s] CMD:' "$(timestamp)" >>"$log_path"
-  printf ' %q' "$@" >>"$log_path"
-  printf '\n' >>"$log_path"
+  {
+    printf '[%s] CMD:' "$(timestamp)"
+    printf ' %q' "$@"
+    printf '\n'
+  } >>"$log_path"
 
   if command -v tee >/dev/null 2>&1; then
     set +e
@@ -96,8 +98,10 @@ install_staged_tree() {
     [[ -n "$relative_path" ]] || continue
     destination_path="/$relative_path"
     mode="$(stat -c '%a' "$source_path")"
-    run_cmd install -d -m "$mode" "$destination_path"
-    printf 'd:%s\n' "$destination_path" >>"$manifest_tmp"
+    if [[ ! -d "$destination_path" ]]; then
+      run_cmd install -d -m "$mode" "$destination_path"
+      printf 'd:%s\n' "$destination_path" >>"$manifest_tmp"
+    fi
   done < <(find "$source_root" -mindepth 1 -type d | LC_ALL=C sort)
 
   while IFS= read -r source_path; do
@@ -257,7 +261,7 @@ fetch_source_checkout() {
   if declare -F run_target_user_command >/dev/null 2>&1 \
     && [[ -n "${LABWC_TARGET_USER:-}" ]] \
     && [[ "${LABWC_TARGET_USER}" != "root" ]]; then
-    run_cmd chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$work_root"
+    run_cmd chown -R "$LABWC_TARGET_USER:$LABWC_TARGET_GROUP" "$work_root"
     retry_cmd 3 run_target_user_command -- git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
     retry_cmd 3 run_target_user_command -- git -C "$repo_dir" fetch --quiet --depth 1 origin "$commit_sha"
     run_target_user_command -- git -C "$repo_dir" checkout --quiet --detach "$commit_sha"

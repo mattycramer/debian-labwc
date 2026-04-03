@@ -308,6 +308,9 @@ load_env_file() {
   [[ -f "$ENV_FILE" ]] || die "missing env file: $ENV_FILE"
   # shellcheck disable=SC1090
   source "$ENV_FILE"
+  if [[ -n "${LABWC_TARGET_USER:-}" && -z "${LABWC_TARGET_GROUP:-}" ]]; then
+    LABWC_TARGET_GROUP="$(resolve_target_group "$LABWC_TARGET_USER")"
+  fi
 }
 
 phase_doctor() {

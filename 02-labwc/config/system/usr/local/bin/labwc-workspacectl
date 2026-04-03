@@ -176,20 +176,22 @@ def build_protocol():
 
 PROTOCOL = build_protocol()
 
-LIB = ctypes.CDLL(ctypes.util.find_library("wayland-client"))
-LIB.wl_display_connect.restype = ctypes.c_void_p
-LIB.wl_display_connect.argtypes = [ctypes.c_char_p]
-LIB.wl_display_disconnect.restype = None
-LIB.wl_display_disconnect.argtypes = [ctypes.c_void_p]
-LIB.wl_display_roundtrip.restype = ctypes.c_int
-LIB.wl_display_roundtrip.argtypes = [ctypes.c_void_p]
-LIB.wl_proxy_marshal_flags.restype = ctypes.c_void_p
-LIB.wl_proxy_add_listener.restype = ctypes.c_int
-LIB.wl_proxy_add_listener.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
-LIB.wl_proxy_destroy.restype = None
-LIB.wl_proxy_destroy.argtypes = [ctypes.c_void_p]
-LIB.wl_proxy_get_version.restype = ctypes.c_uint32
-LIB.wl_proxy_get_version.argtypes = [ctypes.c_void_p]
+WAYLAND_CLIENT_LIB = ctypes.util.find_library("wayland-client")
+LIB = ctypes.CDLL(WAYLAND_CLIENT_LIB) if WAYLAND_CLIENT_LIB else None
+if LIB is not None:
+    LIB.wl_display_connect.restype = ctypes.c_void_p
+    LIB.wl_display_connect.argtypes = [ctypes.c_char_p]
+    LIB.wl_display_disconnect.restype = None
+    LIB.wl_display_disconnect.argtypes = [ctypes.c_void_p]
+    LIB.wl_display_roundtrip.restype = ctypes.c_int
+    LIB.wl_display_roundtrip.argtypes = [ctypes.c_void_p]
+    LIB.wl_proxy_marshal_flags.restype = ctypes.c_void_p
+    LIB.wl_proxy_add_listener.restype = ctypes.c_int
+    LIB.wl_proxy_add_listener.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+    LIB.wl_proxy_destroy.restype = None
+    LIB.wl_proxy_destroy.argtypes = [ctypes.c_void_p]
+    LIB.wl_proxy_get_version.restype = ctypes.c_uint32
+    LIB.wl_proxy_get_version.argtypes = [ctypes.c_void_p]
 
 REG_GLOBAL = ctypes.CFUNCTYPE(
     None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint32, ctypes.c_char_p, ctypes.c_uint32
@@ -279,6 +281,8 @@ class WorkspaceContext:
         )
 
     def connect(self):
+        if LIB is None:
+            raise RuntimeError("libwayland-client is not available on this system")
         self.display = LIB.wl_display_connect(None)
         if not self.display:
             raise RuntimeError("unable to connect to Wayland display")
@@ -523,7 +527,7 @@ def parse_workspace(value):
 
 def main():
     if len(sys.argv) != 3 or sys.argv[1] not in {"activate", "status"}:
-        print("usage: workspacectl.py [activate|status] <workspace>", file=sys.stderr)
+        print("usage: labwc-workspacectl [activate|status] <workspace>", file=sys.stderr)
         return 2
 
     workspace = parse_workspace(sys.argv[2])

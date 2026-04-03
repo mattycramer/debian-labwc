@@ -22,9 +22,11 @@ run_logged_command() {
   local rc=0
 
   prepare_build_log_dir
-  printf '[%s] CMD:' "$(timestamp)" >>"$log_path"
-  printf ' %q' "$@" >>"$log_path"
-  printf '\n' >>"$log_path"
+  {
+    printf '[%s] CMD:' "$(timestamp)"
+    printf ' %q' "$@"
+    printf '\n'
+  } >>"$log_path"
 
   if command -v tee >/dev/null 2>&1; then
     set +e
@@ -45,6 +47,7 @@ run_logged_command() {
 }
 
 init_broker_runtime_paths() {
+  [[ -n "${DBUS_BROKER_STATE_DIR:-}" ]] || die "DBUS_BROKER_STATE_DIR must be set before initializing broker runtime paths"
   DBUS_BROKER_BACKUP_DIR="${DBUS_BROKER_STATE_DIR%/}/backups"
   DBUS_BROKER_TOOLCHAIN_BIN_DIR="${DBUS_BROKER_STATE_DIR%/}/toolchain-bin"
   DBUS_BROKER_LEGACY_PROVENANCE_PATH="${DBUS_BROKER_INSTALL_SHARE_DIR%/}/release.env"
@@ -470,6 +473,7 @@ prepare_source_build() {
   }
   apply_patch_series_if_present "$DBUS_BROKER_REPO_DIR"
 
+  # shellcheck disable=SC2016
   run_logged_command "$(dbus_broker_build_log_path)" env PATH="$DBUS_BROKER_TOOLCHAIN_BIN_DIR:$PATH" bash -lc '
     set -euo pipefail
     cd "$1"

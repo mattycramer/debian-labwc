@@ -67,7 +67,7 @@ resolve_wayland_display() {
     display_count=$((display_count + 1))
     if [ "$display_count" -gt 1 ]; then
       printf '%s\n' "ERROR: WAYLAND_DISPLAY is unset and multiple Wayland sockets exist under ${XDG_RUNTIME_DIR}." >&2
-      return 1
+      return 2
     fi
   done
 
@@ -76,6 +76,23 @@ resolve_wayland_display() {
     return 0
   fi
 
+  return 1
+}
+
+wait_for_wayland_display() {
+  attempt=1
+  while [ "$attempt" -le 20 ]; do
+    if display_name="$(resolve_wayland_display)"; then
+      printf '%s\n' "$display_name"
+      return 0
+    fi
+    status=$?
+    if [ "$status" -eq 2 ]; then
+      return 2
+    fi
+    sleep 1
+    attempt=$((attempt + 1))
+  done
   return 1
 }
 
@@ -116,9 +133,11 @@ require_readable_file "$regreet_style" "regreet stylesheet"
 require_writable_dir "/var/log/regreet" "regreet log directory"
 require_writable_dir "/var/lib/regreet" "regreet state directory"
 
-display_name="$(resolve_wayland_display || true)"
-if [ -z "$display_name" ]; then
-  printf '%s\n' "ERROR: labwc did not provide WAYLAND_DISPLAY and no Wayland socket could be resolved in ${XDG_RUNTIME_DIR}." >&2
+if ! display_name="$(wait_for_wayland_display)"; then
+  status=$?
+  if [ "$status" -ne 2 ]; then
+    printf '%s\n' "ERROR: labwc did not expose a Wayland display under ${XDG_RUNTIME_DIR} within 20 seconds." >&2
+  fi
   exit 1
 fi
 if ! wait_for_wayland_socket "$display_name"; then

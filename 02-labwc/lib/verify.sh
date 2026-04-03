@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+verify_path_mode() {
+  local path="$1"
+  local expected="$2"
+
+  stat -c '%U:%G:%a' "$path" | grep -Fx "$expected" >/dev/null || {
+    die "${path} has unexpected ownership or mode (expected ${expected})"
+  }
+}
+
 verify_regreet_install() {
   require_file "$(regreet_binary_path)"
   require_file "$(regreet_provenance_path)"
@@ -155,12 +164,19 @@ verify_kirigami_runtime_install() {
 
 verify_greeter_contract() {
   require_file "/etc/greetd/config.toml"
+  require_file "/etc/greetd/regreet.toml"
+  require_file "/etc/greetd/regreet.css"
   require_file "/usr/local/bin/labwc-greeter-session"
   require_file "/usr/local/bin/labwc-greeter-regreet"
+  require_file "/etc/labwc-greeter/autostart"
+  require_file "/etc/labwc-greeter/rc.xml"
   require_file "/etc/pam.d/greetd"
   require_file "/etc/pam.d/greetd-greeter"
+  require_dir "/var/lib/greetd/greeter"
   require_dir "/var/lib/regreet"
   require_dir "/var/log/regreet"
+  require_file "$(greeter_log_path)"
+  require_file "$(greeter_session_log_path)"
 
   grep -F '/usr/local/bin/labwc-greeter-session' "/etc/greetd/config.toml" >/dev/null || {
     die "greetd config lost the managed greeter session wrapper"
@@ -171,21 +187,29 @@ verify_greeter_contract() {
   grep -F '/usr/local/bin/labwc-greeter-regreet' "/etc/labwc-greeter/autostart" >/dev/null || {
     die "greeter labwc autostart no longer launches the managed regreet wrapper"
   }
+  # shellcheck disable=SC2016
   grep -F 'kill -TERM "$LABWC_PID"' "/etc/labwc-greeter/autostart" >/dev/null || {
     die "greeter labwc autostart no longer terminates labwc when regreet exits"
   }
   grep -F 'WAYLAND_DISPLAY=%s' "/usr/local/bin/labwc-greeter-session" >/dev/null || {
     die "greeter session wrapper lost the managed WAYLAND_DISPLAY logging format"
   }
+  # shellcheck disable=SC2016
+  grep -F 'display_name="$(wait_for_wayland_display)"' "/usr/local/bin/labwc-greeter-regreet" >/dev/null || {
+    die "greeter launcher no longer waits for a Wayland display name before starting regreet"
+  }
+  # shellcheck disable=SC2016
   grep -F 'export WAYLAND_DISPLAY="$display_name"' "/usr/local/bin/labwc-greeter-regreet" >/dev/null || {
     die "greeter launcher no longer exports the resolved WAYLAND_DISPLAY"
   }
+  # shellcheck disable=SC2016
   grep -F 'wait_for_wayland_socket "$display_name"' "/usr/local/bin/labwc-greeter-regreet" >/dev/null || {
     die "greeter launcher lost the managed Wayland socket readiness wait"
   }
   grep -F 'sleep 1' "/usr/local/bin/labwc-greeter-regreet" >/dev/null || {
     die "greeter launcher lost the managed post-socket startup delay"
   }
+  # shellcheck disable=SC2016
   grep -F 'exec "$regreet_bin" --config "$regreet_config" --style "$regreet_style"' "/usr/local/bin/labwc-greeter-regreet" >/dev/null || {
     die "greeter launcher lost the managed regreet config/style execution path"
   }
@@ -202,12 +226,18 @@ verify_greeter_contract() {
     die "managed greeter PAM stack lost pam_systemd greeter metadata"
   }
 
-  stat -c '%U:%G:%a' /var/lib/regreet | grep -Fx 'greeter:greeter:700' >/dev/null || {
-    die "/var/lib/regreet has unexpected ownership or mode"
-  }
-  stat -c '%U:%G:%a' /var/log/regreet | grep -Fx 'greeter:greeter:750' >/dev/null || {
-    die "/var/log/regreet has unexpected ownership or mode"
-  }
+  verify_path_mode "/etc/greetd/config.toml" "root:root:644"
+  verify_path_mode "/etc/greetd/regreet.toml" "root:root:644"
+  verify_path_mode "/etc/greetd/regreet.css" "root:root:644"
+  verify_path_mode "/usr/local/bin/labwc-greeter-session" "root:root:755"
+  verify_path_mode "/usr/local/bin/labwc-greeter-regreet" "root:root:755"
+  verify_path_mode "/etc/labwc-greeter/autostart" "root:root:755"
+  verify_path_mode "/etc/labwc-greeter/rc.xml" "root:root:644"
+  verify_path_mode "/var/lib/greetd/greeter" "greeter:greeter:700"
+  verify_path_mode "/var/lib/regreet" "greeter:greeter:700"
+  verify_path_mode "/var/log/regreet" "greeter:greeter:750"
+  verify_path_mode "$(greeter_log_path)" "greeter:greeter:640"
+  verify_path_mode "$(greeter_session_log_path)" "greeter:greeter:640"
 }
 
 verify_session_activation_contract() {
@@ -229,6 +259,7 @@ verify_session_activation_contract() {
   grep -F 'dbus-update-activation-environment --systemd' "$session_autostart" >/dev/null || {
     die "labwc autostart lost the explicit systemd activation-environment handoff"
   }
+  # shellcheck disable=SC2016
   grep -F 'dbus-update-activation-environment $dbus_vars' "$session_autostart" >/dev/null || {
     die "labwc autostart lost the explicit D-Bus activation-environment handoff"
   }

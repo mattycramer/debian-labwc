@@ -54,6 +54,91 @@ strip_archive_suffix() {
   printf '%s\n' "${filename%.*}"
 }
 
+validate_member_paths_from_stdin() {
+  python3 - <<'PY'
+from pathlib import PurePosixPath
+import sys
+
+for raw_line in sys.stdin:
+    entry = raw_line.rstrip("\n")
+    if not entry:
+        continue
+    path = PurePosixPath(entry)
+    if path.is_absolute():
+        raise SystemExit(f"absolute archive entry is not allowed: {entry}")
+    if any(part == ".." for part in path.parts):
+        raise SystemExit(f"parent traversal archive entry is not allowed: {entry}")
+PY
+}
+
+validate_archive_members() {
+  local archive="$1"
+  local python_status=0
+
+  if python3 - "$archive" <<'PY'
+from pathlib import PurePosixPath
+import stat
+import sys
+import tarfile
+import zipfile
+
+archive = sys.argv[1]
+
+def validate_name(name: str) -> None:
+    path = PurePosixPath(name)
+    if path.is_absolute():
+        raise SystemExit(f"absolute archive entry is not allowed: {name}")
+    if any(part == ".." for part in path.parts):
+        raise SystemExit(f"parent traversal archive entry is not allowed: {name}")
+
+if tarfile.is_tarfile(archive):
+    with tarfile.open(archive, "r:*") as tf:
+        for member in tf.getmembers():
+            validate_name(member.name)
+            if member.issym() or member.islnk():
+                raise SystemExit(f"link archive entry is not allowed: {member.name}")
+            if member.isdev():
+                raise SystemExit(f"device archive entry is not allowed: {member.name}")
+    raise SystemExit(0)
+
+if zipfile.is_zipfile(archive):
+    with zipfile.ZipFile(archive) as zf:
+        for member in zf.infolist():
+            validate_name(member.filename)
+            file_type = stat.S_IFMT(member.external_attr >> 16)
+            if file_type == stat.S_IFLNK:
+                raise SystemExit(f"symlink archive entry is not allowed: {member.filename}")
+    raise SystemExit(0)
+
+raise SystemExit(10)
+PY
+  then
+    return 0
+  else
+    python_status=$?
+  fi
+  case "$python_status" in
+    10) ;;
+    *) return "$python_status" ;;
+  esac
+
+  if command -v bsdtar >/dev/null 2>&1; then
+    bsdtar -tf "$archive" | validate_member_paths_from_stdin
+    return 0
+  fi
+
+  case "$archive" in
+    *.zip)
+      command -v unzip >/dev/null 2>&1 || die "missing unzip for '$archive'"
+      unzip -Z1 "$archive" | validate_member_paths_from_stdin
+      ;;
+    *)
+      command -v tar >/dev/null 2>&1 || die "missing tar for '$archive'"
+      tar -tf "$archive" | validate_member_paths_from_stdin
+      ;;
+  esac
+}
+
 extract_archive() {
   local archive="$1"
   local destination="$2"
@@ -83,6 +168,7 @@ archive_dir="$(dirname -- "$archive_path")"
 archive_name="$(basename -- "$archive_path")"
 target_name="$(strip_archive_suffix "$archive_name")"
 [[ -n "$target_name" && "$target_name" != "." && "$target_name" != "/" ]] || die "could not derive extraction folder for '$archive_name'"
+validate_archive_members "$archive_path"
 
 target_dir="$archive_dir/$target_name"
 [[ ! -e "$target_dir" ]] || die "target already exists: $target_dir"

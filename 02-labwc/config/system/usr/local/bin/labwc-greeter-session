@@ -11,8 +11,39 @@ if [ ! -d /var/log/regreet ]; then
   printf '%s\n' "ERROR: missing /var/log/regreet for greeter session logging" >&2
   exit 1
 fi
+if [ ! -w /var/log/regreet ]; then
+  printf '%s\n' "ERROR: /var/log/regreet is not writable for the greeter session" >&2
+  exit 1
+fi
+if ! : >>"$log_file"; then
+  printf '%s\n' "ERROR: cannot append to greeter session log: ${log_file}" >&2
+  exit 1
+fi
+if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+  printf '%s\n' "ERROR: XDG_RUNTIME_DIR is not set for the greeter session" >&2
+  exit 1
+fi
+if [ -z "${GREETD_SOCK:-}" ]; then
+  printf '%s\n' "ERROR: GREETD_SOCK is not set for the greeter session" >&2
+  exit 1
+fi
+if [ ! -S "${GREETD_SOCK}" ]; then
+  printf '%s\n' "ERROR: greetd socket is not a UNIX socket: ${GREETD_SOCK}" >&2
+  exit 1
+fi
+if [ ! -x /usr/bin/dbus-run-session ]; then
+  printf '%s\n' "ERROR: missing /usr/bin/dbus-run-session for greeter session startup" >&2
+  exit 1
+fi
+if [ ! -x /usr/bin/labwc ]; then
+  printf '%s\n' "ERROR: missing /usr/bin/labwc for greeter session startup" >&2
+  exit 1
+fi
+if [ ! -d /etc/labwc-greeter ]; then
+  printf '%s\n' "ERROR: missing /etc/labwc-greeter configuration directory" >&2
+  exit 1
+fi
 
-: >>"$log_file"
 exec >>"$log_file" 2>&1
 
 printf '[%s] INFO: starting labwc greeter session wrapper\n' "$(timestamp)"

@@ -50,8 +50,9 @@ ensure_greeter_runtime_dirs() {
   run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/greetd/greeter/.local/state
   run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/greetd/greeter/.local/share
   run_cmd install -d -m 0700 -o greeter -g greeter /var/lib/regreet
-  run_cmd install -d -m 0750 -o greeter -g greeter /var/log/regreet
-  run_cmd install -D -m 0640 -o greeter -g greeter /dev/null /var/log/regreet/log
+  run_cmd install -d -m 0750 -o greeter -g greeter "$(greeter_log_dir)"
+  run_cmd install -D -m 0640 -o greeter -g greeter /dev/null "$(greeter_log_path)"
+  run_cmd install -D -m 0640 -o greeter -g greeter /dev/null "$(greeter_session_log_path)"
 }
 
 validate_greetd_vt() {
@@ -198,7 +199,7 @@ refresh_user_font_cache() {
     font_dirs+=("$user_fonts_dir")
   fi
 
-  run_cmd install -d -m 0700 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$cache_home" "$cache_dir"
+  run_cmd install -d -m 0700 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_GROUP" "$cache_home" "$cache_dir"
 
   if ((${#font_dirs[@]} == 0)); then
     log_info "rendered $LABWC_TARGET_HOME/.config/fontconfig/fonts.conf; no user font directory exists under $user_fonts_dir, so only the system font cache was refreshed"
@@ -270,10 +271,10 @@ stage_target_user_gpg_secret_seed() {
   local state_dir="$LABWC_TARGET_HOME/.local/state/labwc-session"
   local seed_path="$state_dir/kwallet-session-gpg-passphrase.seed"
   [[ -n "$gpg_passphrase" ]] || return 0
-  run_cmd install -d -m 0700 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$state_dir"
-  run_cmd install -D -m 0600 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" /dev/null "$seed_path"
+  run_cmd install -d -m 0700 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_GROUP" "$state_dir"
+  run_cmd install -D -m 0600 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_GROUP" /dev/null "$seed_path"
   printf '%s' "$gpg_passphrase" >"$seed_path"
-  run_cmd chown "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$seed_path"
+  run_cmd chown "$LABWC_TARGET_USER:$LABWC_TARGET_GROUP" "$seed_path"
   run_cmd chmod 0600 "$seed_path"
 }
 
@@ -311,6 +312,18 @@ greeter_labwc_config_dir() {
 
 greeter_wallpaper_dir() {
   printf '%s\n' "/usr/local/share/labwc-greeter"
+}
+
+greeter_log_dir() {
+  printf '%s\n' "/var/log/regreet"
+}
+
+greeter_log_path() {
+  printf '%s\n' "$(greeter_log_dir)/log"
+}
+
+greeter_session_log_path() {
+  printf '%s\n' "$(greeter_log_dir)/greeter-session.log"
 }
 
 regreet_wallpaper_target_path() {
@@ -511,9 +524,9 @@ create_target_user_unit_link() {
   local unit_path="$2"
   local target_name="$3"
   local wants_dir="$LABWC_TARGET_HOME/.config/systemd/user/${target_name}.wants"
-  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_USER" "$wants_dir"
+  run_cmd install -d -m 0755 -o "$LABWC_TARGET_USER" -g "$LABWC_TARGET_GROUP" "$wants_dir"
   run_cmd ln -sfn "$unit_path" "$wants_dir/$unit_name"
-  run_cmd chown -h "$LABWC_TARGET_USER:$LABWC_TARGET_USER" "$wants_dir/$unit_name"
+  run_cmd chown -h "$LABWC_TARGET_USER:$LABWC_TARGET_GROUP" "$wants_dir/$unit_name"
 }
 
 enable_target_user_unit() {

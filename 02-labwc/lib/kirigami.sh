@@ -76,7 +76,7 @@ remove_kirigami_runtime_install() {
 }
 
 build_kirigami_prefix() {
-  local work_root repo_dir build_dir prefix_dir log_path cflags cxxflags ldflags
+  local work_root repo_dir build_dir log_path cflags cxxflags ldflags
   local ecm_work_root ecm_prefix cmake_prefix_path ecm_dir
 
   validate_kirigami_settings
@@ -85,7 +85,6 @@ build_kirigami_prefix() {
   work_root="$(fetch_source_checkout "kirigami" "$KIRIGAMI_REPO_URL" "$KIRIGAMI_REPO_COMMIT" "$log_path")"
   repo_dir="$work_root/source"
   build_dir="$work_root/build"
-  prefix_dir="$work_root/stage/usr/local"
   cflags="$(native_cflags)"
   cxxflags="$(native_cxxflags)"
   ldflags="$(native_ldflags)"
