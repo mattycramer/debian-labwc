@@ -40,10 +40,12 @@ verify_keepsecret_stage() {
 
 install_keepsecret() {
   local work_root repo_dir build_dir stage_root provenance log_path cflags cxxflags ldflags
-  local kirigami_work_root kirigami_prefix cmake_prefix_path kirigami_provenance
+  local kirigami_work_root kirigami_prefix kirigami_provenance
+  local ecm_work_root ecm_prefix ecm_dir cmake_prefix_env cmake_prefix_arg
 
   validate_keepsecret_settings
   validate_kirigami_settings
+  validate_ecm_settings
   log_path="$(build_log_path "keepsecret-build")"
   work_root="$(fetch_source_checkout "keepsecret" "$KEEPSECRET_GIT_URL" "$KEEPSECRET_COMMIT_SHA" "$log_path")"
   repo_dir="$work_root/source"
@@ -54,9 +56,13 @@ install_keepsecret() {
   ldflags="$(native_ldflags)"
   kirigami_work_root="$(build_kirigami_prefix)"
   kirigami_prefix="$kirigami_work_root/stage/usr/local"
-  cmake_prefix_path="$kirigami_prefix"
+  ecm_work_root="$(build_ecm_prefix)"
+  ecm_prefix="$ecm_work_root/prefix"
+  ecm_dir="$ecm_prefix/share/ECM/cmake"
+  cmake_prefix_env="${kirigami_prefix}:${ecm_prefix}"
+  cmake_prefix_arg="${kirigami_prefix};${ecm_prefix}"
 
-  trap 'cleanup_source_checkout "$work_root"; cleanup_source_checkout "$kirigami_work_root"' RETURN
+  trap 'cleanup_source_checkout "$work_root"; cleanup_source_checkout "$kirigami_work_root"; cleanup_source_checkout "$ecm_work_root"' RETURN
 
   log_info "building keepsecret from ${KEEPSECRET_COMMIT_SHA}"
   run_logged_command "$log_path" env \
@@ -65,7 +71,9 @@ install_keepsecret() {
     CFLAGS="$cflags" \
     CXXFLAGS="$cxxflags" \
     LDFLAGS="$ldflags" \
-    CMAKE_PREFIX_PATH="$cmake_prefix_path" \
+    PATH="$ecm_prefix/bin:$PATH" \
+    CMAKE_PREFIX_PATH="$cmake_prefix_env" \
+    ECM_DIR="$ecm_dir" \
     cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
       -D CMAKE_BUILD_TYPE=Release \
       -D CMAKE_INSTALL_PREFIX=/usr/local \
@@ -73,7 +81,8 @@ install_keepsecret() {
       -D CMAKE_CXX_FLAGS="$cxxflags" \
       -D CMAKE_EXE_LINKER_FLAGS="$ldflags" \
       -D CMAKE_SHARED_LINKER_FLAGS="$ldflags" \
-      -D CMAKE_PREFIX_PATH="$cmake_prefix_path" \
+      -D CMAKE_PREFIX_PATH="$cmake_prefix_arg" \
+      -D ECM_DIR="$ecm_dir" \
       -D CMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
   run_logged_command "$log_path" cmake --build "$build_dir" --verbose
   run_logged_command "$log_path" env DESTDIR="$stage_root" cmake --install "$build_dir" --prefix /usr/local
@@ -114,7 +123,10 @@ KEEPSECRET_COMMIT_SHA="$KEEPSECRET_COMMIT_SHA"
 KEEPSECRET_INSTALL_METHOD="source"
 KIRIGAMI_REPO_URL="$KIRIGAMI_REPO_URL"
 KIRIGAMI_REPO_COMMIT="$KIRIGAMI_REPO_COMMIT"
-KEEPSECRET_CMAKE_PREFIX_PATH="$cmake_prefix_path"
+ECM_REPO_URL="$ECM_REPO_URL"
+ECM_REPO_COMMIT="$ECM_REPO_COMMIT"
+KEEPSECRET_CMAKE_PREFIX_PATH="$cmake_prefix_arg"
+KEEPSECRET_ECM_DIR="$ecm_dir"
 KEEPSECRET_PATCH_SERIES="patches/release/series"
 KEEPSECRET_CFLAGS="$cflags"
 KEEPSECRET_CXXFLAGS="$cxxflags"
@@ -128,6 +140,7 @@ EOF
   trap - RETURN
   cleanup_source_checkout "$work_root"
   cleanup_source_checkout "$kirigami_work_root"
+  cleanup_source_checkout "$ecm_work_root"
 }
 
 install_keepsecret_artifact() {
