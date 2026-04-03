@@ -121,6 +121,84 @@ normalize_git_url() {
   printf '%s\n' "$url"
 }
 
+normalize_sha256_value() {
+  local value="$1"
+  value="${value#sha256:}"
+  printf '%s\n' "${value,,}"
+}
+
+verify_file_sha256() {
+  local file_path="$1"
+  local expected_sha actual_sha
+
+  expected_sha="$(normalize_sha256_value "$2")"
+  require_sha256_hex "$expected_sha"
+  require_file "$file_path"
+  actual_sha="$(sha256sum "$file_path" | awk '{print $1}')"
+  [[ "$actual_sha" == "$expected_sha" ]] || {
+    die "sha256 mismatch for '$file_path': expected '$expected_sha', got '$actual_sha'"
+  }
+}
+
+validate_tarball_members_safe() {
+  local tarball_path="$1"
+
+  require_file "$tarball_path"
+  python3 - "$tarball_path" <<'PY'
+from pathlib import PurePosixPath
+import sys
+import tarfile
+
+tarball_path = sys.argv[1]
+
+with tarfile.open(tarball_path, "r:gz") as archive:
+    for member in archive.getmembers():
+        path = PurePosixPath(member.name)
+        if path.is_absolute():
+            raise SystemExit(f"tarball entry must not be absolute: {member.name}")
+        if any(part == ".." for part in path.parts):
+            raise SystemExit(f"tarball entry must not contain parent traversal: {member.name}")
+        if member.issym() or member.islnk():
+            raise SystemExit(f"tarball entry must not be a symlink or hard link: {member.name}")
+        if member.isdev():
+            raise SystemExit(f"tarball entry must not be a device node: {member.name}")
+PY
+}
+
+download_release_tarball() {
+  local artifact_name="$1"
+  local tarball_url="$2"
+  local tarball_sha="$3"
+  local log_path="${4:-}"
+  local work_root tarball_path
+
+  require_https_url "${artifact_name} tarball url" "$tarball_url"
+  require_sha256_hex "$(normalize_sha256_value "$tarball_sha")"
+
+  work_root="$(mktemp -d "/tmp/${artifact_name}.XXXXXX")"
+  tarball_path="$work_root/archive.tar.gz"
+
+  if [[ -n "$log_path" ]]; then
+    retry_cmd 3 run_logged_command "$log_path" curl --fail --location --max-time 60 --silent --show-error -o "$tarball_path" "$tarball_url"
+  else
+    retry_cmd 3 curl --fail --location --max-time 60 --silent --show-error -o "$tarball_path" "$tarball_url"
+  fi
+
+  verify_file_sha256 "$tarball_path" "$tarball_sha"
+  validate_tarball_members_safe "$tarball_path"
+  printf '%s\n' "$work_root"
+}
+
+extract_release_tarball() {
+  local tarball_path="$1"
+  local destination_dir="$2"
+
+  require_file "$tarball_path"
+  run_cmd install -d -m 0755 "$destination_dir"
+  validate_tarball_members_safe "$tarball_path"
+  run_cmd tar -xzf "$tarball_path" -C "$destination_dir"
+}
+
 verify_checkout_remote() {
   local repo_dir="$1"
   local expected_url="$2"
@@ -204,6 +282,22 @@ cleanup_source_checkout() {
 
 ensure_source_state_dir() {
   run_cmd install -d -m 0755 "$LABWC_SOURCE_BUILD_STATE_DIR"
+}
+
+native_cflags() {
+  printf '%s\n' "-O3 -march=native -mtune=native -pipe -fno-plt"
+}
+
+native_cxxflags() {
+  printf '%s\n' "$(native_cflags)"
+}
+
+native_ldflags() {
+  printf '%s\n' "-Wl,-O2 -Wl,--as-needed -fuse-ld=lld"
+}
+
+native_rustflags() {
+  printf '%s\n' "-C target-cpu=native -C opt-level=3 -C codegen-units=1 -C lto=thin -C strip=symbols"
 }
 
 rust_toolchain_bin_dir() {

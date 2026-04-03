@@ -4,12 +4,39 @@ verify_regreet_install() {
   require_file "$(regreet_binary_path)"
   require_file "$(regreet_provenance_path)"
   [[ -x "$(regreet_binary_path)" ]] || die "regreet binary is not executable"
-  grep -F "REGREET_COMMIT_SHA=\"$REGREET_COMMIT_SHA\"" "$(regreet_provenance_path)" >/dev/null || {
-    die "regreet provenance does not record expected commit"
-  }
-  grep -F "REGREET_RUST_TOOLCHAIN=\"$REGREET_RUST_TOOLCHAIN\"" "$(regreet_provenance_path)" >/dev/null || {
-    die "regreet provenance does not record expected rust toolchain"
-  }
+  case "${LABWC_INSTALL_METHOD:-}" in
+    source)
+      grep -F 'REGREET_INSTALL_METHOD="source"' "$(regreet_provenance_path)" >/dev/null || {
+        die "regreet provenance does not record the source install method"
+      }
+      grep -F "REGREET_COMMIT_SHA=\"$REGREET_COMMIT_SHA\"" "$(regreet_provenance_path)" >/dev/null || {
+        die "regreet provenance does not record expected commit"
+      }
+      grep -F "REGREET_RUST_TOOLCHAIN=\"$REGREET_RUST_TOOLCHAIN\"" "$(regreet_provenance_path)" >/dev/null || {
+        die "regreet provenance does not record expected rust toolchain"
+      }
+      ;;
+    artifact)
+      grep -F 'REGREET_INSTALL_METHOD="artifact"' "$(regreet_provenance_path)" >/dev/null || {
+        die "regreet provenance does not record the artifact install method"
+      }
+      grep -F "REGREET_TARBALL_URL=\"$REGREET_TARBALL_URL\"" "$(regreet_provenance_path)" >/dev/null || {
+        die "regreet provenance does not record expected tarball URL"
+      }
+      grep -F "REGREET_TARBALL_SHA=\"$(normalize_sha256_value "$REGREET_TARBALL_SHA")\"" "$(regreet_provenance_path)" >/dev/null || {
+        die "regreet provenance does not record expected tarball sha"
+      }
+      grep -F "REGREET_COMMIT_TAG=\"$REGREET_COMMIT_TAG\"" "$(regreet_provenance_path)" >/dev/null || {
+        die "regreet provenance does not record expected commit tag"
+      }
+      grep -F "REGREET_COMMIT_SHA=\"$REGREET_COMMIT_SHA\"" "$(regreet_provenance_path)" >/dev/null || {
+        die "regreet provenance does not record expected commit"
+      }
+      ;;
+    *)
+      die "LABWC_INSTALL_METHOD must be 'source' or 'artifact', found '${LABWC_INSTALL_METHOD:-}'"
+      ;;
+  esac
   assert_binary_dependencies "$(regreet_binary_path)" "regreet"
   "$(regreet_binary_path)" --version >/dev/null 2>&1 || die "regreet --version failed"
 }
@@ -22,9 +49,36 @@ verify_labwc_tweaks_install() {
   require_file "$LABWC_TWEAKS_POLICY_PATH"
   require_file "$LABWC_TWEAKS_LOGIN_HELPER_PATH"
   require_file "$LABWC_TWEAKS_PROVENANCE_PATH"
-  grep -F "LABWC_TWEAKS_COMMIT_SHA=\"$LABWC_TWEAKS_COMMIT_SHA\"" "$LABWC_TWEAKS_PROVENANCE_PATH" >/dev/null || {
-    die "labwc-tweaks provenance does not record expected commit"
-  }
+  case "${LABWC_INSTALL_METHOD:-}" in
+    source)
+      grep -F 'LABWC_TWEAKS_INSTALL_METHOD="source"' "$LABWC_TWEAKS_PROVENANCE_PATH" >/dev/null || {
+        die "labwc-tweaks provenance does not record the source install method"
+      }
+      grep -F "LABWC_TWEAKS_COMMIT_SHA=\"$LABWC_TWEAKS_COMMIT_SHA\"" "$LABWC_TWEAKS_PROVENANCE_PATH" >/dev/null || {
+        die "labwc-tweaks provenance does not record expected commit"
+      }
+      ;;
+    artifact)
+      grep -F 'LABWC_TWEAKS_INSTALL_METHOD="artifact"' "$LABWC_TWEAKS_PROVENANCE_PATH" >/dev/null || {
+        die "labwc-tweaks provenance does not record the artifact install method"
+      }
+      grep -F "LABWC_TWEAKS_TARBALL_URL=\"$LABWC_TWEAKS_TARBALL_URL\"" "$LABWC_TWEAKS_PROVENANCE_PATH" >/dev/null || {
+        die "labwc-tweaks provenance does not record expected tarball URL"
+      }
+      grep -F "LABWC_TWEAKS_TARBALL_SHA=\"$(normalize_sha256_value "$LABWC_TWEAKS_TARBALL_SHA")\"" "$LABWC_TWEAKS_PROVENANCE_PATH" >/dev/null || {
+        die "labwc-tweaks provenance does not record expected tarball sha"
+      }
+      grep -F "LABWC_TWEAKS_COMMIT_TAG=\"$LABWC_TWEAKS_COMMIT_TAG\"" "$LABWC_TWEAKS_PROVENANCE_PATH" >/dev/null || {
+        die "labwc-tweaks provenance does not record expected commit tag"
+      }
+      grep -F "LABWC_TWEAKS_COMMIT_SHA=\"$LABWC_TWEAKS_COMMIT_SHA\"" "$LABWC_TWEAKS_PROVENANCE_PATH" >/dev/null || {
+        die "labwc-tweaks provenance does not record expected commit"
+      }
+      ;;
+    *)
+      die "LABWC_INSTALL_METHOD must be 'source' or 'artifact', found '${LABWC_INSTALL_METHOD:-}'"
+      ;;
+  esac
   assert_binary_dependencies "$LABWC_TWEAKS_BIN_PATH" "labwc-tweaks"
   bash -n "$LABWC_TWEAKS_LOGIN_HELPER_PATH"
   grep -F 'org.labwc.labwc-tweaks.login-screen' "$LABWC_TWEAKS_POLICY_PATH" >/dev/null || {
@@ -39,9 +93,36 @@ verify_keepsecret_install() {
   require_file "$KEEPSECRET_ICON_PATH"
   require_file "$KEEPSECRET_LOGGING_CATEGORIES_PATH"
   require_file "$KEEPSECRET_PROVENANCE_PATH"
-  grep -F "KEEPSECRET_COMMIT_SHA=\"$KEEPSECRET_COMMIT_SHA\"" "$KEEPSECRET_PROVENANCE_PATH" >/dev/null || {
-    die "keepsecret provenance does not record expected commit"
-  }
+  case "${LABWC_INSTALL_METHOD:-}" in
+    source)
+      grep -F 'KEEPSECRET_INSTALL_METHOD="source"' "$KEEPSECRET_PROVENANCE_PATH" >/dev/null || {
+        die "keepsecret provenance does not record the source install method"
+      }
+      grep -F "KEEPSECRET_COMMIT_SHA=\"$KEEPSECRET_COMMIT_SHA\"" "$KEEPSECRET_PROVENANCE_PATH" >/dev/null || {
+        die "keepsecret provenance does not record expected commit"
+      }
+      ;;
+    artifact)
+      grep -F 'KEEPSECRET_INSTALL_METHOD="artifact"' "$KEEPSECRET_PROVENANCE_PATH" >/dev/null || {
+        die "keepsecret provenance does not record the artifact install method"
+      }
+      grep -F "KEEPSECRET_TARBALL_URL=\"$KEEPSECRET_TARBALL_URL\"" "$KEEPSECRET_PROVENANCE_PATH" >/dev/null || {
+        die "keepsecret provenance does not record expected tarball URL"
+      }
+      grep -F "KEEPSECRET_TARBALL_SHA=\"$(normalize_sha256_value "$KEEPSECRET_TARBALL_SHA")\"" "$KEEPSECRET_PROVENANCE_PATH" >/dev/null || {
+        die "keepsecret provenance does not record expected tarball sha"
+      }
+      grep -F "KEEPSECRET_COMMIT_TAG=\"$KEEPSECRET_COMMIT_TAG\"" "$KEEPSECRET_PROVENANCE_PATH" >/dev/null || {
+        die "keepsecret provenance does not record expected commit tag"
+      }
+      grep -F "KEEPSECRET_COMMIT_SHA=\"$KEEPSECRET_COMMIT_SHA\"" "$KEEPSECRET_PROVENANCE_PATH" >/dev/null || {
+        die "keepsecret provenance does not record expected commit"
+      }
+      ;;
+    *)
+      die "LABWC_INSTALL_METHOD must be 'source' or 'artifact', found '${LABWC_INSTALL_METHOD:-}'"
+      ;;
+  esac
   assert_binary_dependencies "$KEEPSECRET_BIN_PATH" "keepsecret"
 }
 
@@ -60,6 +141,9 @@ verify_greeter_contract() {
   grep -F 'dbus-run-session -- /usr/bin/labwc' "/usr/local/bin/labwc-greeter-session" >/dev/null || {
     die "greeter session wrapper lost the managed dbus-run-session greeter contract"
   }
+  grep -F 'WAYLAND_DISPLAY=%s' "/usr/local/bin/labwc-greeter-session" >/dev/null || {
+    die "greeter session wrapper lost the managed WAYLAND_DISPLAY logging format"
+  }
   grep -F 'export WAYLAND_DISPLAY="$display_name"' "/usr/local/bin/labwc-greeter-regreet" >/dev/null || {
     die "greeter launcher no longer exports the resolved WAYLAND_DISPLAY"
   }
@@ -68,6 +152,9 @@ verify_greeter_contract() {
   }
   grep -F 'sleep 1' "/usr/local/bin/labwc-greeter-regreet" >/dev/null || {
     die "greeter launcher lost the managed post-socket startup delay"
+  }
+  grep -F 'exec "$regreet_bin" --config "$regreet_config" --style "$regreet_style"' "/usr/local/bin/labwc-greeter-regreet" >/dev/null || {
+    die "greeter launcher lost the managed regreet config/style execution path"
   }
   grep -F 'LABWC_UPDATE_ACTIVATION_ENV=1' "/etc/greetd/config.toml" >/dev/null || {
     die "greetd config lost the managed activation-environment contract"

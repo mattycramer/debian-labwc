@@ -10,8 +10,21 @@ readonly KEEPSECRET_MANIFEST_PATH="${KEEPSECRET_MANIFEST_DIR}/keepsecret-install
 readonly KEEPSECRET_PROVENANCE_PATH="${KEEPSECRET_MANIFEST_DIR}/keepsecret-build.env"
 
 validate_keepsecret_settings() {
-  require_https_url "KEEPSECRET_GIT_URL" "${KEEPSECRET_GIT_URL:-}"
-  require_commit_sha "${KEEPSECRET_COMMIT_SHA:-}"
+  case "${LABWC_INSTALL_METHOD:-}" in
+    source)
+      require_https_url "KEEPSECRET_GIT_URL" "${KEEPSECRET_GIT_URL:-}"
+      require_commit_sha "${KEEPSECRET_COMMIT_SHA:-}"
+      ;;
+    artifact)
+      require_https_url "KEEPSECRET_TARBALL_URL" "${KEEPSECRET_TARBALL_URL:-}"
+      require_sha256_hex "$(normalize_sha256_value "${KEEPSECRET_TARBALL_SHA:-}")"
+      require_safe_token "KEEPSECRET_COMMIT_TAG" "${KEEPSECRET_COMMIT_TAG:-}"
+      require_commit_sha "${KEEPSECRET_COMMIT_SHA:-}"
+      ;;
+    *)
+      die "LABWC_INSTALL_METHOD must be 'source' or 'artifact', found '${LABWC_INSTALL_METHOD:-}'"
+      ;;
+  esac
 }
 
 verify_keepsecret_stage() {
@@ -26,7 +39,7 @@ verify_keepsecret_stage() {
 }
 
 install_keepsecret() {
-  local work_root repo_dir build_dir stage_root provenance log_path
+  local work_root repo_dir build_dir stage_root provenance log_path cflags cxxflags ldflags
 
   validate_keepsecret_settings
   log_path="$(build_log_path "keepsecret-build")"
@@ -34,13 +47,27 @@ install_keepsecret() {
   repo_dir="$work_root/source"
   build_dir="$work_root/build"
   stage_root="$work_root/stage"
+  cflags="$(native_cflags)"
+  cxxflags="$(native_cxxflags)"
+  ldflags="$(native_ldflags)"
 
   trap 'cleanup_source_checkout "$work_root"' RETURN
 
   log_info "building keepsecret from ${KEEPSECRET_COMMIT_SHA}"
-  run_logged_command "$log_path" cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
-    -D CMAKE_BUILD_TYPE=Release \
-    -D CMAKE_INSTALL_PREFIX=/usr/local
+  run_logged_command "$log_path" env \
+    CC=clang \
+    CXX=clang++ \
+    CFLAGS="$cflags" \
+    CXXFLAGS="$cxxflags" \
+    LDFLAGS="$ldflags" \
+    cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
+      -D CMAKE_BUILD_TYPE=Release \
+      -D CMAKE_INSTALL_PREFIX=/usr/local \
+      -D CMAKE_C_FLAGS="$cflags" \
+      -D CMAKE_CXX_FLAGS="$cxxflags" \
+      -D CMAKE_EXE_LINKER_FLAGS="$ldflags" \
+      -D CMAKE_SHARED_LINKER_FLAGS="$ldflags" \
+      -D CMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
   run_logged_command "$log_path" cmake --build "$build_dir" --verbose
   run_logged_command "$log_path" env DESTDIR="$stage_root" cmake --install "$build_dir" --prefix /usr/local
   verify_keepsecret_stage "$stage_root"
@@ -59,7 +86,52 @@ install_keepsecret() {
   provenance="$(cat <<EOF
 KEEPSECRET_GIT_URL="$KEEPSECRET_GIT_URL"
 KEEPSECRET_COMMIT_SHA="$KEEPSECRET_COMMIT_SHA"
+KEEPSECRET_INSTALL_METHOD="source"
 KEEPSECRET_PATCH_SERIES="patches/release/series"
+KEEPSECRET_CFLAGS="$cflags"
+KEEPSECRET_CXXFLAGS="$cxxflags"
+KEEPSECRET_LDFLAGS="$ldflags"
+KEEPSECRET_BUILD_LOG="$log_path"
+KEEPSECRET_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+EOF
+)"
+  write_source_provenance "$KEEPSECRET_PROVENANCE_PATH" "$provenance"
+
+  trap - RETURN
+  cleanup_source_checkout "$work_root"
+}
+
+install_keepsecret_artifact() {
+  local work_root tarball_path stage_root provenance log_path
+
+  validate_keepsecret_settings
+  log_path="$(build_log_path "keepsecret-artifact-install")"
+  work_root="$(download_release_tarball "keepsecret" "$KEEPSECRET_TARBALL_URL" "$KEEPSECRET_TARBALL_SHA" "$log_path")"
+  tarball_path="$work_root/archive.tar.gz"
+  stage_root="$work_root/stage"
+
+  trap 'cleanup_source_checkout "$work_root"' RETURN
+
+  extract_release_tarball "$tarball_path" "$stage_root"
+  verify_keepsecret_stage "$stage_root"
+
+  remove_keepsecret_install
+  install_staged_tree "$stage_root" "$KEEPSECRET_MANIFEST_PATH"
+  assert_binary_dependencies "$KEEPSECRET_BIN_PATH" "keepsecret"
+  require_file "$KEEPSECRET_DESKTOP_PATH"
+  require_file "$KEEPSECRET_APPDATA_PATH"
+  require_file "$KEEPSECRET_ICON_PATH"
+  require_file "$KEEPSECRET_LOGGING_CATEGORIES_PATH"
+  if command -v update-desktop-database >/dev/null 2>&1; then
+    run_cmd update-desktop-database /usr/local/share/applications >/dev/null 2>&1 || true
+  fi
+
+  provenance="$(cat <<EOF
+KEEPSECRET_INSTALL_METHOD="artifact"
+KEEPSECRET_TARBALL_URL="$KEEPSECRET_TARBALL_URL"
+KEEPSECRET_TARBALL_SHA="$(normalize_sha256_value "$KEEPSECRET_TARBALL_SHA")"
+KEEPSECRET_COMMIT_TAG="$KEEPSECRET_COMMIT_TAG"
+KEEPSECRET_COMMIT_SHA="$KEEPSECRET_COMMIT_SHA"
 KEEPSECRET_BUILD_LOG="$log_path"
 KEEPSECRET_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 EOF

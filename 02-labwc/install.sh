@@ -121,6 +121,76 @@ PY
   rm -f -- "$value_file"
 }
 
+install_method_prompt_required_for_phase() {
+  case "$PHASE" in
+    detect|packages|render|build-sources|enable|verify|all)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+install_method_is_source() {
+  [[ "${LABWC_INSTALL_METHOD:-}" == "source" ]]
+}
+
+current_install_method() {
+  local value
+  value="$(read_env_value "LABWC_INSTALL_METHOD")"
+  case "$value" in
+    source|artifact)
+      printf '%s\n' "$value"
+      ;;
+    *)
+      printf '%s\n' ""
+      ;;
+  esac
+}
+
+prompt_install_method() {
+  local answer=""
+
+  [[ -t 0 && -t 1 ]] || die "LABWC_INSTALL_METHOD is unset in $ENV_FILE and no interactive terminal is available to choose source or artifact install mode"
+  while true; do
+    IFS= read -r -p "Do you want to build from source? [Y/n] " answer
+    case "${answer:-Y}" in
+      Y|y|yes|YES)
+        printf '%s\n' "source"
+        return 0
+        ;;
+      N|n|no|NO)
+        printf '%s\n' "artifact"
+        return 0
+        ;;
+      *)
+        printf '%s\n' "Please answer Y or n." >&2
+        ;;
+    esac
+  done
+}
+
+ensure_install_method_in_env() {
+  local selected_method=""
+
+  install_method_prompt_required_for_phase || return 0
+  [[ -f "$ENV_FILE" ]] || die "missing env file: $ENV_FILE"
+
+  selected_method="$(current_install_method)"
+  if [[ "$PHASE" == "all" ]]; then
+    selected_method="$(prompt_install_method)"
+    write_env_value "LABWC_INSTALL_METHOD" "$selected_method"
+    return 0
+  fi
+  if [[ -n "$selected_method" ]]; then
+    return 0
+  fi
+
+  selected_method="$(prompt_install_method)"
+  write_env_value "LABWC_INSTALL_METHOD" "$selected_method"
+}
+
 ensure_gpg_password_in_env() {
   local current_value prompt_value confirm_value
 
@@ -226,12 +296,18 @@ phase_doctor() {
   require_command mktemp
   require_command mv
   require_command python3
+  require_command curl
+  require_command sha256sum
+  require_command tar
   require_command useradd
   require_command usermod
 }
 
 phase_source_build_doctor() {
   require_command git
+  require_command clang
+  require_command clang++
+  require_command ld.lld
   require_command rustup
   require_command cmake
   require_command ninja
@@ -281,18 +357,27 @@ phase_enable() {
 phase_build_sources() {
   log_info "phase: build-sources"
   phase_doctor
-  phase_source_build_doctor
   load_env_file
-  install_regreet_binary
-  install_labwc_tweaks
-  install_keepsecret
+  if install_method_is_source; then
+    phase_source_build_doctor
+    install_regreet_binary
+    install_labwc_tweaks
+    install_keepsecret
+    return 0
+  fi
+
+  install_regreet_artifact
+  install_labwc_tweaks_artifact
+  install_keepsecret_artifact
 }
 
 phase_verify() {
   log_info "phase: verify"
   phase_doctor
-  phase_source_build_doctor
   load_env_file
+  if install_method_is_source; then
+    phase_source_build_doctor
+  fi
   verify_install
 }
 
@@ -311,6 +396,7 @@ phase_nuke() {
 
 main() {
   parse_args "$@"
+  ensure_install_method_in_env
   ensure_gpg_password_in_env
   ensure_wireguard_private_key_in_env
   case "$PHASE" in

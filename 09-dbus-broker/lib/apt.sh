@@ -11,12 +11,18 @@ readonly DBUS_RUNTIME_PACKAGES=(
   dbus
   dbus-daemon
   dbus-user-session
+  gzip
+  libapparmor1
+  libexpat1
+  libsystemd0
+  tar
+)
+
+readonly DBUS_SOURCE_BUILD_PACKAGES=(
   git
   bindgen
   build-essential
   clang
-  gzip
-  jq
   libapparmor-dev
   libclang-dev
   libexpat1-dev
@@ -27,10 +33,6 @@ readonly DBUS_RUNTIME_PACKAGES=(
   pkgconf
   python3-docutils
   rustup
-  libapparmor1
-  libexpat1
-  libsystemd0
-  tar
 )
 
 retry_cmd() {
@@ -71,6 +73,10 @@ install_dbus_runtime_packages() {
   mapfile -t apt_args < <(apt_yes_args)
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
     apt -t "$SID_SUITE" install --no-install-recommends -o DPkg::Lock::Timeout=60 "${apt_args[@]}" "${DBUS_RUNTIME_PACKAGES[@]}"
+  if [[ "${DBUS_BROKER_INSTALL_METHOD:-source}" == "source" ]]; then
+    retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
+      apt -t "$SID_SUITE" install --no-install-recommends -o DPkg::Lock::Timeout=60 "${apt_args[@]}" "${DBUS_SOURCE_BUILD_PACKAGES[@]}"
+  fi
 }
 
 package_is_installed() {

@@ -38,6 +38,16 @@ require_readable_file() {
   fi
 }
 
+require_executable_file() {
+  path="$1"
+  label="$2"
+  require_path "$path" "$label"
+  if [ ! -x "$path" ]; then
+    printf '%s\n' "ERROR: ${label} is not executable: ${path}" >&2
+    exit 1
+  fi
+}
+
 resolve_wayland_display() {
   if [ -n "${WAYLAND_DISPLAY:-}" ]; then
     printf '%s\n' "$WAYLAND_DISPLAY"
@@ -87,6 +97,9 @@ if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
   printf '%s\n' "ERROR: XDG_RUNTIME_DIR is not set for the greeter session." >&2
   exit 1
 fi
+regreet_bin="/usr/local/bin/regreet"
+regreet_config="/etc/greetd/regreet.toml"
+regreet_style="/etc/greetd/regreet.css"
 require_writable_dir "$XDG_RUNTIME_DIR" "greeter runtime directory"
 if [ -z "${GREETD_SOCK:-}" ]; then
   printf '%s\n' "ERROR: GREETD_SOCK is not set for the greeter session." >&2
@@ -97,8 +110,9 @@ if [ ! -S "$GREETD_SOCK" ]; then
   printf '%s\n' "ERROR: greetd socket is not a UNIX socket: ${GREETD_SOCK}" >&2
   exit 1
 fi
-require_readable_file "/etc/greetd/regreet.toml" "regreet config"
-require_readable_file "/etc/greetd/regreet.css" "regreet stylesheet"
+require_executable_file "$regreet_bin" "regreet binary"
+require_readable_file "$regreet_config" "regreet config"
+require_readable_file "$regreet_style" "regreet stylesheet"
 require_writable_dir "/var/log/regreet" "regreet log directory"
 require_writable_dir "/var/lib/regreet" "regreet state directory"
 
@@ -130,4 +144,4 @@ export GTK_A11Y=none
 export NO_AT_BRIDGE=1
 export XCURSOR_THEME="@XCURSOR_THEME@"
 export XCURSOR_SIZE="@XCURSOR_SIZE@"
-exec /usr/local/bin/regreet --config /etc/greetd/regreet.toml --style /etc/greetd/regreet.css
+exec "$regreet_bin" --config "$regreet_config" --style "$regreet_style"

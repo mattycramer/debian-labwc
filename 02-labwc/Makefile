@@ -8,11 +8,11 @@ help:
 	  '  help        Show this message' \
 	  '  doctor      Validate platform assumptions' \
 	  '  detect      Detect user, GPU, and outputs into .env' \
-	  '  install     Run doctor, detect, packages, render, build-sources, enable, verify' \
+	  '  install     Prompt for source-vs-artifact install, then run doctor, detect, packages, render, build-sources, enable, verify' \
 	  '  render      Render configs from .env' \
-	  '  build-sources Fetch, patch, build, and install regreet, labwc-tweaks, and keepsecret from source' \
+	  '  build-sources Build pinned sources or install pinned release artifacts for regreet, labwc-tweaks, and keepsecret' \
 	  '  enable      Install root-owned files and enable services' \
-	  '  verify      Verify installed source builds, greeter wiring, and session activation contracts' \
+	  '  verify      Verify the selected source/artifact install path, greeter wiring, and session activation contracts' \
 	  '  reconfigure Run detect, render, build-sources, enable, verify' \
 	  '  print-env   Print effective env values' \
 	  '  nuke        Remove generated state and disable installed wiring'

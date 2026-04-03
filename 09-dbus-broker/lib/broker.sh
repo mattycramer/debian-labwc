@@ -56,15 +56,87 @@ init_broker_runtime_paths() {
   DBUS_BROKER_REPO_DIR=""
   DBUS_BROKER_BUILD_DIR=""
   DBUS_BROKER_STAGE_DIR=""
+  DBUS_BROKER_ARTIFACT_TARBALL_PATH=""
   DBUS_BROKER_SUBPROJECTS_LOCK_PATH=""
 }
 
+normalize_sha256_value() {
+  local value="$1"
+  value="${value#sha256:}"
+  printf '%s\n' "${value,,}"
+}
+
+native_cflags() {
+  printf '%s\n' "-O3 -march=native -mtune=native -pipe -fno-plt"
+}
+
+native_cxxflags() {
+  printf '%s\n' "$(native_cflags)"
+}
+
+native_ldflags() {
+  printf '%s\n' "-Wl,-O2 -Wl,--as-needed -fuse-ld=lld"
+}
+
+native_rustflags() {
+  printf '%s\n' "-C target-cpu=native -C opt-level=3 -C codegen-units=1 -C lto=thin -C strip=symbols"
+}
+
+verify_file_sha256() {
+  local file_path="$1"
+  local expected_sha actual_sha
+
+  expected_sha="$(normalize_sha256_value "$2")"
+  require_sha256_hex "$expected_sha"
+  require_file "$file_path"
+  actual_sha="$(sha256sum "$file_path" | awk '{print $1}')"
+  [[ "$actual_sha" == "$expected_sha" ]] || {
+    die "sha256 mismatch for '$file_path': expected '$expected_sha', got '$actual_sha'"
+  }
+}
+
+validate_tarball_members_safe() {
+  local tarball_path="$1"
+
+  require_file "$tarball_path"
+  python3 - "$tarball_path" <<'PY'
+from pathlib import PurePosixPath
+import sys
+import tarfile
+
+tarball_path = sys.argv[1]
+
+with tarfile.open(tarball_path, "r:gz") as archive:
+    for member in archive.getmembers():
+        path = PurePosixPath(member.name)
+        if path.is_absolute():
+            raise SystemExit(f"tarball entry must not be absolute: {member.name}")
+        if any(part == ".." for part in path.parts):
+            raise SystemExit(f"tarball entry must not contain parent traversal: {member.name}")
+        if member.issym() or member.islnk():
+            raise SystemExit(f"tarball entry must not be a symlink or hard link: {member.name}")
+        if member.isdev():
+            raise SystemExit(f"tarball entry must not be a device node: {member.name}")
+PY
+}
+
 validate_env_settings() {
+  case "${DBUS_BROKER_INSTALL_METHOD:-}" in
+    source|artifact) ;;
+    *) die "DBUS_BROKER_INSTALL_METHOD must be 'source' or 'artifact', found '${DBUS_BROKER_INSTALL_METHOD:-}'" ;;
+  esac
+
   require_https_url "DBUS_BROKER_GIT_URL" "$DBUS_BROKER_GIT_URL"
   require_commit_sha "$DBUS_BROKER_COMMIT_SHA"
-  [[ "$DBUS_BROKER_RUST_TOOLCHAIN" =~ ^nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || {
-    die "DBUS_BROKER_RUST_TOOLCHAIN must be a dated nightly, found '$DBUS_BROKER_RUST_TOOLCHAIN'"
-  }
+  if [[ "$DBUS_BROKER_INSTALL_METHOD" == "source" ]]; then
+    [[ "$DBUS_BROKER_RUST_TOOLCHAIN" =~ ^nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || {
+      die "DBUS_BROKER_RUST_TOOLCHAIN must be a dated nightly, found '$DBUS_BROKER_RUST_TOOLCHAIN'"
+    }
+  else
+    require_https_url "DBUS_BROKER_TARBALL_URL" "$DBUS_BROKER_TARBALL_URL"
+    require_sha256_hex "$(normalize_sha256_value "$DBUS_BROKER_TARBALL_SHA")"
+    require_safe_token "DBUS_BROKER_COMMIT_TAG" "$DBUS_BROKER_COMMIT_TAG"
+  fi
 
   require_absolute_path "DBUS_BROKER_INSTALL_BIN_DIR" "$DBUS_BROKER_INSTALL_BIN_DIR"
   require_absolute_path "DBUS_BROKER_INSTALL_MAN_DIR" "$DBUS_BROKER_INSTALL_MAN_DIR"
@@ -285,6 +357,10 @@ dbus_broker_meson_args() {
 --buildtype=release
 --prefix=/usr
 --warnlevel=2
+-Db_lto=true
+-Db_lto_mode=thin
+-Db_ndebug=true
+-Db_pie=true
 -Dapparmor=true
 -Daudit=false
 -Ddocs=true
@@ -325,6 +401,7 @@ cleanup_build_workspace() {
   DBUS_BROKER_REPO_DIR=""
   DBUS_BROKER_BUILD_DIR=""
   DBUS_BROKER_STAGE_DIR=""
+  DBUS_BROKER_ARTIFACT_TARBALL_PATH=""
   DBUS_BROKER_SUBPROJECTS_LOCK_PATH=""
 }
 
@@ -368,10 +445,15 @@ $missing_output"
 prepare_source_build() {
   local meson_args_file
   local -a meson_args=()
+  local cflags cxxflags ldflags rustflags
 
   cleanup_build_workspace
   ensure_runtime_directories
   ensure_rustup_toolchain "$DBUS_BROKER_RUST_TOOLCHAIN"
+  cflags="$(native_cflags)"
+  cxxflags="$(native_cxxflags)"
+  ldflags="$(native_ldflags)"
+  rustflags="$(native_rustflags)"
 
   DBUS_BROKER_WORK_ROOT="$(mktemp -d "${DBUS_BROKER_TMP_DIR%/}/dbus-broker.XXXXXX")"
   DBUS_BROKER_REPO_DIR="$DBUS_BROKER_WORK_ROOT/source"
@@ -403,9 +485,34 @@ prepare_source_build() {
   done <"$meson_args_file"
   run_cmd rm -f -- "$meson_args_file"
 
-  run_logged_command "$(dbus_broker_build_log_path)" env PATH="$DBUS_BROKER_TOOLCHAIN_BIN_DIR:$PATH" meson setup "$DBUS_BROKER_BUILD_DIR" "$DBUS_BROKER_REPO_DIR" "${meson_args[@]}"
-  run_logged_command "$(dbus_broker_build_log_path)" env PATH="$DBUS_BROKER_TOOLCHAIN_BIN_DIR:$PATH" meson compile -C "$DBUS_BROKER_BUILD_DIR"
-  run_logged_command "$(dbus_broker_build_log_path)" env DESTDIR="$DBUS_BROKER_STAGE_DIR" PATH="$DBUS_BROKER_TOOLCHAIN_BIN_DIR:$PATH" meson install -C "$DBUS_BROKER_BUILD_DIR" --no-rebuild
+  run_logged_command "$(dbus_broker_build_log_path)" env \
+    PATH="$DBUS_BROKER_TOOLCHAIN_BIN_DIR:$PATH" \
+    CC=clang \
+    CXX=clang++ \
+    CFLAGS="$cflags" \
+    CXXFLAGS="$cxxflags" \
+    LDFLAGS="$ldflags" \
+    RUSTFLAGS="$rustflags" \
+    meson setup "$DBUS_BROKER_BUILD_DIR" "$DBUS_BROKER_REPO_DIR" "${meson_args[@]}"
+  run_logged_command "$(dbus_broker_build_log_path)" env \
+    PATH="$DBUS_BROKER_TOOLCHAIN_BIN_DIR:$PATH" \
+    CC=clang \
+    CXX=clang++ \
+    CFLAGS="$cflags" \
+    CXXFLAGS="$cxxflags" \
+    LDFLAGS="$ldflags" \
+    RUSTFLAGS="$rustflags" \
+    meson compile -C "$DBUS_BROKER_BUILD_DIR"
+  run_logged_command "$(dbus_broker_build_log_path)" env \
+    DESTDIR="$DBUS_BROKER_STAGE_DIR" \
+    PATH="$DBUS_BROKER_TOOLCHAIN_BIN_DIR:$PATH" \
+    CC=clang \
+    CXX=clang++ \
+    CFLAGS="$cflags" \
+    CXXFLAGS="$cxxflags" \
+    LDFLAGS="$ldflags" \
+    RUSTFLAGS="$rustflags" \
+    meson install -C "$DBUS_BROKER_BUILD_DIR" --no-rebuild
   require_stage_layout "$DBUS_BROKER_STAGE_DIR"
   assert_stage_binary_dependencies "$DBUS_BROKER_STAGE_DIR"
 }
@@ -430,9 +537,14 @@ install_source_build() {
   install_managed_file 0644 "$DBUS_BROKER_STAGE_DIR/usr/lib/systemd/catalog/dbus-broker-launch.catalog" "$DBUS_BROKER_INSTALL_CATALOG_DIR/dbus-broker-launch.catalog"
 
   provenance="$(cat <<EOF
+DBUS_BROKER_INSTALL_METHOD="source"
 DBUS_BROKER_GIT_URL="$DBUS_BROKER_GIT_URL"
 DBUS_BROKER_COMMIT_SHA="$DBUS_BROKER_COMMIT_SHA"
 DBUS_BROKER_RUST_TOOLCHAIN="$DBUS_BROKER_RUST_TOOLCHAIN"
+DBUS_BROKER_CFLAGS="$(native_cflags)"
+DBUS_BROKER_CXXFLAGS="$(native_cxxflags)"
+DBUS_BROKER_LDFLAGS="$(native_ldflags)"
+DBUS_BROKER_RUSTFLAGS="$(native_rustflags)"
 DBUS_BROKER_RUSTC_VERSION="$(run_with_rust_toolchain rustc --version)"
 DBUS_BROKER_CARGO_VERSION="$(run_with_rust_toolchain cargo --version)"
 DBUS_BROKER_MESON_VERSION="$(meson --version)"
@@ -455,6 +567,80 @@ EOF
   backup_existing_path "$DBUS_BROKER_BUILD_VERIFICATION_PATH"
   write_root_file "$DBUS_BROKER_BUILD_VERIFICATION_PATH" 0644 "$verification"
   remove_if_present "$DBUS_BROKER_LEGACY_VERIFICATION_PATH"
+
+  backup_existing_path "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH"
+  run_cmd install -m 0644 "$DBUS_BROKER_SUBPROJECTS_LOCK_PATH" "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH"
+  run_cmd journalctl --update-catalog >/dev/null 2>&1 || true
+}
+
+prepare_artifact_install() {
+  cleanup_build_workspace
+  ensure_runtime_directories
+
+  DBUS_BROKER_WORK_ROOT="$(mktemp -d "${DBUS_BROKER_TMP_DIR%/}/dbus-broker.XXXXXX")"
+  DBUS_BROKER_STAGE_DIR="$DBUS_BROKER_WORK_ROOT/stage"
+  DBUS_BROKER_ARTIFACT_TARBALL_PATH="$DBUS_BROKER_WORK_ROOT/dbus-broker-artifact.tar.gz"
+
+  retry_cmd 3 run_logged_command "$(dbus_broker_build_log_path)" \
+    curl --fail --location --max-time 60 --silent --show-error -o "$DBUS_BROKER_ARTIFACT_TARBALL_PATH" "$DBUS_BROKER_TARBALL_URL"
+  verify_file_sha256 "$DBUS_BROKER_ARTIFACT_TARBALL_PATH" "$DBUS_BROKER_TARBALL_SHA"
+  validate_tarball_members_safe "$DBUS_BROKER_ARTIFACT_TARBALL_PATH"
+
+  run_cmd install -d -m 0755 "$DBUS_BROKER_STAGE_DIR"
+  run_cmd tar -xzf "$DBUS_BROKER_ARTIFACT_TARBALL_PATH" -C "$DBUS_BROKER_STAGE_DIR"
+  require_stage_layout "$DBUS_BROKER_STAGE_DIR"
+  assert_stage_binary_dependencies "$DBUS_BROKER_STAGE_DIR"
+  require_file "$DBUS_BROKER_STAGE_DIR/usr/share/dbus-broker/release-verification.txt"
+  DBUS_BROKER_SUBPROJECTS_LOCK_PATH="$DBUS_BROKER_STAGE_DIR/usr/share/dbus-broker/subprojects.lock"
+  require_file "$DBUS_BROKER_SUBPROJECTS_LOCK_PATH"
+}
+
+install_artifact_build() {
+  local provenance verification artifact_release_verification_path
+
+  [[ -n "${DBUS_BROKER_STAGE_DIR:-}" ]] || die "dbus-broker artifact tree is not prepared"
+
+  run_cmd install -d -m 0755 "$DBUS_BROKER_INSTALL_BIN_DIR"
+  run_cmd install -d -m 0755 "$DBUS_BROKER_INSTALL_MAN_DIR"
+  run_cmd install -d -m 0755 "$DBUS_BROKER_INSTALL_SHARE_DIR"
+  run_cmd install -d -m 0755 "$DBUS_BROKER_INSTALL_CATALOG_DIR"
+
+  install_managed_file 0755 "$DBUS_BROKER_STAGE_DIR/usr/bin/dbus-broker" "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker"
+  install_managed_file 0755 "$DBUS_BROKER_STAGE_DIR/usr/bin/dbus-broker-launch" "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-launch"
+  install_managed_file 0755 "$DBUS_BROKER_STAGE_DIR/usr/bin/dbus-broker-session" "$DBUS_BROKER_INSTALL_BIN_DIR/dbus-broker-session"
+  install_managed_file 0644 "$DBUS_BROKER_STAGE_DIR/usr/share/man/man1/dbus-broker.1" "$DBUS_BROKER_INSTALL_MAN_DIR/dbus-broker.1"
+  install_managed_file 0644 "$DBUS_BROKER_STAGE_DIR/usr/share/man/man1/dbus-broker-launch.1" "$DBUS_BROKER_INSTALL_MAN_DIR/dbus-broker-launch.1"
+  install_managed_file 0644 "$DBUS_BROKER_STAGE_DIR/usr/lib/systemd/catalog/dbus-broker.catalog" "$DBUS_BROKER_INSTALL_CATALOG_DIR/dbus-broker.catalog"
+  install_managed_file 0644 "$DBUS_BROKER_STAGE_DIR/usr/lib/systemd/catalog/dbus-broker-launch.catalog" "$DBUS_BROKER_INSTALL_CATALOG_DIR/dbus-broker-launch.catalog"
+
+  provenance="$(cat <<EOF
+DBUS_BROKER_INSTALL_METHOD="artifact"
+DBUS_BROKER_TARBALL_URL="$DBUS_BROKER_TARBALL_URL"
+DBUS_BROKER_TARBALL_SHA="$(normalize_sha256_value "$DBUS_BROKER_TARBALL_SHA")"
+DBUS_BROKER_COMMIT_TAG="$DBUS_BROKER_COMMIT_TAG"
+DBUS_BROKER_COMMIT_SHA="$DBUS_BROKER_COMMIT_SHA"
+DBUS_BROKER_BUILD_LOG="$(dbus_broker_build_log_path)"
+DBUS_BROKER_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+EOF
+)"
+  backup_existing_path "$DBUS_BROKER_BUILD_PROVENANCE_PATH"
+  write_root_file "$DBUS_BROKER_BUILD_PROVENANCE_PATH" 0644 "$provenance"
+  remove_if_present "$DBUS_BROKER_LEGACY_PROVENANCE_PATH"
+
+  verification="$(cat <<EOF
+Artifact URL: $DBUS_BROKER_TARBALL_URL
+Artifact SHA256: $(normalize_sha256_value "$DBUS_BROKER_TARBALL_SHA")
+Artifact Commit Tag: $DBUS_BROKER_COMMIT_TAG
+Artifact Commit SHA: $DBUS_BROKER_COMMIT_SHA
+Artifact Release Verification Path: $DBUS_BROKER_LEGACY_VERIFICATION_PATH
+EOF
+)"
+  backup_existing_path "$DBUS_BROKER_BUILD_VERIFICATION_PATH"
+  write_root_file "$DBUS_BROKER_BUILD_VERIFICATION_PATH" 0644 "$verification"
+
+  artifact_release_verification_path="$DBUS_BROKER_STAGE_DIR/usr/share/dbus-broker/release-verification.txt"
+  backup_existing_path "$DBUS_BROKER_LEGACY_VERIFICATION_PATH"
+  run_cmd install -D -m 0644 "$artifact_release_verification_path" "$DBUS_BROKER_LEGACY_VERIFICATION_PATH"
 
   backup_existing_path "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH"
   run_cmd install -m 0644 "$DBUS_BROKER_SUBPROJECTS_LOCK_PATH" "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH"

@@ -16,8 +16,21 @@ labwc_tweaks_cache_root() {
 }
 
 validate_labwc_tweaks_settings() {
-  require_https_url "LABWC_TWEAKS_GIT_URL" "${LABWC_TWEAKS_GIT_URL:-}"
-  require_commit_sha "${LABWC_TWEAKS_COMMIT_SHA:-}"
+  case "${LABWC_INSTALL_METHOD:-}" in
+    source)
+      require_https_url "LABWC_TWEAKS_GIT_URL" "${LABWC_TWEAKS_GIT_URL:-}"
+      require_commit_sha "${LABWC_TWEAKS_COMMIT_SHA:-}"
+      ;;
+    artifact)
+      require_https_url "LABWC_TWEAKS_TARBALL_URL" "${LABWC_TWEAKS_TARBALL_URL:-}"
+      require_sha256_hex "$(normalize_sha256_value "${LABWC_TWEAKS_TARBALL_SHA:-}")"
+      require_safe_token "LABWC_TWEAKS_COMMIT_TAG" "${LABWC_TWEAKS_COMMIT_TAG:-}"
+      require_commit_sha "${LABWC_TWEAKS_COMMIT_SHA:-}"
+      ;;
+    *)
+      die "LABWC_INSTALL_METHOD must be 'source' or 'artifact', found '${LABWC_INSTALL_METHOD:-}'"
+      ;;
+  esac
 }
 
 patch_labwc_tweaks_login_helper() {
@@ -57,7 +70,7 @@ verify_labwc_tweaks_stage() {
 }
 
 install_labwc_tweaks() {
-  local work_root repo_dir build_dir stage_root provenance log_path
+  local work_root repo_dir build_dir stage_root provenance log_path cflags cxxflags ldflags
 
   validate_labwc_tweaks_settings
   log_path="$(build_log_path "labwc-tweaks-build")"
@@ -65,14 +78,28 @@ install_labwc_tweaks() {
   repo_dir="$work_root/source"
   build_dir="$work_root/build"
   stage_root="$work_root/stage"
+  cflags="$(native_cflags)"
+  cxxflags="$(native_cxxflags)"
+  ldflags="$(native_ldflags)"
 
   trap 'cleanup_source_checkout "$work_root"' RETURN
 
   log_info "building labwc-tweaks from ${LABWC_TWEAKS_COMMIT_SHA}"
-  run_logged_command "$log_path" cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
-    -D CMAKE_BUILD_TYPE=Release \
-    -D CMAKE_INSTALL_PREFIX=/usr \
-    -W no-dev
+  run_logged_command "$log_path" env \
+    CC=clang \
+    CXX=clang++ \
+    CFLAGS="$cflags" \
+    CXXFLAGS="$cxxflags" \
+    LDFLAGS="$ldflags" \
+    cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
+      -D CMAKE_BUILD_TYPE=Release \
+      -D CMAKE_INSTALL_PREFIX=/usr \
+      -D CMAKE_C_FLAGS="$cflags" \
+      -D CMAKE_CXX_FLAGS="$cxxflags" \
+      -D CMAKE_EXE_LINKER_FLAGS="$ldflags" \
+      -D CMAKE_SHARED_LINKER_FLAGS="$ldflags" \
+      -D CMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
+      -W no-dev
   run_logged_command "$log_path" cmake --build "$build_dir" --verbose
   run_logged_command "$log_path" env DESTDIR="$stage_root" cmake --install "$build_dir" --prefix /usr
   verify_labwc_tweaks_stage "$stage_root"
@@ -92,7 +119,53 @@ install_labwc_tweaks() {
   provenance="$(cat <<EOF
 LABWC_TWEAKS_GIT_URL="$LABWC_TWEAKS_GIT_URL"
 LABWC_TWEAKS_COMMIT_SHA="$LABWC_TWEAKS_COMMIT_SHA"
+LABWC_TWEAKS_INSTALL_METHOD="source"
 LABWC_TWEAKS_PATCH_SERIES="patches/release/series"
+LABWC_TWEAKS_CFLAGS="$cflags"
+LABWC_TWEAKS_CXXFLAGS="$cxxflags"
+LABWC_TWEAKS_LDFLAGS="$ldflags"
+LABWC_TWEAKS_BUILD_LOG="$log_path"
+LABWC_TWEAKS_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+EOF
+)"
+  write_source_provenance "$LABWC_TWEAKS_PROVENANCE_PATH" "$provenance"
+
+  trap - RETURN
+  cleanup_source_checkout "$work_root"
+}
+
+install_labwc_tweaks_artifact() {
+  local work_root tarball_path stage_root provenance log_path
+
+  validate_labwc_tweaks_settings
+  log_path="$(build_log_path "labwc-tweaks-artifact-install")"
+  work_root="$(download_release_tarball "labwc-tweaks" "$LABWC_TWEAKS_TARBALL_URL" "$LABWC_TWEAKS_TARBALL_SHA" "$log_path")"
+  tarball_path="$work_root/archive.tar.gz"
+  stage_root="$work_root/stage"
+
+  trap 'cleanup_source_checkout "$work_root"' RETURN
+
+  extract_release_tarball "$tarball_path" "$stage_root"
+  verify_labwc_tweaks_stage "$stage_root"
+
+  remove_labwc_tweaks_install
+  install_staged_tree "$stage_root" "$LABWC_TWEAKS_MANIFEST_PATH"
+  assert_binary_dependencies "$LABWC_TWEAKS_BIN_PATH" "labwc-tweaks"
+  require_file "$LABWC_TWEAKS_DESKTOP_PATH"
+  require_file "$LABWC_TWEAKS_APPDATA_PATH"
+  require_file "$LABWC_TWEAKS_ICON_PATH"
+  require_dir "$LABWC_TWEAKS_DATA_DIR"
+  require_file "$LABWC_TWEAKS_POLICY_PATH"
+  require_file "$LABWC_TWEAKS_LOGIN_HELPER_PATH"
+  patch_labwc_tweaks_login_helper "$LABWC_TWEAKS_LOGIN_HELPER_PATH"
+  bash -n "$LABWC_TWEAKS_LOGIN_HELPER_PATH"
+
+  provenance="$(cat <<EOF
+LABWC_TWEAKS_INSTALL_METHOD="artifact"
+LABWC_TWEAKS_TARBALL_URL="$LABWC_TWEAKS_TARBALL_URL"
+LABWC_TWEAKS_TARBALL_SHA="$(normalize_sha256_value "$LABWC_TWEAKS_TARBALL_SHA")"
+LABWC_TWEAKS_COMMIT_TAG="$LABWC_TWEAKS_COMMIT_TAG"
+LABWC_TWEAKS_COMMIT_SHA="$LABWC_TWEAKS_COMMIT_SHA"
 LABWC_TWEAKS_BUILD_LOG="$log_path"
 LABWC_TWEAKS_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 EOF

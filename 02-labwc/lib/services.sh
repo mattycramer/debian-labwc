@@ -59,11 +59,24 @@ validate_greetd_vt() {
 }
 
 validate_regreet_settings() {
-  require_https_url "REGREET_GIT_URL" "${REGREET_GIT_URL:-}"
-  require_commit_sha "${REGREET_COMMIT_SHA:-}"
-  [[ "${REGREET_RUST_TOOLCHAIN:-}" =~ ^nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || {
-    die "REGREET_RUST_TOOLCHAIN must be a dated nightly, found '${REGREET_RUST_TOOLCHAIN:-}'"
-  }
+  case "${LABWC_INSTALL_METHOD:-}" in
+    source)
+      require_https_url "REGREET_GIT_URL" "${REGREET_GIT_URL:-}"
+      require_commit_sha "${REGREET_COMMIT_SHA:-}"
+      [[ "${REGREET_RUST_TOOLCHAIN:-}" =~ ^nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || {
+        die "REGREET_RUST_TOOLCHAIN must be a dated nightly, found '${REGREET_RUST_TOOLCHAIN:-}'"
+      }
+      ;;
+    artifact)
+      require_https_url "REGREET_TARBALL_URL" "${REGREET_TARBALL_URL:-}"
+      require_sha256_hex "$(normalize_sha256_value "${REGREET_TARBALL_SHA:-}")"
+      require_safe_token "REGREET_COMMIT_TAG" "${REGREET_COMMIT_TAG:-}"
+      require_commit_sha "${REGREET_COMMIT_SHA:-}"
+      ;;
+    *)
+      die "LABWC_INSTALL_METHOD must be 'source' or 'artifact', found '${LABWC_INSTALL_METHOD:-}'"
+      ;;
+  esac
 }
 
 render_template_to_file() {
@@ -314,7 +327,7 @@ remove_regreet_runtime_files() {
 }
 
 install_regreet_binary() {
-  local work_root repo_dir target_dir rust_state_root provenance log_path
+  local work_root repo_dir target_dir rust_state_root provenance log_path rust_flags
 
   validate_regreet_settings
   ensure_source_state_dir
@@ -324,12 +337,16 @@ install_regreet_binary() {
   work_root="$(fetch_source_checkout "regreet" "$REGREET_GIT_URL" "$REGREET_COMMIT_SHA" "$log_path")"
   repo_dir="$work_root/source"
   target_dir="$work_root/target"
+  rust_flags="$(native_rustflags)"
 
   trap 'cleanup_source_checkout "$work_root"' RETURN
 
   log_info "building regreet from ${REGREET_COMMIT_SHA} with ${REGREET_RUST_TOOLCHAIN}"
   run_logged_command "$log_path" \
     env PATH="$(rust_toolchain_bin_dir "$rust_state_root"):$PATH" \
+      RUSTFLAGS="$rust_flags" \
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
+      CARGO_PROFILE_RELEASE_LTO=thin \
       GREETD_CONFIG_DIR=/etc/greetd \
       STATE_DIR=/var/lib/regreet \
       LOG_DIR=/var/log/regreet \
@@ -345,9 +362,46 @@ install_regreet_binary() {
   provenance="$(cat <<EOF
 REGREET_GIT_URL="$REGREET_GIT_URL"
 REGREET_COMMIT_SHA="$REGREET_COMMIT_SHA"
+REGREET_INSTALL_METHOD="source"
 REGREET_RUST_TOOLCHAIN="$REGREET_RUST_TOOLCHAIN"
+REGREET_RUSTFLAGS="$rust_flags"
 REGREET_RUSTC_VERSION="$(rust_version_output "$rust_state_root" "$REGREET_RUST_TOOLCHAIN")"
 REGREET_CARGO_VERSION="$(cargo_version_output "$rust_state_root" "$REGREET_RUST_TOOLCHAIN")"
+REGREET_BUILD_LOG="$log_path"
+REGREET_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+EOF
+)"
+  write_source_provenance "$(regreet_provenance_path)" "$provenance"
+
+  trap - RETURN
+  cleanup_source_checkout "$work_root"
+}
+
+install_regreet_artifact() {
+  local work_root tarball_path stage_root provenance log_path
+
+  validate_regreet_settings
+  ensure_source_state_dir
+  log_path="$(build_log_path "regreet-artifact-install")"
+  work_root="$(download_release_tarball "regreet" "$REGREET_TARBALL_URL" "$REGREET_TARBALL_SHA" "$log_path")"
+  tarball_path="$work_root/archive.tar.gz"
+  stage_root="$work_root/stage"
+
+  trap 'cleanup_source_checkout "$work_root"' RETURN
+
+  extract_release_tarball "$tarball_path" "$stage_root"
+  require_file "$stage_root/regreet"
+  assert_binary_dependencies "$stage_root/regreet" "regreet artifact"
+  run_cmd install -D -m 0755 "$stage_root/regreet" "$(regreet_binary_path)"
+  assert_binary_dependencies "$(regreet_binary_path)" "regreet"
+  "$(regreet_binary_path)" --version >/dev/null 2>&1 || die "installed regreet artifact failed the --version self-test"
+
+  provenance="$(cat <<EOF
+REGREET_INSTALL_METHOD="artifact"
+REGREET_TARBALL_URL="$REGREET_TARBALL_URL"
+REGREET_TARBALL_SHA="$(normalize_sha256_value "$REGREET_TARBALL_SHA")"
+REGREET_COMMIT_TAG="$REGREET_COMMIT_TAG"
+REGREET_COMMIT_SHA="$REGREET_COMMIT_SHA"
 REGREET_BUILD_LOG="$log_path"
 REGREET_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 EOF
@@ -494,6 +548,7 @@ enable_system_services_only() {
   run_cmd systemctl daemon-reload
   run_cmd systemctl set-default graphical.target
   run_cmd systemctl enable greetd.service
+  systemctl reset-failed greetd.service >/dev/null 2>&1 || true
   run_cmd systemctl enable NetworkManager.service
   if systemctl cat NetworkManager-dispatcher.service >/dev/null 2>&1; then
     run_cmd systemctl enable NetworkManager-dispatcher.service

@@ -29,6 +29,136 @@ Usage: ./install.sh --phase doctor|detect|packages|render|enable|verify|print-en
 EOF
 }
 
+read_env_value() {
+  local key="$1"
+  python3 - "$ENV_FILE" "$key" <<'PY'
+from pathlib import Path
+import sys
+
+env_path = Path(sys.argv[1])
+key = sys.argv[2]
+
+for line in env_path.read_text(encoding="utf-8").splitlines():
+    if not line.startswith(f"{key}="):
+        continue
+    value = line.split("=", 1)[1].strip()
+    if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
+        value = bytes(value[1:-1], "utf-8").decode("unicode_escape")
+    print(value, end="")
+    break
+PY
+}
+
+write_env_value() {
+  local key="$1"
+  local value="$2"
+  local value_file
+
+  value_file="$(mktemp)"
+  printf '%s' "$value" >"$value_file"
+
+  python3 - "$ENV_FILE" "$key" "$value_file" <<'PY'
+from pathlib import Path
+import sys
+
+env_path = Path(sys.argv[1])
+key = sys.argv[2]
+value = Path(sys.argv[3]).read_text(encoding="utf-8")
+
+escaped = (
+    value
+    .replace("\\", "\\\\")
+    .replace('"', '\\"')
+    .replace("$", "\\$")
+    .replace("`", "\\`")
+)
+
+replacement = f'{key}="{escaped}"'
+lines = env_path.read_text(encoding="utf-8").splitlines()
+
+for index, line in enumerate(lines):
+    if line.startswith(f"{key}="):
+        lines[index] = replacement
+        break
+else:
+    lines.append(replacement)
+
+env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+PY
+
+  rm -f -- "$value_file"
+}
+
+install_method_prompt_required_for_phase() {
+  case "$PHASE" in
+    detect|packages|render|enable|verify|all)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+install_method_is_source() {
+  [[ "${DBUS_BROKER_INSTALL_METHOD:-}" == "source" ]]
+}
+
+current_install_method() {
+  local value
+  value="$(read_env_value "DBUS_BROKER_INSTALL_METHOD")"
+  case "$value" in
+    source|artifact)
+      printf '%s\n' "$value"
+      ;;
+    *)
+      printf '%s\n' ""
+      ;;
+  esac
+}
+
+prompt_install_method() {
+  local answer=""
+
+  [[ -t 0 && -t 1 ]] || die "DBUS_BROKER_INSTALL_METHOD is unset in $ENV_FILE and no interactive terminal is available to choose source or artifact install mode"
+  while true; do
+    IFS= read -r -p "Do you want to build from source? [Y/n] " answer
+    case "${answer:-Y}" in
+      Y|y|yes|YES)
+        printf '%s\n' "source"
+        return 0
+        ;;
+      N|n|no|NO)
+        printf '%s\n' "artifact"
+        return 0
+        ;;
+      *)
+        printf '%s\n' "Please answer Y or n." >&2
+        ;;
+    esac
+  done
+}
+
+ensure_install_method_in_env() {
+  local selected_method=""
+
+  install_method_prompt_required_for_phase || return 0
+  [[ -f "$ENV_FILE" ]] || die "missing env file: $ENV_FILE"
+
+  selected_method="$(current_install_method)"
+  if [[ "$PHASE" == "all" ]]; then
+    selected_method="$(prompt_install_method)"
+    write_env_value "DBUS_BROKER_INSTALL_METHOD" "$selected_method"
+    return 0
+  fi
+  if [[ -n "$selected_method" ]]; then
+    return 0
+  fi
+
+  selected_method="$(prompt_install_method)"
+  write_env_value "DBUS_BROKER_INSTALL_METHOD" "$selected_method"
+}
+
 parse_args() {
   while (($#)); do
     case "$1" in
@@ -97,6 +227,9 @@ phase_doctor() {
 }
 
 phase_build_doctor() {
+  require_command clang
+  require_command clang++
+  require_command ld.lld
   require_command git
   require_command meson
   require_command ninja
@@ -124,12 +257,19 @@ phase_packages() {
 phase_render() {
   log_info "phase: render"
   phase_doctor
-  phase_build_doctor
   load_env_file
   validate_env_settings
+  if install_method_is_source; then
+    phase_build_doctor
+  fi
   trap 'cleanup_build_workspace' RETURN
-  prepare_source_build
-  install_source_build
+  if install_method_is_source; then
+    prepare_source_build
+    install_source_build
+  else
+    prepare_artifact_install
+    install_artifact_build
+  fi
   render_managed_units
   trap - RETURN
   cleanup_build_workspace
@@ -146,8 +286,10 @@ phase_enable() {
 phase_verify() {
   log_info "phase: verify"
   phase_doctor
-  phase_build_doctor
   load_env_file
+  if install_method_is_source; then
+    phase_build_doctor
+  fi
   validate_env_settings
   verify_install
 }
@@ -168,6 +310,7 @@ phase_nuke() {
 
 main() {
   parse_args "$@"
+  ensure_install_method_in_env
   case "$PHASE" in
     doctor) phase_doctor ;;
     detect) phase_detect ;;

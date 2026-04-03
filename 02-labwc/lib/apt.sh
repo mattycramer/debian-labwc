@@ -4,7 +4,7 @@ readonly SID_SUITE="sid"
 readonly SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
 readonly SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
 readonly DEBIAN_ARCHIVE_KEYRING_PATH="/usr/share/keyrings/debian-archive-keyring.gpg"
-readonly SID_PACKAGES=(
+readonly SID_RUNTIME_PACKAGES=(
   labwc
   kanshi
   waybar
@@ -61,6 +61,10 @@ readonly SID_PACKAGES=(
   kwallet6
   qtwayland5
   qt6-wayland
+  qml6-module-qtqml
+  qml6-module-qtquick
+  qml6-module-qtquick-controls
+  qml6-module-qtquick-layouts
   qml6-module-org-kde-config
   qml6-module-org-kde-coreaddons
   qml6-module-org-kde-kirigami
@@ -123,6 +127,10 @@ readonly SID_PACKAGES=(
   ncdu
   fzf
   git
+  tar
+  )
+
+readonly SID_SOURCE_BUILD_PACKAGES=(
   build-essential
   pkg-config
   pkgconf
@@ -160,7 +168,7 @@ readonly SID_PACKAGES=(
   qt6-tools-dev
   qt6-tools-dev-tools
   qt6-l10n-tools
-  )
+)
 
 readonly GRAPHICS_PACKAGES=(
   bash-completion
@@ -212,7 +220,7 @@ require_sid_repository() {
 }
 
 resolved_sid_packages() {
-  printf '%s\n' "${SID_PACKAGES[@]}"
+  printf '%s\n' "${SID_RUNTIME_PACKAGES[@]}"
 }
 
 resolved_graphics_packages() {
@@ -224,21 +232,32 @@ resolved_graphics_packages() {
 
 resolved_requested_packages() {
   resolved_sid_packages
+  if [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]]; then
+    printf '%s\n' "${SID_SOURCE_BUILD_PACKAGES[@]}"
+  fi
   resolved_graphics_packages
 }
 
 install_requested_packages() {
   log_info "installing sid package set"
   local -a sid_package_list=()
+  local -a build_package_list=()
   local -a graphics_package_list=()
   local -a all_package_list=()
   local -a apt_args=()
   mapfile -t all_package_list < <(resolved_requested_packages)
   ((${#all_package_list[@]} > 0)) || die "resolved package set is empty"
   mapfile -t sid_package_list < <(resolved_sid_packages)
+  if [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]]; then
+    mapfile -t build_package_list < <(printf '%s\n' "${SID_SOURCE_BUILD_PACKAGES[@]}")
+  fi
   mapfile -t graphics_package_list < <(resolved_graphics_packages)
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${sid_package_list[@]}"
+  if ((${#build_package_list[@]} > 0)); then
+    log_info "installing source-build package set from sid"
+    run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${build_package_list[@]}"
+  fi
   log_info "installing graphics package set from sid"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${graphics_package_list[@]}"
 }

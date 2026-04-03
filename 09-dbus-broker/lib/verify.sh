@@ -19,6 +19,9 @@ verify_paths() {
   require_file "$DBUS_BROKER_BUILD_PROVENANCE_PATH"
   require_file "$DBUS_BROKER_BUILD_VERIFICATION_PATH"
   require_file "$DBUS_BROKER_SUBPROJECTS_LOCK_INSTALL_PATH"
+  if [[ "${DBUS_BROKER_INSTALL_METHOD:-}" == "artifact" ]]; then
+    require_file "$DBUS_BROKER_LEGACY_VERIFICATION_PATH"
+  fi
   require_file "$DBUS_BROKER_SYSTEM_UNIT_PATH"
   require_file "$DBUS_BROKER_USER_UNIT_PATH"
 }
@@ -30,21 +33,63 @@ verify_launcher_binary_contract() {
 }
 
 verify_provenance_file() {
-  grep -F "DBUS_BROKER_GIT_URL=\"$DBUS_BROKER_GIT_URL\"" "$DBUS_BROKER_BUILD_PROVENANCE_PATH" >/dev/null || {
-    die "provenance file missing DBUS_BROKER_GIT_URL"
-  }
-  grep -F "DBUS_BROKER_COMMIT_SHA=\"$DBUS_BROKER_COMMIT_SHA\"" "$DBUS_BROKER_BUILD_PROVENANCE_PATH" >/dev/null || {
-    die "provenance file missing DBUS_BROKER_COMMIT_SHA"
-  }
-  grep -F "DBUS_BROKER_RUST_TOOLCHAIN=\"$DBUS_BROKER_RUST_TOOLCHAIN\"" "$DBUS_BROKER_BUILD_PROVENANCE_PATH" >/dev/null || {
-    die "provenance file missing DBUS_BROKER_RUST_TOOLCHAIN"
-  }
+  case "${DBUS_BROKER_INSTALL_METHOD:-}" in
+    source)
+      grep -F 'DBUS_BROKER_INSTALL_METHOD="source"' "$DBUS_BROKER_BUILD_PROVENANCE_PATH" >/dev/null || {
+        die "provenance file missing source install method"
+      }
+      grep -F "DBUS_BROKER_GIT_URL=\"$DBUS_BROKER_GIT_URL\"" "$DBUS_BROKER_BUILD_PROVENANCE_PATH" >/dev/null || {
+        die "provenance file missing DBUS_BROKER_GIT_URL"
+      }
+      grep -F "DBUS_BROKER_COMMIT_SHA=\"$DBUS_BROKER_COMMIT_SHA\"" "$DBUS_BROKER_BUILD_PROVENANCE_PATH" >/dev/null || {
+        die "provenance file missing DBUS_BROKER_COMMIT_SHA"
+      }
+      grep -F "DBUS_BROKER_RUST_TOOLCHAIN=\"$DBUS_BROKER_RUST_TOOLCHAIN\"" "$DBUS_BROKER_BUILD_PROVENANCE_PATH" >/dev/null || {
+        die "provenance file missing DBUS_BROKER_RUST_TOOLCHAIN"
+      }
+      ;;
+    artifact)
+      grep -F 'DBUS_BROKER_INSTALL_METHOD="artifact"' "$DBUS_BROKER_BUILD_PROVENANCE_PATH" >/dev/null || {
+        die "provenance file missing artifact install method"
+      }
+      grep -F "DBUS_BROKER_TARBALL_URL=\"$DBUS_BROKER_TARBALL_URL\"" "$DBUS_BROKER_BUILD_PROVENANCE_PATH" >/dev/null || {
+        die "provenance file missing DBUS_BROKER_TARBALL_URL"
+      }
+      grep -F "DBUS_BROKER_TARBALL_SHA=\"$(normalize_sha256_value "$DBUS_BROKER_TARBALL_SHA")\"" "$DBUS_BROKER_BUILD_PROVENANCE_PATH" >/dev/null || {
+        die "provenance file missing DBUS_BROKER_TARBALL_SHA"
+      }
+      grep -F "DBUS_BROKER_COMMIT_TAG=\"$DBUS_BROKER_COMMIT_TAG\"" "$DBUS_BROKER_BUILD_PROVENANCE_PATH" >/dev/null || {
+        die "provenance file missing DBUS_BROKER_COMMIT_TAG"
+      }
+      grep -F "DBUS_BROKER_COMMIT_SHA=\"$DBUS_BROKER_COMMIT_SHA\"" "$DBUS_BROKER_BUILD_PROVENANCE_PATH" >/dev/null || {
+        die "provenance file missing DBUS_BROKER_COMMIT_SHA"
+      }
+      ;;
+    *)
+      die "DBUS_BROKER_INSTALL_METHOD must be 'source' or 'artifact', found '${DBUS_BROKER_INSTALL_METHOD:-}'"
+      ;;
+  esac
 }
 
 verify_build_manifest() {
-  grep -F "Meson args:" "$DBUS_BROKER_BUILD_VERIFICATION_PATH" >/dev/null || {
-    die "build verification file is missing the Meson argument section"
-  }
+  case "${DBUS_BROKER_INSTALL_METHOD:-}" in
+    source)
+      grep -F "Meson args:" "$DBUS_BROKER_BUILD_VERIFICATION_PATH" >/dev/null || {
+        die "build verification file is missing the Meson argument section"
+      }
+      ;;
+    artifact)
+      grep -F "Artifact SHA256: $(normalize_sha256_value "$DBUS_BROKER_TARBALL_SHA")" "$DBUS_BROKER_BUILD_VERIFICATION_PATH" >/dev/null || {
+        die "artifact verification file is missing the expected tarball sha"
+      }
+      grep -F "## dbus-broker" "$DBUS_BROKER_LEGACY_VERIFICATION_PATH" >/dev/null || {
+        die "release verification file is missing the expected dbus-broker marker"
+      }
+      ;;
+    *)
+      die "DBUS_BROKER_INSTALL_METHOD must be 'source' or 'artifact', found '${DBUS_BROKER_INSTALL_METHOD:-}'"
+      ;;
+  esac
 }
 
 verify_unit_content() {
