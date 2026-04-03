@@ -152,23 +152,46 @@ current_install_method() {
 prompt_install_method() {
   local answer=""
 
-  [[ -t 0 && -t 1 ]] || die "LABWC_INSTALL_METHOD is unset in $ENV_FILE and no interactive terminal is available to choose source or artifact install mode"
-  while true; do
-    IFS= read -r -p "Do you want to compile and install keepsecret, labwc-tweaks, and regreet from source? [Y/n] " answer
-    case "${answer:-Y}" in
-      Y|y|yes|YES)
-        printf '%s\n' "source"
-        return 0
-        ;;
-      N|n|no|NO)
-        printf '%s\n' "artifact"
-        return 0
-        ;;
-      *)
-        printf '%s\n' "Please answer Y or n." >&2
-        ;;
-    esac
-  done
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    while true; do
+      printf '%s' "Do you want to compile and install keepsecret, labwc-tweaks, and regreet from source? [Y/n] " >/dev/tty
+      IFS= read -r answer </dev/tty || die "LABWC_INSTALL_METHOD is unset in $ENV_FILE and the terminal prompt could not be read from /dev/tty"
+      case "${answer:-Y}" in
+        Y|y|yes|YES)
+          printf '%s\n' "source"
+          return 0
+          ;;
+        N|n|no|NO)
+          printf '%s\n' "artifact"
+          return 0
+          ;;
+        *)
+          printf '%s\n' "Please answer Y or n." >/dev/tty
+          ;;
+      esac
+    done
+  fi
+
+  if [[ -t 0 && -t 1 ]]; then
+    while true; do
+      IFS= read -r -p "Do you want to compile and install keepsecret, labwc-tweaks, and regreet from source? [Y/n] " answer
+      case "${answer:-Y}" in
+        Y|y|yes|YES)
+          printf '%s\n' "source"
+          return 0
+          ;;
+        N|n|no|NO)
+          printf '%s\n' "artifact"
+          return 0
+          ;;
+        *)
+          printf '%s\n' "Please answer Y or n." >&2
+          ;;
+      esac
+    done
+  fi
+
+  die "LABWC_INSTALL_METHOD is unset in $ENV_FILE and no interactive terminal is available to choose source or artifact install mode"
 }
 
 ensure_install_method_in_env() {
