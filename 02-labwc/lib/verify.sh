@@ -54,11 +54,11 @@ verify_greeter_contract() {
   require_dir "/var/lib/regreet"
   require_dir "/var/log/regreet"
 
-  grep -F 'dbus-run-session -- /usr/bin/labwc' "/etc/greetd/config.toml" >/dev/null || {
-    die "greetd config lost the managed dbus-run-session greeter contract"
-  }
   grep -F '/usr/local/bin/labwc-greeter-session' "/etc/greetd/config.toml" >/dev/null || {
     die "greetd config lost the managed greeter session wrapper"
+  }
+  grep -F 'dbus-run-session -- /usr/bin/labwc' "/usr/local/bin/labwc-greeter-session" >/dev/null || {
+    die "greeter session wrapper lost the managed dbus-run-session greeter contract"
   }
   grep -F 'LABWC_UPDATE_ACTIVATION_ENV=1' "/etc/greetd/config.toml" >/dev/null || {
     die "greetd config lost the managed activation-environment contract"

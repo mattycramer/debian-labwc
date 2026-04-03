@@ -22,7 +22,9 @@ printf '[%s] INFO: XDG_RUNTIME_DIR=%s GREETD_SOCK=%s WAYLAND_DISPLAY=%s\n' \
   "${GREETD_SOCK:-unset}" \
   "${WAYLAND_DISPLAY:-unset}"
 
+set +e
 /usr/bin/dbus-run-session -- /usr/bin/labwc -C /etc/labwc-greeter -S /usr/local/bin/labwc-greeter-regreet
 rc=$?
+set -e
 printf '[%s] ERROR: labwc greeter session exited with status %s\n' "$(timestamp)" "$rc"
 exit "$rc"
