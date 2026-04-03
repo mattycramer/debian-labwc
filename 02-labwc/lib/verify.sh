@@ -138,8 +138,14 @@ verify_greeter_contract() {
   grep -F '/usr/local/bin/labwc-greeter-session' "/etc/greetd/config.toml" >/dev/null || {
     die "greetd config lost the managed greeter session wrapper"
   }
-  grep -F 'dbus-run-session -- /usr/bin/labwc' "/usr/local/bin/labwc-greeter-session" >/dev/null || {
+  grep -F 'dbus-run-session -- /usr/bin/labwc -C /etc/labwc-greeter' "/usr/local/bin/labwc-greeter-session" >/dev/null || {
     die "greeter session wrapper lost the managed dbus-run-session greeter contract"
+  }
+  grep -F '/usr/local/bin/labwc-greeter-regreet' "/etc/labwc-greeter/autostart" >/dev/null || {
+    die "greeter labwc autostart no longer launches the managed regreet wrapper"
+  }
+  grep -F 'kill -TERM "$LABWC_PID"' "/etc/labwc-greeter/autostart" >/dev/null || {
+    die "greeter labwc autostart no longer terminates labwc when regreet exits"
   }
   grep -F 'WAYLAND_DISPLAY=%s' "/usr/local/bin/labwc-greeter-session" >/dev/null || {
     die "greeter session wrapper lost the managed WAYLAND_DISPLAY logging format"
