@@ -2,6 +2,7 @@
 set -u
 set -o pipefail
 IFS=$'\n\t'
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
@@ -25,6 +26,10 @@ log_warn() {
   printf '[%s] WARN: %s\n' "$(timestamp)" "$*" >&2
 }
 
+log_phase() {
+  printf '\n[%s] PHASE: %s\n' "$(timestamp)" "$*"
+}
+
 write_note() {
   local destination="$1"
   shift
@@ -34,6 +39,10 @@ write_note() {
 
 ensure_dir() {
   mkdir -p -- "$1"
+}
+
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
 }
 
 greeter_uid() {
@@ -76,8 +85,16 @@ greetd_vt() {
 run_and_capture() {
   local relative_path="$1"
   shift
+  run_and_capture_allowed "$relative_path" "0" "$@"
+}
+
+run_and_capture_allowed() {
+  local relative_path="$1"
+  local allowed_statuses="$2"
+  shift 2
   local destination="${BUNDLE_ROOT}/${relative_path}"
   local status=0
+  local allowed=0
 
   mkdir -p -- "$(dirname -- "$destination")"
   {
@@ -89,11 +106,43 @@ run_and_capture() {
     "$@"
   } >"$destination" 2>&1 || status=$?
 
-  if [ "$status" -ne 0 ]; then
+  if [[ " ${allowed_statuses} " == *" ${status} "* ]]; then
+    allowed=1
+  fi
+
+  if [ "$allowed" -eq 0 ]; then
     printf '\nexit_status=%s\n' "$status" >>"$destination"
+    log_warn "${relative_path} exited with status ${status}"
   fi
 
   return 0
+}
+
+run_optional_command() {
+  local relative_path="$1"
+  local command_name="$2"
+  shift 2
+
+  if ! command_exists "$command_name"; then
+    write_note "${BUNDLE_ROOT}/${relative_path}" "missing command: ${command_name}"
+    return 0
+  fi
+
+  run_and_capture "$relative_path" "$@"
+}
+
+run_optional_command_allowed() {
+  local relative_path="$1"
+  local allowed_statuses="$2"
+  local command_name="$3"
+  shift 3
+
+  if ! command_exists "$command_name"; then
+    write_note "${BUNDLE_ROOT}/${relative_path}" "missing command: ${command_name}"
+    return 0
+  fi
+
+  run_and_capture_allowed "$relative_path" "$allowed_statuses" "$@"
 }
 
 copy_text_file() {
@@ -160,21 +209,28 @@ apt_runner() {
 ensure_debug_packages() {
   local runner=""
   local missing=()
-  local package_name
   local command_name
-  local mapping
+  local package_name
+  local suite_name
+  local entry
+  local install_status=0
 
-  while IFS='|' read -r command_name package_name; do
+  while IFS='|' read -r command_name package_name suite_name; do
     [ -n "$command_name" ] || continue
-    if ! command -v "$command_name" >/dev/null 2>&1; then
-      missing+=("$package_name")
+    if ! command_exists "$command_name"; then
+      missing+=("${command_name}|${package_name}|${suite_name}")
     fi
   done <<'EOF'
-lspci|pciutils
-lsusb|usbutils
-gdb|gdb
-vulkaninfo|vulkan-tools
-vainfo|vainfo
+lspci|pciutils|sid
+lsusb|usbutils|sid
+gdb|gdb|sid
+vulkaninfo|vulkan-tools|sid
+vainfo|vainfo|sid
+coredumpctl|systemd-coredump|sid
+file|file|sid
+strings|binutils|sid
+modinfo|kmod|sid
+lsmod|kmod|sid
 EOF
 
   if [ "${#missing[@]}" -eq 0 ]; then
@@ -191,11 +247,34 @@ EOF
 
   if [ -n "$runner" ]; then
     run_and_capture "meta/apt-update.txt" timeout 600 "$runner" env DEBIAN_FRONTEND=noninteractive apt-get update
-    run_and_capture "meta/apt-install.txt" timeout 1200 "$runner" env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing[@]}"
   else
     run_and_capture "meta/apt-update.txt" timeout 600 env DEBIAN_FRONTEND=noninteractive apt-get update
-    run_and_capture "meta/apt-install.txt" timeout 1200 env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing[@]}"
   fi
+
+  for entry in "${missing[@]}"; do
+    IFS='|' read -r command_name package_name suite_name <<EOF
+$entry
+EOF
+    if [ -n "$runner" ]; then
+      run_and_capture "meta/packages/${command_name}.txt" timeout 1200 "$runner" env DEBIAN_FRONTEND=noninteractive apt-get -t "$suite_name" install -y --no-install-recommends "$package_name"
+    else
+      run_and_capture "meta/packages/${command_name}.txt" timeout 1200 env DEBIAN_FRONTEND=noninteractive apt-get -t "$suite_name" install -y --no-install-recommends "$package_name"
+    fi
+    if ! command_exists "$command_name"; then
+      install_status=1
+    fi
+  done
+
+  if [ "$install_status" -ne 0 ]; then
+    write_note "${BUNDLE_ROOT}/meta/package-bootstrap.txt" \
+      "one or more helper commands are still unavailable after bootstrap" \
+      "see meta/packages/*.txt for per-command install attempts"
+    return 0
+  fi
+
+  write_note "${BUNDLE_ROOT}/meta/package-bootstrap.txt" \
+    "helper package bootstrap completed" \
+    "see meta/packages/*.txt for per-command install logs"
 }
 
 collect_repo_context() {
@@ -219,10 +298,10 @@ collect_systemd_and_logs() {
   vt_value="$(greetd_vt)"
 
   run_and_capture "systemd/systemctl-failed.txt" systemctl --failed --no-pager
-  run_and_capture "systemd/greetd-status.txt" systemctl status greetd.service --no-pager
+  run_and_capture_allowed "systemd/greetd-status.txt" "0 3" systemctl status greetd.service --no-pager
   run_and_capture "systemd/greetd-show.txt" systemctl show greetd.service
   run_and_capture "systemd/greetd-cat.txt" systemctl cat greetd.service
-  run_and_capture "systemd/getty-tty${vt_value}-status.txt" systemctl status "getty@tty${vt_value}.service" --no-pager
+  run_and_capture_allowed "systemd/getty-tty${vt_value}-status.txt" "0 3 4" systemctl status "getty@tty${vt_value}.service" --no-pager
   run_and_capture "systemd/getty-tty${vt_value}-cat.txt" systemctl cat "getty@tty${vt_value}.service"
   run_and_capture "systemd/journal-greetd-boot.txt" journalctl -b -u greetd.service --no-pager
   run_and_capture "systemd/journal-greetd-tail.txt" journalctl -u greetd.service -n 300 --no-pager
@@ -249,38 +328,38 @@ collect_runtime_state() {
   run_and_capture "runtime/loginctl-list-sessions.txt" loginctl list-sessions
   run_and_capture "runtime/loginctl-list-users.txt" loginctl list-users
   run_and_capture "runtime/loginctl-seat0.txt" loginctl seat-status seat0
-  run_and_capture "runtime/loginctl-user-greeter.txt" loginctl user-status greeter
-  run_and_capture "runtime/loginctl-greeter-sessions.txt" loginctl show-user greeter
+  run_and_capture_allowed "runtime/loginctl-user-greeter.txt" "0 1" loginctl user-status greeter
+  run_and_capture_allowed "runtime/loginctl-greeter-sessions.txt" "0 1" loginctl show-user greeter
   run_and_capture "systemd/journal-user-${uid_value}.txt" journalctl "_UID=${uid_value}" -b --no-pager
   run_and_capture "runtime/greeter-passwd.txt" getent passwd greeter
   run_and_capture "runtime/greeter-groups.txt" id greeter
-  run_and_capture "runtime/run-user-${uid_value}.txt" ls -la "/run/user/${uid_value}"
-  run_and_capture "runtime/run-user-${uid_value}-find.txt" find "/run/user/${uid_value}" -maxdepth 2 -mindepth 1 -printf '%y %m %u %g %p\n'
+  run_and_capture_allowed "runtime/run-user-${uid_value}.txt" "0 1 2" ls -la "/run/user/${uid_value}"
+  run_and_capture_allowed "runtime/run-user-${uid_value}-find.txt" "0 1" find "/run/user/${uid_value}" -maxdepth 2 -mindepth 1 -printf '%y %m %u %g %p\n'
   run_and_capture "runtime/greetd-sockets.txt" find /run -maxdepth 2 \( -name 'greetd*.sock' -o -name 'greetd-*' \) -printf '%y %m %u %g %p\n'
   run_and_capture "runtime/dri-devices.txt" find /dev/dri -maxdepth 2 -printf '%y %m %u %g %p\n'
 }
 
 collect_graphics_state() {
-  run_and_capture "hardware/lspci-nnk.txt" lspci -nnk
-  run_and_capture "hardware/lsusb.txt" lsusb
-  run_and_capture "hardware/lsmod.txt" lsmod
-  run_and_capture "hardware/modinfo-i915.txt" modinfo i915
-  run_and_capture "hardware/modinfo-amdgpu.txt" modinfo amdgpu
-  run_and_capture "hardware/modinfo-nvidia.txt" modinfo nvidia
+  run_optional_command "hardware/lspci-nnk.txt" lspci lspci -nnk
+  run_optional_command "hardware/lsusb.txt" lsusb lsusb
+  run_optional_command "hardware/lsmod.txt" lsmod lsmod
+  run_optional_command_allowed "hardware/modinfo-i915.txt" "0 1" modinfo modinfo i915
+  run_optional_command_allowed "hardware/modinfo-amdgpu.txt" "0 1" modinfo modinfo amdgpu
+  run_optional_command_allowed "hardware/modinfo-nvidia.txt" "0 1" modinfo modinfo nvidia
   run_and_capture "hardware/drm-tree.txt" find /sys/class/drm -maxdepth 3 -printf '%y %p\n'
   run_and_capture "hardware/drm-status.txt" sh -c 'for node in /sys/class/drm/*/status; do [ -e "$node" ] || continue; printf "%s: " "$node"; cat "$node"; done'
-  run_and_capture "hardware/dmesg-drm.txt" dmesg
-  run_and_capture "hardware/vulkaninfo-summary.txt" vulkaninfo --summary
-  run_and_capture "hardware/vainfo.txt" vainfo
+  run_and_capture_allowed "hardware/dmesg-drm.txt" "0 1" dmesg
+  run_optional_command_allowed "hardware/vulkaninfo-summary.txt" "0 1" vulkaninfo vulkaninfo --summary
+  run_optional_command_allowed "hardware/vainfo.txt" "0 1" vainfo vainfo
 }
 
 collect_binary_diagnostics() {
-  run_and_capture "binaries/regreet-file.txt" file /usr/local/bin/regreet
+  run_optional_command "binaries/regreet-file.txt" file file /usr/local/bin/regreet
   run_and_capture "binaries/regreet-ldd.txt" ldd /usr/local/bin/regreet
-  run_and_capture "binaries/regreet-version.txt" /usr/local/bin/regreet --version
-  run_and_capture "binaries/labwc-version.txt" /usr/bin/labwc --version
+  run_and_capture_allowed "binaries/regreet-version.txt" "0 1" /usr/local/bin/regreet --version
+  run_and_capture_allowed "binaries/labwc-version.txt" "0 1" /usr/bin/labwc --version
   run_and_capture "binaries/gtk-query-settings.txt" sh -c 'command -v gtk4-query-settings >/dev/null 2>&1 && gtk4-query-settings || printf "%s\n" "gtk4-query-settings unavailable"'
-  run_and_capture "packages/dpkg-relevant.txt" sh -c '
+  run_and_capture_allowed "packages/dpkg-relevant.txt" "0 1" sh -c '
     dpkg-query -W -f='"'"'${binary:Package}\t${Version}\n'"'"' \
       greetd labwc dbus dbus-broker libgtk-4-1 libadwaita-1-0 mesa-vulkan-drivers libegl1 libgl1-mesa-dri \
       vulkan-tools vainfo pciutils gdb 2>/dev/null
@@ -290,11 +369,15 @@ collect_binary_diagnostics() {
 }
 
 collect_coredump_state() {
-  run_and_capture "coredump/coredump-list-regreet.txt" coredumpctl list /usr/local/bin/regreet
-  run_and_capture "coredump/coredump-info-regreet.txt" coredumpctl info /usr/local/bin/regreet
-  run_and_capture "coredump/coredump-info-greetd.txt" coredumpctl info greetd
-  run_and_capture "coredump/coredump-gdb-regreet.txt" \
-    coredumpctl debug /usr/local/bin/regreet --debugger=gdb --debugger-arguments='-batch -ex "set pagination off" -ex "thread apply all bt full" -ex "quit"'
+  run_optional_command_allowed "coredump/coredump-list-regreet.txt" "0 1" coredumpctl coredumpctl list /usr/local/bin/regreet
+  run_optional_command_allowed "coredump/coredump-info-regreet.txt" "0 1" coredumpctl coredumpctl info /usr/local/bin/regreet
+  run_optional_command_allowed "coredump/coredump-info-greetd.txt" "0 1" coredumpctl coredumpctl info greetd
+  if command_exists coredumpctl && command_exists gdb; then
+    run_and_capture_allowed "coredump/coredump-gdb-regreet.txt" "0 1" \
+      coredumpctl debug /usr/local/bin/regreet --debugger=gdb --debugger-arguments='-batch -ex "set pagination off" -ex "thread apply all bt full" -ex "quit"'
+  else
+    write_note "${BUNDLE_ROOT}/coredump/coredump-gdb-regreet.txt" "missing command: coredumpctl or gdb"
+  fi
 }
 
 write_manifest() {
@@ -305,14 +388,23 @@ main() {
   ensure_dir "$BUNDLE_ROOT"
   log_info "writing debug bundle to ${BUNDLE_ROOT}"
 
+  log_phase "bootstrap debug tools"
   ensure_debug_packages
+  log_phase "collect repo context"
   collect_repo_context
+  log_phase "collect systemd and logs"
   collect_systemd_and_logs
+  log_phase "collect greetd and labwc config"
   collect_greetd_labwc_config
+  log_phase "collect runtime state"
   collect_runtime_state
+  log_phase "collect graphics state"
   collect_graphics_state
+  log_phase "collect binary and package diagnostics"
   collect_binary_diagnostics
+  log_phase "collect coredump state"
   collect_coredump_state
+  log_phase "write bundle manifest"
   write_manifest
 
   log_info "debug bundle ready at ${BUNDLE_ROOT}"

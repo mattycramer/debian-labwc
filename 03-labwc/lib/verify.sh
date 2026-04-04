@@ -9,6 +9,23 @@ verify_path_mode() {
   }
 }
 
+verify_safe_gtk_runtime() {
+  local gtk_runtime_version=""
+  local gtk_common_version=""
+
+  gtk_runtime_version="$(dpkg-query -W -f='${Version}' libgtk-4-1 2>/dev/null || true)"
+  [[ -n "$gtk_runtime_version" ]] || die "libgtk-4-1 is not installed"
+  gtk_common_version="$(dpkg-query -W -f='${Version}' libgtk-4-common 2>/dev/null || true)"
+  [[ -n "$gtk_common_version" ]] || die "libgtk-4-common is not installed"
+
+  [[ "$gtk_runtime_version" != "$BROKEN_GTK4_RUNTIME_VERSION" ]] || {
+    die "libgtk-4-1 ${BROKEN_GTK4_RUNTIME_VERSION} is installed; this sid GTK4 build is known to segfault ReGreet on affected hosts"
+  }
+  [[ "$gtk_common_version" != "$BROKEN_GTK4_RUNTIME_VERSION" ]] || {
+    die "libgtk-4-common ${BROKEN_GTK4_RUNTIME_VERSION} is installed; this sid GTK4 build is known to segfault ReGreet on affected hosts"
+  }
+}
+
 verify_regreet_install() {
   require_file "$(regreet_binary_path)"
   require_file "$(regreet_provenance_path)"
@@ -386,6 +403,7 @@ verify_shell_and_units() {
 }
 
 verify_install() {
+  verify_safe_gtk_runtime
   verify_regreet_install
   verify_labwc_tweaks_install
   verify_keepsecret_install

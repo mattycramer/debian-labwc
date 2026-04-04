@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
 readonly SID_SUITE="sid"
+readonly TRIXIE_SUITE="trixie"
 readonly SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
 readonly SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
 readonly DEBIAN_ARCHIVE_KEYRING_PATH="/usr/share/keyrings/debian-archive-keyring.gpg"
 readonly LLVM_APT_BASE_URL="https://apt.llvm.org"
 readonly LLVM_APT_KEY_PATH="/etc/apt/keyrings/apt.llvm.org.asc"
 readonly LLVM_APT_SOURCES_PATH="/etc/apt/sources.list.d/llvm-toolchain.sources"
+readonly BROKEN_GTK4_RUNTIME_VERSION="4.22.2+ds-1"
 readonly SID_RUNTIME_PACKAGES=(
   labwc
   kanshi
@@ -46,7 +48,6 @@ readonly SID_RUNTIME_PACKAGES=(
   dbus
   dbus-daemon
   dbus-user-session
-  libgtk-4-1
   libomp5
   greetd
   gammastep
@@ -147,7 +148,6 @@ readonly SID_SOURCE_BUILD_PACKAGES=(
   gettext
   bindgen
   python3-docutils
-  libgtk-4-dev
   libglib2.0-dev
   libpango1.0-dev
   libgdk-pixbuf-2.0-dev
@@ -174,6 +174,17 @@ readonly SID_SOURCE_BUILD_PACKAGES=(
   qt6-tools-dev
   qt6-tools-dev-tools
   qt6-l10n-tools
+)
+
+readonly TRIXIE_GTK_RUNTIME_PACKAGES=(
+  libgtk-4-1
+  libgtk-4-common
+)
+
+readonly TRIXIE_GTK_SOURCE_BUILD_PACKAGES=(
+  libgtk-4-dev
+  libgtk-4-bin
+  gir1.2-gtk-4.0
 )
 
 readonly GRAPHICS_PACKAGES=(
@@ -331,20 +342,28 @@ install_requested_packages() {
   local -a sid_package_list=()
   local -a build_package_list=()
   local -a graphics_package_list=()
+  local -a trixie_gtk_runtime_package_list=()
+  local -a trixie_gtk_build_package_list=()
   local -a all_package_list=()
   local -a apt_args=()
   mapfile -t all_package_list < <(resolved_requested_packages)
   ((${#all_package_list[@]} > 0)) || die "resolved package set is empty"
   mapfile -t sid_package_list < <(resolved_sid_packages)
+  mapfile -t trixie_gtk_runtime_package_list < <(printf '%s\n' "${TRIXIE_GTK_RUNTIME_PACKAGES[@]}")
   if [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]]; then
     mapfile -t build_package_list < <(printf '%s\n' "${SID_SOURCE_BUILD_PACKAGES[@]}")
+    mapfile -t trixie_gtk_build_package_list < <(printf '%s\n' "${TRIXIE_GTK_SOURCE_BUILD_PACKAGES[@]}")
   fi
   mapfile -t graphics_package_list < <(resolved_graphics_packages)
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${sid_package_list[@]}"
+  log_info "installing GTK4 runtime package set from trixie to avoid broken sid libgtk-4-1 ${BROKEN_GTK4_RUNTIME_VERSION}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$TRIXIE_SUITE" install --no-install-recommends "${apt_args[@]}" "${trixie_gtk_runtime_package_list[@]}"
   if ((${#build_package_list[@]} > 0)); then
     log_info "installing source-build package set from sid"
     run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${build_package_list[@]}"
+    log_info "installing GTK4 source-build package set from trixie to match the managed GTK4 runtime"
+    run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$TRIXIE_SUITE" install --no-install-recommends "${apt_args[@]}" "${trixie_gtk_build_package_list[@]}"
     mapfile -t build_package_list < <(llvm_upstream_packages)
     log_info "installing upstream LLVM toolchain packages"
     run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${build_package_list[@]}"
