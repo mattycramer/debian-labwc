@@ -194,6 +194,15 @@ verify_greeter_contract() {
   grep -F 'WAYLAND_DISPLAY=%s' "/usr/local/bin/labwc-greeter-session" >/dev/null || {
     die "greeter session wrapper lost the managed WAYLAND_DISPLAY logging format"
   }
+  grep -F '<autoEnableOutputs>no</autoEnableOutputs>' "/etc/labwc-greeter/rc.xml" >/dev/null || {
+    die "greeter rc.xml lost the managed static-output greeter contract"
+  }
+  grep -F '<mousebind button="Right" action="Press" />' "/etc/labwc-greeter/rc.xml" >/dev/null || {
+    die "greeter rc.xml no longer suppresses the default root-menu press binding"
+  }
+  grep -F '<mousebind button="Right" action="Click" />' "/etc/labwc-greeter/rc.xml" >/dev/null || {
+    die "greeter rc.xml no longer suppresses the default root-menu click binding"
+  }
   # shellcheck disable=SC2016
   grep -F 'display_name="$(wait_for_wayland_display)"' "/usr/local/bin/labwc-greeter-regreet" >/dev/null || {
     die "greeter launcher no longer waits for a Wayland display name before starting regreet"

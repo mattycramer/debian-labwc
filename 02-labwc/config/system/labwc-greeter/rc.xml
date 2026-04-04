@@ -4,11 +4,20 @@
     <gap>0</gap>
     <adaptiveSync>no</adaptiveSync>
     <allowTearing>no</allowTearing>
-    <autoEnableOutputs>yes</autoEnableOutputs>
+    <autoEnableOutputs>no</autoEnableOutputs>
     <reuseOutputMode>yes</reuseOutputMode>
     <xwaylandPersistence>no</xwaylandPersistence>
     <primarySelection>no</primarySelection>
   </core>
+  <mouse>
+    <context name="Root">
+      <mousebind button="Left" action="Press">
+        <action name="Unfocus" />
+      </mousebind>
+      <mousebind button="Right" action="Press" />
+      <mousebind button="Right" action="Click" />
+    </context>
+  </mouse>
   <focus>
     <followMouse>no</followMouse>
     <followMouseRequiresMovement>no</followMouseRequiresMovement>
