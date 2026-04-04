@@ -52,6 +52,8 @@ verify_system_path_permissions() {
   local spec path owner_token group_token mode owner group scope nocow
   local -a verified_tree_roots=()
 
+  validate_required_invoke_writable_pool_roots
+
   for spec in "${SYSTEM_DATA_PATH_SPECS[@]}"; do
     IFS='|' read -r path owner_token group_token mode <<<"$spec"
     owner="$(resolve_path_principal "$owner_token")"

@@ -86,6 +86,11 @@ readonly SYSTEM_POOL_PATH_SPECS=(
   "/pool/cache/sbt/boot|invoke|invoke|0700|tree|yes"
 )
 
+readonly SYSTEM_REQUIRED_INVOKE_WRITABLE_POOL_ROOTS=(
+  "/pool/builds"
+  "/pool/cache"
+)
+
 readonly SYSTEM_HOME_DIR_SPECS=(
   ".config|0750|tree|no"
   ".config/system|0750|tree|no"
@@ -140,6 +145,40 @@ resolve_path_principal() {
   esac
 }
 
+normalized_mode_triplet() {
+  local mode="${1#0}"
+
+  [[ "$mode" =~ ^[0-7]{3,4}$ ]] || die "unsupported mode: $1"
+  printf '%s' "${mode: -3}"
+}
+
+mode_grants_owner_directory_mutation() {
+  local owner_digit
+  owner_digit="$(normalized_mode_triplet "$1")"
+  owner_digit="${owner_digit:0:1}"
+  (((10#$owner_digit & 3) == 3))
+}
+
+validate_required_invoke_writable_pool_roots() {
+  local required_path spec path owner_token group_token mode scope nocow matched
+
+  for required_path in "${SYSTEM_REQUIRED_INVOKE_WRITABLE_POOL_ROOTS[@]}"; do
+    matched="no"
+    for spec in "${SYSTEM_POOL_PATH_SPECS[@]}"; do
+      IFS='|' read -r path owner_token group_token mode scope nocow <<<"$spec"
+      [[ "$path" == "$required_path" ]] || continue
+      matched="yes"
+      [[ "$owner_token" == "invoke" ]] || die "$required_path must stay owned by the invoking user"
+      [[ "$group_token" == "invoke" ]] || die "$required_path must stay grouped to the invoking user"
+      mode_grants_owner_directory_mutation "$mode" || {
+        die "$required_path must keep owner write and execute permissions"
+      }
+      break
+    done
+    [[ "$matched" == "yes" ]] || die "missing required pool permission spec for $required_path"
+  done
+}
+
 ensure_directory_state() {
   local path="$1"
   local owner="$2"
@@ -190,6 +229,8 @@ permissions_path_is_nested_under_any() {
 apply_system_path_permissions() {
   local spec path owner_token group_token mode owner group scope nocow
   local -a repaired_tree_roots=()
+
+  validate_required_invoke_writable_pool_roots
 
   for spec in "${SYSTEM_DATA_PATH_SPECS[@]}"; do
     IFS='|' read -r path owner_token group_token mode <<<"$spec"
