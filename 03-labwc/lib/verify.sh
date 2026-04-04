@@ -178,6 +178,7 @@ verify_greeter_contract() {
   require_file "/etc/labwc-greeter/rc.xml"
   require_file "/etc/pam.d/greetd"
   require_file "/etc/pam.d/greetd-greeter"
+  require_file "/etc/systemd/system/greetd.service.d/20-labwc-vt.conf"
   require_dir "/var/lib/greetd/greeter"
   require_dir "/var/lib/regreet"
   require_dir "/var/log/regreet"
@@ -187,18 +188,11 @@ verify_greeter_contract() {
   grep -F '/usr/local/bin/labwc-greeter-session' "/etc/greetd/config.toml" >/dev/null || {
     die "greetd config lost the managed greeter session wrapper"
   }
-  grep -F 'dbus-run-session -- /usr/bin/labwc -C /etc/labwc-greeter' "/usr/local/bin/labwc-greeter-session" >/dev/null || {
+  grep -F 'dbus-run-session -- /usr/bin/labwc -C /etc/labwc-greeter -S /usr/local/bin/labwc-greeter-regreet' "/usr/local/bin/labwc-greeter-session" >/dev/null || {
     die "greeter session wrapper lost the managed dbus-run-session greeter contract"
   }
-  grep -F '/usr/local/bin/labwc-greeter-regreet' "/etc/labwc-greeter/autostart" >/dev/null || {
-    die "greeter labwc autostart no longer launches the managed regreet wrapper"
-  }
-  grep -F 'labwc_pid="${LABWC_PID:-$PPID}"' "/etc/labwc-greeter/autostart" >/dev/null || {
-    die "greeter labwc autostart no longer falls back to terminating the parent labwc process when LABWC_PID is unset"
-  }
-  # shellcheck disable=SC2016
-  grep -F 'kill -TERM "$labwc_pid"' "/etc/labwc-greeter/autostart" >/dev/null || {
-    die "greeter labwc autostart no longer terminates labwc when regreet exits"
+  grep -F 'launched via labwc --session' "/etc/labwc-greeter/autostart" >/dev/null || {
+    die "greeter labwc autostart lost the managed no-op contract for labwc --session"
   }
   grep -F 'WAYLAND_DISPLAY=%s' "/usr/local/bin/labwc-greeter-session" >/dev/null || {
     die "greeter session wrapper lost the managed WAYLAND_DISPLAY logging format"
@@ -243,6 +237,12 @@ verify_greeter_contract() {
   grep -F 'LIBSEAT_BACKEND=logind' "/etc/greetd/config.toml" >/dev/null || {
     die "greetd config lost the managed logind greeter contract"
   }
+  grep -F "Conflicts=getty@tty${LABWC_GREETD_VT}.service" "/etc/systemd/system/greetd.service.d/20-labwc-vt.conf" >/dev/null || {
+    die "greetd unit override lost the managed VT conflict guard"
+  }
+  grep -F "Before=getty@tty${LABWC_GREETD_VT}.service" "/etc/systemd/system/greetd.service.d/20-labwc-vt.conf" >/dev/null || {
+    die "greetd unit override lost the managed VT ordering guard"
+  }
   grep -F 'pam_systemd.so type=wayland desktop=labwc' "/etc/pam.d/greetd" >/dev/null || {
     die "managed greetd PAM stack lost pam_systemd metadata"
   }
@@ -257,6 +257,7 @@ verify_greeter_contract() {
   verify_path_mode "/usr/local/bin/labwc-greeter-regreet" "root:root:755"
   verify_path_mode "/etc/labwc-greeter/autostart" "root:root:755"
   verify_path_mode "/etc/labwc-greeter/rc.xml" "root:root:644"
+  verify_path_mode "/etc/systemd/system/greetd.service.d/20-labwc-vt.conf" "root:root:644"
   verify_path_mode "/var/lib/greetd/greeter" "greeter:greeter:700"
   verify_path_mode "/var/lib/regreet" "greeter:greeter:700"
   verify_path_mode "/var/log/regreet" "greeter:greeter:750"

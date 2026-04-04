@@ -465,6 +465,7 @@ install_regreet_runtime_files() {
   require_file "$(regreet_binary_path)"
   install_regreet_support_dirs
   install_regreet_wallpaper
+  render_template_to_file "$(config_system_template_path "etc/systemd/system/greetd.service.d/20-labwc-vt.conf")" "/etc/systemd/system/greetd.service.d/20-labwc-vt.conf" 0644
   render_template_to_file "$(config_system_template_path "greetd/config.toml")" "/etc/greetd/config.toml" 0644
   render_template_to_file "$(config_system_template_path "greetd/regreet.toml")" "$(regreet_config_path)" 0644
   render_template_to_file "$(config_system_template_path "greetd/regreet.css")" "$(regreet_css_path)" 0644
@@ -701,6 +702,7 @@ nuke_all_state() {
   remove_if_present "$(regreet_binary_path)"
   remove_if_present "$(regreet_provenance_path)"
   remove_if_present "/usr/share/wayland-sessions/labwc.desktop"
+  remove_if_present "/etc/systemd/system/greetd.service.d/20-labwc-vt.conf"
   remove_if_present "/etc/pam.d/greetd"
   remove_if_present "/etc/pam.d/greetd-greeter"
   remove_if_present "/etc/greetd/config.toml"

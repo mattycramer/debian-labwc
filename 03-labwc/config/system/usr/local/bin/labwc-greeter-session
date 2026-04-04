@@ -39,6 +39,10 @@ if [ ! -x /usr/bin/labwc ]; then
   printf '%s\n' "ERROR: missing /usr/bin/labwc for greeter session startup" >&2
   exit 1
 fi
+if [ ! -x /usr/local/bin/labwc-greeter-regreet ]; then
+  printf '%s\n' "ERROR: missing /usr/local/bin/labwc-greeter-regreet for greeter session startup" >&2
+  exit 1
+fi
 if [ ! -d /etc/labwc-greeter ]; then
   printf '%s\n' "ERROR: missing /etc/labwc-greeter configuration directory" >&2
   exit 1
@@ -54,7 +58,7 @@ printf '[%s] INFO: XDG_RUNTIME_DIR=%s GREETD_SOCK=%s WAYLAND_DISPLAY=%s\n' \
   "${WAYLAND_DISPLAY:-unset}"
 
 set +e
-/usr/bin/dbus-run-session -- /usr/bin/labwc -C /etc/labwc-greeter
+/usr/bin/dbus-run-session -- /usr/bin/labwc -C /etc/labwc-greeter -S /usr/local/bin/labwc-greeter-regreet
 rc=$?
 set -e
 printf '[%s] ERROR: labwc greeter session exited with status %s\n' "$(timestamp)" "$rc"

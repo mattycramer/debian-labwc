@@ -1,11 +1,6 @@
 #!/bin/sh
 set -eu
-IFS='
-	'
 
-/usr/local/bin/labwc-greeter-regreet
-
-labwc_pid="${LABWC_PID:-$PPID}"
-if [ -n "$labwc_pid" ] && [ "$labwc_pid" -gt 1 ] 2>/dev/null; then
-  kill -TERM "$labwc_pid" >/dev/null 2>&1 || true
-fi
+# ReGreet is launched via labwc --session so compositor lifecycle tracks the
+# greeter process directly.
+:
