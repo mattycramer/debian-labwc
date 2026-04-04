@@ -256,7 +256,7 @@ render_fontconfig() {
 }
 
 render_thunar_config() {
-  render_home_template_file ".config/Thunar/thunarrc"
+  remove_if_present "$LABWC_TARGET_HOME/.config/Thunar/thunarrc"
   render_home_template_file ".config/Thunar/uca.xml"
 }
 

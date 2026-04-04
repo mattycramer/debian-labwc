@@ -138,6 +138,7 @@ verify_keepsecret_install() {
 verify_kirigami_runtime_install() {
   local qml_qmldir=""
   local runtime_library=""
+  local missing_output=""
 
   [[ "${LABWC_INSTALL_METHOD:-}" == "source" ]] || return 0
 
@@ -156,6 +157,11 @@ verify_kirigami_runtime_install() {
   [[ -n "$qml_qmldir" ]] || die "Kirigami runtime install is missing the org.kde.kirigami qmldir under /usr/local"
   runtime_library="$(find /usr/local -type f \( -name 'libKirigami*.so*' -o -name 'libKF6Kirigami*.so*' \) | LC_ALL=C sort | head -n 1)"
   [[ -n "$runtime_library" ]] || die "Kirigami runtime install is missing shared libraries under /usr/local"
+  missing_output="$(ldd "$runtime_library" 2>&1 | awk '/not found/ {print}')"
+  [[ -z "$missing_output" ]] || {
+    die "Kirigami runtime library has unresolved shared-library dependencies:
+$missing_output"
+  }
 
   if find /usr/local -path '*/cmake/KF6Kirigami*' -o -path '*/include/KF6/Kirigami*' | grep -q .; then
     die "Kirigami development artifacts were left installed under /usr/local"

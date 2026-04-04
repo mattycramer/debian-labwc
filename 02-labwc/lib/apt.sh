@@ -47,6 +47,7 @@ readonly SID_RUNTIME_PACKAGES=(
   dbus-daemon
   dbus-user-session
   libgtk-4-1
+  libomp5
   greetd
   gammastep
   xdg-user-dirs
@@ -359,12 +360,16 @@ remove_source_build_packages() {
 
   [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]] || return 0
   mapfile -t apt_args < <(apt_yes_args)
-  cleanup_package_list=("${SID_SOURCE_BUILD_PACKAGES[@]}")
+  for package_name in "${SID_SOURCE_BUILD_PACKAGES[@]}"; do
+    [[ "$package_name" == *-dev ]] || continue
+    cleanup_package_list+=("$package_name")
+  done
   while IFS= read -r package_name; do
-    [[ -n "$package_name" ]] || continue
+    [[ -n "$package_name" && "$package_name" == *-dev ]] || continue
     cleanup_package_list+=("$package_name")
   done < <(llvm_upstream_packages)
 
-  log_info "removing source-build tooling packages after successful install"
+  ((${#cleanup_package_list[@]} > 0)) || return 0
+  log_info "removing source-build -dev packages after successful install"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt purge --autoremove "${apt_args[@]}" "${cleanup_package_list[@]}"
 }
