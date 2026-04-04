@@ -213,8 +213,8 @@ verify_greeter_contract() {
   grep -F 'exec "$regreet_bin" --config "$regreet_config" --style "$regreet_style"' "/usr/local/bin/labwc-greeter-regreet" >/dev/null || {
     die "greeter launcher lost the managed regreet config/style execution path"
   }
-  grep -F 'LABWC_UPDATE_ACTIVATION_ENV=1' "/etc/greetd/config.toml" >/dev/null || {
-    die "greetd config lost the managed activation-environment contract"
+  grep -F 'LABWC_UPDATE_ACTIVATION_ENV=0' "/etc/greetd/config.toml" >/dev/null || {
+    die "greetd config lost the managed no-activation-update greeter contract"
   }
   grep -F 'LIBSEAT_BACKEND=logind' "/etc/greetd/config.toml" >/dev/null || {
     die "greetd config lost the managed logind greeter contract"
