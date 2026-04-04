@@ -54,3 +54,9 @@ require_safe_token() {
   local value="$2"
   [[ "$value" =~ ^[A-Za-z0-9._-]+$ ]] || die "$label contains unsupported characters: '$value'"
 }
+
+require_zero_or_one() {
+  local label="$1"
+  local value="$2"
+  [[ "$value" == "0" || "$value" == "1" ]] || die "$label must be '0' or '1', found '$value'"
+}

@@ -359,6 +359,7 @@ remove_source_build_packages() {
   local package_name
 
   [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]] || return 0
+  [[ "${LABWC_PURGE_BUILD_DEPS:-1}" == "1" ]] || return 0
   mapfile -t apt_args < <(apt_yes_args)
   for package_name in "${SID_SOURCE_BUILD_PACKAGES[@]}"; do
     [[ "$package_name" == *-dev ]] || continue

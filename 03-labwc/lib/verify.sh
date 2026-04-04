@@ -184,6 +184,7 @@ verify_greeter_contract() {
   require_dir "/var/log/regreet"
   require_file "$(greeter_log_path)"
   require_file "$(greeter_session_log_path)"
+  require_zero_or_one "LABWC_PURGE_BUILD_DEPS" "${LABWC_PURGE_BUILD_DEPS:-1}"
 
   grep -F '/usr/local/bin/labwc-greeter-session' "/etc/greetd/config.toml" >/dev/null || {
     die "greetd config lost the managed greeter session wrapper"
@@ -220,6 +221,9 @@ verify_greeter_contract() {
   }
   grep -F 'sleep 1' "/usr/local/bin/labwc-greeter-regreet" >/dev/null || {
     die "greeter launcher lost the managed post-socket startup delay"
+  }
+  grep -F 'export GSK_RENDERER=cairo' "/usr/local/bin/labwc-greeter-regreet" >/dev/null || {
+    die "greeter launcher lost the managed GTK cairo renderer guard"
   }
   # shellcheck disable=SC2016
   grep -F 'exec "$regreet_bin" --config "$regreet_config" --style "$regreet_style"' "/usr/local/bin/labwc-greeter-regreet" >/dev/null || {

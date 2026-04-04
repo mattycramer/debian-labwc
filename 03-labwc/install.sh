@@ -140,6 +140,10 @@ install_method_is_source() {
   [[ "${LABWC_INSTALL_METHOD:-}" == "source" ]]
 }
 
+purge_build_deps_enabled() {
+  [[ "${LABWC_PURGE_BUILD_DEPS:-1}" == "1" ]]
+}
+
 current_install_method() {
   local value
   value="$(read_env_value "LABWC_INSTALL_METHOD")"
@@ -308,6 +312,7 @@ load_env_file() {
   [[ -f "$ENV_FILE" ]] || die "missing env file: $ENV_FILE"
   # shellcheck disable=SC1090
   source "$ENV_FILE"
+  require_zero_or_one "LABWC_PURGE_BUILD_DEPS" "${LABWC_PURGE_BUILD_DEPS:-1}"
   if [[ -n "${LABWC_TARGET_USER:-}" && -z "${LABWC_TARGET_GROUP:-}" ]]; then
     LABWC_TARGET_GROUP="$(resolve_target_group "$LABWC_TARGET_USER")"
   fi
@@ -448,7 +453,11 @@ main() {
       phase_build_sources
       phase_enable
       phase_verify
-      remove_source_build_packages
+      if purge_build_deps_enabled; then
+        remove_source_build_packages
+      else
+        log_info "keeping source-build packages because LABWC_PURGE_BUILD_DEPS=0"
+      fi
       ;;
     *)
       die "unsupported phase: $PHASE"
