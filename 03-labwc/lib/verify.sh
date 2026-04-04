@@ -203,8 +203,8 @@ verify_greeter_contract() {
   grep -F 'WAYLAND_DISPLAY=%s' "/usr/local/bin/labwc-greeter-session" >/dev/null || {
     die "greeter session wrapper lost the managed WAYLAND_DISPLAY logging format"
   }
-  grep -F '<autoEnableOutputs>no</autoEnableOutputs>' "/etc/labwc-greeter/rc.xml" >/dev/null || {
-    die "greeter rc.xml lost the managed static-output greeter contract"
+  grep -F '<autoEnableOutputs>yes</autoEnableOutputs>' "/etc/labwc-greeter/rc.xml" >/dev/null || {
+    die "greeter rc.xml no longer enables connected outputs for the greeter"
   }
   grep -F '<mousebind button="Right" action="Press" />' "/etc/labwc-greeter/rc.xml" >/dev/null || {
     die "greeter rc.xml no longer suppresses the default root-menu press binding"
