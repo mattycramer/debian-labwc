@@ -8,6 +8,7 @@ readonly DEBIAN_ARCHIVE_KEYRING_PATH="/usr/share/keyrings/debian-archive-keyring
 readonly DBUS_RUNTIME_PACKAGES=(
   ca-certificates
   curl
+  jq
   dbus
   dbus-daemon
   dbus-user-session
