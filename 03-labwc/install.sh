@@ -354,6 +354,8 @@ phase_source_build_doctor() {
   require_command ninja
   require_command pkg-config
   require_command wayland-scanner
+  require_command bison
+  require_command flex
   require_command msgfmt
   require_command scdoc
   require_command ldd

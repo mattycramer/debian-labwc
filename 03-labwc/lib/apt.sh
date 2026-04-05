@@ -144,6 +144,8 @@ readonly SID_SOURCE_BUILD_PACKAGES=(
   meson
   gettext
   bindgen
+  bison
+  flex
   python3-docutils
   wayland-protocols
   libwayland-dev
