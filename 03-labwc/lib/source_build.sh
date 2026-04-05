@@ -345,6 +345,67 @@ fetch_source_checkout() {
   printf '%s\n' "$work_root"
 }
 
+fetch_source_ref_checkout() {
+  local repo_name="$1"
+  local source_url="$2"
+  local git_ref="$3"
+  local log_path="${4:-}"
+  local work_root repo_dir current_url
+
+  if [[ "$git_ref" =~ ^[0-9a-f]{40}$ ]]; then
+    fetch_source_checkout "$repo_name" "$source_url" "$git_ref" "$log_path"
+    return 0
+  fi
+
+  require_https_url "${repo_name} source url" "$source_url"
+  [[ -n "$git_ref" ]] || die "${repo_name} source ref must not be empty"
+  [[ "$git_ref" != *" "* ]] || die "${repo_name} source ref must not contain spaces: '$git_ref'"
+
+  work_root="$(prepare_persistent_component_work_root "$repo_name")"
+  repo_dir="$work_root/source"
+
+  if [[ -e "$repo_dir" && ! -d "$repo_dir/.git" ]]; then
+    run_cmd rm -rf -- "$repo_dir" "$work_root/build" "$work_root/stage" "$work_root/target" "$work_root/prefix"
+  fi
+
+  if [[ -d "$repo_dir/.git" ]]; then
+    current_url="$(run_git_in_checkout "$repo_dir" remote get-url origin 2>/dev/null || true)"
+    if [[ -z "$current_url" || "$(normalize_git_url "$current_url")" != "$(normalize_git_url "$source_url")" ]]; then
+      run_cmd rm -rf -- "$repo_dir" "$work_root/build" "$work_root/stage" "$work_root/target" "$work_root/prefix"
+    fi
+  fi
+
+  if [[ ! -d "$repo_dir/.git" ]]; then
+    if declare -F run_target_user_command >/dev/null 2>&1 \
+      && [[ -n "${LABWC_TARGET_USER:-}" ]] \
+      && [[ "${LABWC_TARGET_USER}" != "root" ]]; then
+      retry_cmd 3 run_target_user_command -- git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
+    elif [[ -n "$log_path" ]]; then
+      retry_cmd 3 run_logged_command "$log_path" git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
+    else
+      retry_cmd 3 git clone --quiet --filter=blob:none "$source_url" "$repo_dir"
+    fi
+  fi
+
+  if declare -F run_target_user_command >/dev/null 2>&1 \
+    && [[ -n "${LABWC_TARGET_USER:-}" ]] \
+    && [[ "${LABWC_TARGET_USER}" != "root" ]]; then
+    retry_cmd 3 run_target_user_command -- git -C "$repo_dir" fetch --quiet --depth 1 origin "$git_ref"
+    run_target_user_command -- git -C "$repo_dir" checkout --quiet --detach FETCH_HEAD
+  else
+    if [[ -n "$log_path" ]]; then
+      retry_cmd 3 run_logged_command "$log_path" git -C "$repo_dir" fetch --quiet --depth 1 origin "$git_ref"
+      run_logged_command "$log_path" git -C "$repo_dir" checkout --quiet --detach FETCH_HEAD
+    else
+      retry_cmd 3 git -C "$repo_dir" fetch --quiet --depth 1 origin "$git_ref"
+      run_cmd git -C "$repo_dir" checkout --quiet --detach FETCH_HEAD
+    fi
+  fi
+
+  verify_checkout_remote "$repo_dir" "$source_url"
+  printf '%s\n' "$work_root"
+}
+
 cleanup_source_checkout() {
   local work_root="$1"
   [[ -n "$work_root" ]] || return 0
@@ -371,7 +432,7 @@ remove_persistent_build_workspace() {
 }
 
 native_cflags() {
-  printf '%s\n' "-O3 -march=native -mtune=native -pipe -fno-plt"
+  printf '%s\n' "-O3 -march=native -mtune=native -pipe -fno-plt -DNDEBUG -flto=thin"
 }
 
 native_cxxflags() {
@@ -379,11 +440,11 @@ native_cxxflags() {
 }
 
 native_ldflags() {
-  printf '%s\n' "-Wl,-O2 -Wl,--as-needed -fuse-ld=lld"
+  printf '%s\n' "-flto=thin -Wl,-O2 -Wl,--as-needed -fuse-ld=lld"
 }
 
 native_rustflags() {
-  printf '%s\n' "-C target-cpu=native -C opt-level=3 -C codegen-units=1 -C strip=symbols"
+  printf '%s\n' "-C linker=$(llvm_clang_bin) -C link-arg=-fuse-ld=lld -C target-cpu=native -C opt-level=3 -C codegen-units=1 -C lto=thin -C strip=symbols"
 }
 
 rust_toolchain_bin_dir() {

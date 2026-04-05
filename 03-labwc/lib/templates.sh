@@ -16,6 +16,14 @@ template_lock_wallpaper_name() {
   printf '%s\n' ""
 }
 
+managed_labwc_binary_path_for_template() {
+  if declare -F managed_labwc_binary_path >/dev/null 2>&1; then
+    managed_labwc_binary_path
+    return 0
+  fi
+  printf '%s\n' "/usr/bin/labwc"
+}
+
 render_template_content() {
   local template_path="$1"
   local background_wallpaper_path=""
@@ -29,6 +37,7 @@ render_template_content() {
   local kanshi_internal_profile="${KANSHI_INTERNAL_PROFILE:-}"
   local kanshi_external_clause="${KANSHI_EXTERNAL_CLAUSE:-}"
   local migrated_path_snippet="${MIGRATED_PATH_SNIPPET:-}"
+  local labwc_binary_path=""
 
   [[ -f "$template_path" ]] || die "missing config template: $template_path"
 
@@ -44,6 +53,7 @@ render_template_content() {
   if declare -F regreet_wallpaper_target_path >/dev/null 2>&1; then
     regreet_background_path="$(regreet_wallpaper_target_path)"
   fi
+  labwc_binary_path="$(managed_labwc_binary_path_for_template)"
   if [[ "${LABWC_HAS_INTEL_GPU:-no}" == "yes" ]]; then
     intel_media_env="$(cat <<'EOF'
 LIBVA_DRIVER_NAME=iHD
@@ -80,6 +90,7 @@ EOF
     TEMPLATE_MIGRATED_PATH_SNIPPET="$migrated_path_snippet" \
     TEMPLATE_INTEL_MEDIA_ENV="$intel_media_env" \
     TEMPLATE_GREETD_VT="${LABWC_GREETD_VT:-}" \
+    TEMPLATE_LABWC_BINARY="$labwc_binary_path" \
     TEMPLATE_SESSION_WRAPPER="/usr/local/bin/labwc-session" \
     TEMPLATE_WIREGUARD_PRIV_KEY="${WIREGUARD_PRIV_KEY:-}" \
     TEMPLATE_INTERNAL_OUTPUT="${LABWC_INTERNAL_OUTPUT:-}" \
@@ -125,6 +136,7 @@ replacements = {
     "@MIGRATED_PATH_SNIPPET@": os.environ.get("TEMPLATE_MIGRATED_PATH_SNIPPET", ""),
     "@INTEL_MEDIA_ENV@": os.environ.get("TEMPLATE_INTEL_MEDIA_ENV", ""),
     "@GREETD_VT@": os.environ.get("TEMPLATE_GREETD_VT", ""),
+    "@LABWC_BINARY@": os.environ.get("TEMPLATE_LABWC_BINARY", ""),
     "@SESSION_WRAPPER@": os.environ.get("TEMPLATE_SESSION_WRAPPER", ""),
     "@WIREGUARD_PRIV_KEY@": os.environ.get("TEMPLATE_WIREGUARD_PRIV_KEY", ""),
     "@INTERNAL_OUTPUT@": os.environ.get("TEMPLATE_INTERNAL_OUTPUT", ""),

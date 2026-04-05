@@ -30,7 +30,7 @@ validate_ecm_source_tree() {
 }
 
 build_ecm_prefix() {
-  local work_root repo_dir build_dir prefix_dir log_path
+  local work_root repo_dir build_dir prefix_dir log_path cflags cxxflags ldflags
 
   validate_ecm_settings
   log_path="$(build_log_path "$ECM_BUILD_LOG_NAME")"
@@ -38,14 +38,28 @@ build_ecm_prefix() {
   repo_dir="$work_root/source"
   build_dir="$work_root/build"
   prefix_dir="$work_root/prefix"
+  cflags="$(native_cflags)"
+  cxxflags="$(native_cxxflags)"
+  ldflags="$(native_ldflags)"
   validate_ecm_source_tree "$repo_dir"
   run_cmd rm -rf -- "$prefix_dir"
 
-  run_logged_command "$log_path" cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
-    -D CMAKE_BUILD_TYPE=Release \
-    -D CMAKE_INSTALL_PREFIX="$prefix_dir" \
-    -D BUILD_TESTING=OFF \
-    -W no-dev
+  run_logged_command "$log_path" env \
+    CC="$(llvm_clang_bin)" \
+    CXX="$(llvm_clangxx_bin)" \
+    CFLAGS="$cflags" \
+    CXXFLAGS="$cxxflags" \
+    LDFLAGS="$ldflags" \
+    cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
+      -D CMAKE_BUILD_TYPE=Release \
+      -D CMAKE_INSTALL_PREFIX="$prefix_dir" \
+      -D CMAKE_C_FLAGS="$cflags" \
+      -D CMAKE_CXX_FLAGS="$cxxflags" \
+      -D CMAKE_EXE_LINKER_FLAGS="$ldflags" \
+      -D CMAKE_SHARED_LINKER_FLAGS="$ldflags" \
+      -D CMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
+      -D BUILD_TESTING=OFF \
+      -W no-dev
   run_logged_command "$log_path" cmake --build "$build_dir" --verbose
   run_logged_command "$log_path" cmake --install "$build_dir"
 

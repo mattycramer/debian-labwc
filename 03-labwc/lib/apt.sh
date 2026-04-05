@@ -148,12 +148,36 @@ readonly SID_SOURCE_BUILD_PACKAGES=(
   gettext
   bindgen
   python3-docutils
+  wayland-protocols
+  libwayland-dev
+  libxkbcommon-dev
+  libdrm-dev
+  libpixman-1-dev
+  libudev-dev
+  libseat-dev
+  hwdata
+  libdisplay-info-dev
+  libgbm-dev
+  libegl1-mesa-dev
+  libgles2-mesa-dev
+  libinput-dev
+  libxcb-composite0-dev
+  libxcb-render0-dev
+  libxcb-res0-dev
+  libxcb-xfixes0-dev
+  xcb-proto
+  libxcb-errors-dev
+  libxcb-ewmh-dev
+  libxcb-icccm4-dev
   libglib2.0-dev
   libpango1.0-dev
   libgdk-pixbuf-2.0-dev
   libgraphene-1.0-dev
   libcairo2-dev
   libxml2-dev
+  libpng-dev
+  librsvg2-dev
+  libsfdo-dev
   libsecret-1-dev
   libkf6config-dev
   libkf6coreaddons-dev
@@ -174,6 +198,7 @@ readonly SID_SOURCE_BUILD_PACKAGES=(
   qt6-tools-dev
   qt6-tools-dev-tools
   qt6-l10n-tools
+  scdoc
 )
 
 readonly TRIXIE_GTK_RUNTIME_PACKAGES=(
@@ -319,7 +344,13 @@ require_sid_repository() {
 }
 
 resolved_sid_packages() {
-  printf '%s\n' "${SID_RUNTIME_PACKAGES[@]}"
+  local package_name
+  for package_name in "${SID_RUNTIME_PACKAGES[@]}"; do
+    if [[ "$package_name" == "labwc" && "${LABWC_INSTALL_METHOD:-artifact}" == "source" ]]; then
+      continue
+    fi
+    printf '%s\n' "$package_name"
+  done
 }
 
 resolved_graphics_packages() {

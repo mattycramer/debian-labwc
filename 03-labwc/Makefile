@@ -10,7 +10,7 @@ help:
 	  '  detect      Detect user, GPU, and outputs into .env' \
 	  '  install     Install 03-labwc on a fresh system after 01-dbus-broker is staged; runs doctor, detect, packages, render, build-sources, enable, verify' \
 	  '  render      Render configs from .env' \
-	  '  build-sources Build pinned sources or install pinned release artifacts for regreet, labwc-tweaks, and keepsecret' \
+	  '  build-sources Build wlroots/labwc plus pinned extras from source or install the pinned artifact path for the extras' \
 	  '  enable      Install root-owned files and enable services' \
 	  '  verify      Verify the selected source/artifact install path, greeter wiring, and session activation contracts' \
 	  '  reconfigure Re-render 03-labwc after 01-dbus-broker is already staged; runs detect, render, build-sources, enable, verify' \

@@ -386,6 +386,8 @@ install_regreet_binary() {
       CXX="$(llvm_clangxx_bin)" \
       RUSTFLAGS="$rust_flags" \
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
+      CARGO_PROFILE_RELEASE_LTO=thin \
+      CARGO_PROFILE_RELEASE_STRIP=symbols \
       GREETD_CONFIG_DIR=/etc/greetd \
       STATE_DIR=/var/lib/regreet \
       LOG_DIR=/var/log/regreet \
@@ -713,7 +715,11 @@ nuke_all_state() {
   remove_kirigami_runtime_install
   remove_labwc_tweaks_install
   remove_keepsecret_install
+  remove_labwc_source_install
+  remove_wlroots_source_install
   remove_managed_wireguard_profiles
+  remove_persistent_build_workspace "wlroots"
+  remove_persistent_build_workspace "labwc"
   remove_persistent_build_workspace "regreet"
   remove_persistent_build_workspace "labwc-tweaks"
   remove_persistent_build_workspace "keepsecret"

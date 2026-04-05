@@ -67,6 +67,49 @@ verify_regreet_install() {
   "$(regreet_binary_path)" --version >/dev/null 2>&1 || die "regreet --version failed"
 }
 
+verify_wlroots_install() {
+  local provenance_path="$WLROOTS_PROVENANCE_PATH"
+  local required_dep actual_version
+
+  [[ "${LABWC_INSTALL_METHOD:-}" == "source" ]] || return 0
+
+  require_file "$provenance_path"
+  grep -F "WLROOTS_REQUESTED_REPO_URL=\"$WLROOTS_REPO_URL\"" "$provenance_path" >/dev/null || {
+    die "wlroots provenance does not record the requested repo URL"
+  }
+  grep -F "WLROOTS_REQUESTED_COMMIT_SHA=\"$WLROOTS_COMMIT_SHA\"" "$provenance_path" >/dev/null || {
+    die "wlroots provenance does not record the requested commit"
+  }
+
+  required_dep="$(awk -F= '/^WLROOTS_REQUIRED_DEPENDENCY=/{gsub(/"/,"",$2); print $2; exit}' "$provenance_path")"
+  [[ -n "$required_dep" ]] || die "wlroots provenance does not record the required labwc dependency name"
+  pkg-config --exists "$required_dep" || die "pkg-config cannot resolve installed wlroots dependency '$required_dep'"
+  actual_version="$(pkg-config --modversion "$required_dep" 2>/dev/null || true)"
+  [[ -n "$actual_version" ]] || die "pkg-config did not return a wlroots version for '$required_dep'"
+}
+
+verify_labwc_compositor_install() {
+  local binary_path
+
+  if [[ "${LABWC_INSTALL_METHOD:-}" == "source" ]]; then
+    binary_path="$(managed_labwc_binary_path)"
+    require_file "$binary_path"
+    require_file "$LABWC_MANAGED_PROVENANCE_PATH"
+    grep -F "LABWC_REPO_URL=\"$LABWC_REPO_URL\"" "$LABWC_MANAGED_PROVENANCE_PATH" >/dev/null || {
+      die "labwc provenance does not record the expected repo URL"
+    }
+    grep -F "LABWC_COMMIT_SHA=\"$LABWC_COMMIT_SHA\"" "$LABWC_MANAGED_PROVENANCE_PATH" >/dev/null || {
+      die "labwc provenance does not record the expected commit"
+    }
+    assert_binary_dependencies "$binary_path" "labwc"
+    "$binary_path" --version >/dev/null 2>&1 || die "labwc --version failed"
+    return 0
+  fi
+
+  binary_path="$(managed_labwc_binary_path)"
+  [[ -x "$binary_path" ]] || die "labwc runtime package did not provide executable $binary_path"
+}
+
 verify_labwc_tweaks_install() {
   require_file "$LABWC_TWEAKS_BIN_PATH"
   require_file "$LABWC_TWEAKS_DESKTOP_PATH"
@@ -186,6 +229,9 @@ $missing_output"
 }
 
 verify_greeter_contract() {
+  local labwc_binary
+
+  labwc_binary="$(managed_labwc_binary_path)"
   require_file "/etc/greetd/config.toml"
   require_file "/etc/greetd/regreet.toml"
   require_file "/etc/greetd/regreet.css"
@@ -206,7 +252,7 @@ verify_greeter_contract() {
   grep -F '/usr/local/bin/labwc-greeter-session' "/etc/greetd/config.toml" >/dev/null || {
     die "greetd config lost the managed greeter session wrapper"
   }
-  grep -F 'dbus-run-session -- /usr/bin/labwc -C /etc/labwc-greeter -S /usr/local/bin/labwc-greeter-regreet' "/usr/local/bin/labwc-greeter-session" >/dev/null || {
+  grep -F "dbus-run-session -- \"$labwc_binary\" -C /etc/labwc-greeter -S /usr/local/bin/labwc-greeter-regreet" "/usr/local/bin/labwc-greeter-session" >/dev/null || {
     die "greeter session wrapper lost the managed dbus-run-session greeter contract"
   }
   grep -F 'launched via labwc --session' "/etc/labwc-greeter/autostart" >/dev/null || {
@@ -289,6 +335,7 @@ verify_greeter_contract() {
 verify_session_activation_contract() {
   local session_entry="/usr/local/bin/labwc-session-start"
   local session_wrapper="/usr/local/bin/labwc-session"
+  local labwc_binary
   local session_autostart="$LABWC_TARGET_HOME/.config/labwc/autostart"
   local session_environment="$LABWC_TARGET_HOME/.config/labwc/environment"
   local profile_path="$LABWC_TARGET_HOME/.profile"
@@ -297,6 +344,7 @@ verify_session_activation_contract() {
   local zshrc_path="$LABWC_TARGET_HOME/.zshrc"
 
   require_managed_dbus_broker_units
+  labwc_binary="$(managed_labwc_binary_path)"
   require_file "$session_entry"
   require_file "$session_wrapper"
   require_file "$session_autostart"
@@ -310,6 +358,9 @@ verify_session_activation_contract() {
   }
   grep -F 'DBUS_SESSION_BUS_ADDRESS=' "$session_entry" >/dev/null || {
     die "labwc-session-start lost the managed broker bus export"
+  }
+  grep -F "exec ${labwc_binary}" "$session_wrapper" >/dev/null || {
+    die "labwc-session wrapper lost the managed labwc executable path"
   }
   if grep -F 'dbus-update-activation-environment' "$session_autostart" >/dev/null; then
     die "labwc autostart must not call dbus-update-activation-environment"
@@ -404,6 +455,8 @@ verify_shell_and_units() {
 
 verify_install() {
   verify_safe_gtk_runtime
+  verify_wlroots_install
+  verify_labwc_compositor_install
   verify_regreet_install
   verify_labwc_tweaks_install
   verify_keepsecret_install

@@ -289,6 +289,78 @@ netfilter_pkg_config_path() {
   printf '/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig%s' "${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 }
 
+security_cc() {
+  if [[ -n "${CC:-}" ]]; then
+    printf '%s\n' "$CC"
+    return 0
+  fi
+  command -v cc
+}
+
+security_cxx() {
+  if [[ -n "${CXX:-}" ]]; then
+    printf '%s\n' "$CXX"
+    return 0
+  fi
+  command -v c++
+}
+
+security_compiler_id() {
+  local compiler="$1"
+  local resolved_compiler=""
+  local version_output=""
+
+  resolved_compiler="$(readlink -f "$compiler" 2>/dev/null || printf '%s' "$compiler")"
+  version_output="$("$compiler" --version 2>/dev/null || true)"
+  case "${resolved_compiler##*/}:${version_output,,}" in
+    *clang*:*|*:*clang*)
+      printf '%s\n' "clang"
+      ;;
+    *gcc*:*|*g++*:*|*:*gcc*|*:*gnu*)
+      printf '%s\n' "gcc"
+      ;;
+    *) printf '%s\n' "unknown" ;;
+  esac
+}
+
+security_native_lto_flag() {
+  local compiler_id="$1"
+
+  case "$compiler_id" in
+    clang) printf '%s\n' "-flto=thin" ;;
+    gcc) printf '%s\n' "-flto=auto" ;;
+    *) printf '%s\n' "" ;;
+  esac
+}
+
+security_native_cflags() {
+  local compiler_id lto_flag flags
+
+  compiler_id="$(security_compiler_id "$(security_cc)")"
+  lto_flag="$(security_native_lto_flag "$compiler_id")"
+  flags="-O3 -march=native -mtune=native -pipe -fno-plt -DNDEBUG"
+  if [[ -n "$lto_flag" ]]; then
+    flags+=" $lto_flag"
+  fi
+  printf '%s\n' "$flags"
+}
+
+security_native_cxxflags() {
+  printf '%s\n' "$(security_native_cflags)"
+}
+
+security_native_ldflags() {
+  local compiler_id lto_flag flags
+
+  compiler_id="$(security_compiler_id "$(security_cc)")"
+  lto_flag="$(security_native_lto_flag "$compiler_id")"
+  flags="-Wl,-O2 -Wl,--as-needed"
+  if [[ -n "$lto_flag" ]]; then
+    flags="$lto_flag $flags"
+  fi
+  printf '%s\n' "$flags"
+}
+
 finalize_local_libtool_install() {
   run_cmd "$LDCONFIG_BIN"
 }
@@ -308,6 +380,12 @@ install_latest_libmnl() {
   download_as_security_user "$LIBMNL_URL" "$archive_path"
   run_cmd tar -xjf "$archive_path" -C "$tmpdir"
   (
+    export CC CXX CFLAGS CXXFLAGS LDFLAGS
+    CC="$(security_cc)"
+    CXX="$(security_cxx)"
+    CFLAGS="$(security_native_cflags)"
+    CXXFLAGS="$(security_native_cxxflags)"
+    LDFLAGS="$(security_native_ldflags)"
     cd "$source_dir" || exit 1
     run_cmd ./configure --prefix=/usr/local
     run_cmd make -j"$(nproc)"
@@ -333,8 +411,13 @@ install_latest_libnftnl() {
   download_as_security_user "$LIBNFTNL_URL" "$archive_path"
   run_cmd tar -xJf "$archive_path" -C "$tmpdir"
   (
-    export PKG_CONFIG_PATH
+    export CC CXX PKG_CONFIG_PATH CFLAGS CXXFLAGS LDFLAGS
+    CC="$(security_cc)"
+    CXX="$(security_cxx)"
     PKG_CONFIG_PATH="$(netfilter_pkg_config_path)"
+    CFLAGS="$(security_native_cflags)"
+    CXXFLAGS="$(security_native_cxxflags)"
+    LDFLAGS="$(security_native_ldflags)"
     cd "$source_dir" || exit 1
     run_cmd ./configure --prefix=/usr/local
     run_cmd make -j"$(nproc)"
@@ -362,8 +445,13 @@ install_latest_nftables() {
   download_as_security_user "$NFTABLES_URL" "$archive_path"
   run_cmd tar -xJf "$archive_path" -C "$tmpdir"
   (
-    export PKG_CONFIG_PATH
+    export CC CXX PKG_CONFIG_PATH CFLAGS CXXFLAGS LDFLAGS
+    CC="$(security_cc)"
+    CXX="$(security_cxx)"
     PKG_CONFIG_PATH="$(netfilter_pkg_config_path)"
+    CFLAGS="$(security_native_cflags)"
+    CXXFLAGS="$(security_native_cxxflags)"
+    LDFLAGS="$(security_native_ldflags)"
     cd "$source_dir" || exit 1
     run_cmd ./configure --prefix=/usr/local
     run_cmd make -j"$(nproc)"
@@ -389,6 +477,12 @@ install_latest_aide() {
   download_as_security_user "$AIDE_URL" "$archive_path"
   run_cmd tar -xzf "$archive_path" -C "$tmpdir"
   (
+    export CC CXX CFLAGS CXXFLAGS LDFLAGS
+    CC="$(security_cc)"
+    CXX="$(security_cxx)"
+    CFLAGS="$(security_native_cflags)"
+    CXXFLAGS="$(security_native_cxxflags)"
+    LDFLAGS="$(security_native_ldflags)"
     cd "$source_dir" || exit 1
     run_cmd ./configure --prefix=/usr/local --without-selinux
     run_cmd make -j"$(nproc)"

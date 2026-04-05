@@ -31,6 +31,8 @@ source "$SCRIPT_DIR/lib/kirigami.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/services.sh"
 # shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/compositor.sh"
+# shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/tweaks.sh"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/keepsecret.sh"
@@ -162,7 +164,7 @@ prompt_install_method() {
 
   if [[ -r /dev/tty && -w /dev/tty ]]; then
     while true; do
-      printf '%s' "Do you want to compile and install keepsecret, labwc-tweaks, and regreet from source? [Y/n] " >/dev/tty
+      printf '%s' "Do you want to compile and install wlroots, labwc, keepsecret, labwc-tweaks, and regreet from source? [Y/n] " >/dev/tty
       IFS= read -r answer </dev/tty || die "LABWC_INSTALL_METHOD is unset in $ENV_FILE and the terminal prompt could not be read from /dev/tty"
       case "${answer:-Y}" in
         Y|y|yes|YES)
@@ -182,7 +184,7 @@ prompt_install_method() {
 
   if [[ -t 0 && -t 1 ]]; then
     while true; do
-      IFS= read -r -p "Do you want to compile and install keepsecret, labwc-tweaks, and regreet from source? [Y/n] " answer
+      IFS= read -r -p "Do you want to compile and install wlroots, labwc, keepsecret, labwc-tweaks, and regreet from source? [Y/n] " answer
       case "${answer:-Y}" in
         Y|y|yes|YES)
           printf '%s\n' "source"
@@ -335,6 +337,9 @@ phase_doctor() {
   require_command curl
   require_command sha256sum
   require_command tar
+  require_command ldd
+  require_command pkg-config
+  require_command systemd-analyze
   require_command useradd
   require_command usermod
 }
@@ -348,6 +353,9 @@ phase_source_build_doctor() {
   require_command cmake
   require_command ninja
   require_command pkg-config
+  require_command wayland-scanner
+  require_command msgfmt
+  require_command scdoc
   require_command ldd
   require_command grep
 }
@@ -398,12 +406,15 @@ phase_build_sources() {
   load_env_file
   if install_method_is_source; then
     phase_source_build_doctor
+    install_labwc_stack_from_source
     install_regreet_binary
     install_labwc_tweaks
     install_keepsecret
     return 0
   fi
 
+  remove_labwc_source_install
+  remove_wlroots_source_install
   install_regreet_artifact
   install_labwc_tweaks_artifact
   install_keepsecret_artifact

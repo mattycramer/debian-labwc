@@ -27,4 +27,4 @@ if command -v gpgconf >/dev/null 2>&1; then
   fi
 fi
 
-exec /usr/bin/labwc
+exec @LABWC_BINARY@
