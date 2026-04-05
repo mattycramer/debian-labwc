@@ -118,7 +118,6 @@ wlroots_meson_args() {
 -Db_lto_mode=thin
 -Dwerror=false
 -Dexamples=false
--Dtests=false
 -Dbackends=drm,libinput
 -Drenderers=gles2
 -Dallocators=gbm
@@ -265,6 +264,13 @@ install_labwc_stack_from_source() {
   wlroots_build_dir="$wlroots_work_root/build"
   wlroots_stage_root="$wlroots_work_root/stage"
   run_cmd rm -rf -- "$wlroots_build_dir" "$wlroots_stage_root"
+  run_logged_command "$wlroots_log_path" bash -lc '
+    set -euo pipefail
+    cd "$1"
+    if [[ -d subprojects ]]; then
+      meson subprojects download
+    fi
+  ' bash "$wlroots_repo_dir"
   run_logged_command "$wlroots_log_path" env \
     CC="$(llvm_clang_bin)" \
     CXX="$(llvm_clangxx_bin)" \
