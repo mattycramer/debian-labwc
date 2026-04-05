@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 
 readonly WLROOTS_UPSTREAM_REPO_URL="https://gitlab.freedesktop.org/wlroots/wlroots.git"
+readonly WLROOTS_WRAP_LIBDISPLAY_INFO_REVISION="0.2.0"
+readonly WLROOTS_WRAP_LIBDRM_REVISION="libdrm-2.4.129"
+readonly WLROOTS_WRAP_LIBLIFTOFF_REVISION="v0.4.0"
+readonly WLROOTS_WRAP_LIBXKBCOMMON_REVISION="xkbcommon-1.8.0"
+readonly WLROOTS_WRAP_PIXMAN_REVISION="pixman-0.46.0"
+readonly WLROOTS_WRAP_SEATD_REVISION="0.9.3"
+readonly WLROOTS_WRAP_WAYLAND_PROTOCOLS_REVISION="1.39"
+readonly WLROOTS_WRAP_WAYLAND_REVISION="1.24.0"
 readonly WLROOTS_MANIFEST_PATH="${LABWC_SOURCE_BUILD_STATE_DIR}/wlroots-install-manifest.txt"
 readonly WLROOTS_PROVENANCE_PATH="${LABWC_SOURCE_BUILD_STATE_DIR}/wlroots-build.env"
 readonly LABWC_MANAGED_MANIFEST_PATH="${LABWC_SOURCE_BUILD_STATE_DIR}/labwc-install-manifest.txt"
@@ -106,6 +114,51 @@ load_arg_lines() {
     [[ -n "$arg_line" ]] || continue
     output_ref+=("$arg_line")
   done <<<"$arg_source"
+}
+
+wlroots_wrap_pinned_revision() {
+  local wrap_name="$1"
+
+  case "$wrap_name" in
+    libdisplay-info.wrap) printf '%s\n' "$WLROOTS_WRAP_LIBDISPLAY_INFO_REVISION" ;;
+    libdrm.wrap) printf '%s\n' "$WLROOTS_WRAP_LIBDRM_REVISION" ;;
+    libliftoff.wrap) printf '%s\n' "$WLROOTS_WRAP_LIBLIFTOFF_REVISION" ;;
+    libxkbcommon.wrap) printf '%s\n' "$WLROOTS_WRAP_LIBXKBCOMMON_REVISION" ;;
+    pixman.wrap) printf '%s\n' "$WLROOTS_WRAP_PIXMAN_REVISION" ;;
+    seatd.wrap) printf '%s\n' "$WLROOTS_WRAP_SEATD_REVISION" ;;
+    wayland-protocols.wrap) printf '%s\n' "$WLROOTS_WRAP_WAYLAND_PROTOCOLS_REVISION" ;;
+    wayland.wrap) printf '%s\n' "$WLROOTS_WRAP_WAYLAND_REVISION" ;;
+    *) return 1 ;;
+  esac
+}
+
+pin_wlroots_wrap_revisions() {
+  local repo_dir="$1"
+  local wrap_path=""
+  local wrap_name=""
+  local pinned_revision=""
+
+  while IFS= read -r wrap_path; do
+    [[ -n "$wrap_path" ]] || continue
+    wrap_name="$(basename "$wrap_path")"
+    pinned_revision="$(wlroots_wrap_pinned_revision "$wrap_name" || true)"
+    [[ -n "$pinned_revision" ]] || continue
+    python3 - "$wrap_path" "$pinned_revision" <<'PY'
+from pathlib import Path
+import configparser
+import sys
+
+wrap_path = Path(sys.argv[1])
+revision = sys.argv[2]
+
+config = configparser.ConfigParser(interpolation=None)
+config.read_string(wrap_path.read_text(encoding="utf-8"))
+config["wrap-git"]["revision"] = revision
+
+with wrap_path.open("w", encoding="utf-8") as handle:
+    config.write(handle, space_around_delimiters=True)
+PY
+  done < <(find "$repo_dir/subprojects" -maxdepth 1 -type f -name '*.wrap' | LC_ALL=C sort)
 }
 
 wlroots_meson_args() {
@@ -265,6 +318,7 @@ install_labwc_stack_from_source() {
   wlroots_build_dir="$wlroots_work_root/build"
   wlroots_stage_root="$wlroots_work_root/stage"
   run_cmd rm -rf -- "$wlroots_build_dir" "$wlroots_stage_root"
+  pin_wlroots_wrap_revisions "$wlroots_repo_dir"
   run_logged_command "$wlroots_log_path" bash -lc '
     set -euo pipefail
     cd "$1"
