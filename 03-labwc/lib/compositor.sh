@@ -6,7 +6,6 @@ readonly WLROOTS_WRAP_LIBDRM_REVISION="libdrm-2.4.129"
 readonly WLROOTS_WRAP_LIBLIFTOFF_REVISION="v0.4.0"
 readonly WLROOTS_WRAP_LIBXKBCOMMON_REVISION="xkbcommon-1.8.0"
 readonly WLROOTS_WRAP_PIXMAN_REVISION="pixman-0.46.0"
-readonly WLROOTS_WRAP_SEATD_REVISION="0.9.3"
 readonly WLROOTS_WRAP_WAYLAND_PROTOCOLS_REVISION="1.39"
 readonly WLROOTS_WRAP_WAYLAND_REVISION="1.24.0"
 readonly WLROOTS_MANIFEST_PATH="${LABWC_SOURCE_BUILD_STATE_DIR}/wlroots-install-manifest.txt"
@@ -125,11 +124,21 @@ wlroots_wrap_pinned_revision() {
     libliftoff.wrap) printf '%s\n' "$WLROOTS_WRAP_LIBLIFTOFF_REVISION" ;;
     libxkbcommon.wrap) printf '%s\n' "$WLROOTS_WRAP_LIBXKBCOMMON_REVISION" ;;
     pixman.wrap) printf '%s\n' "$WLROOTS_WRAP_PIXMAN_REVISION" ;;
-    seatd.wrap) printf '%s\n' "$WLROOTS_WRAP_SEATD_REVISION" ;;
     wayland-protocols.wrap) printf '%s\n' "$WLROOTS_WRAP_WAYLAND_PROTOCOLS_REVISION" ;;
     wayland.wrap) printf '%s\n' "$WLROOTS_WRAP_WAYLAND_REVISION" ;;
     *) return 1 ;;
   esac
+}
+
+wlroots_subprojects_to_download() {
+  printf '%s\n' \
+    libdisplay-info \
+    libdrm \
+    libliftoff \
+    libxkbcommon \
+    pixman \
+    wayland-protocols \
+    wayland
 }
 
 pin_wlroots_wrap_revisions() {
@@ -323,9 +332,10 @@ install_labwc_stack_from_source() {
     set -euo pipefail
     cd "$1"
     if [[ -d subprojects ]]; then
-      meson subprojects download
+      shift
+      meson subprojects download "$@"
     fi
-  ' bash "$wlroots_repo_dir"
+  ' bash "$wlroots_repo_dir" $(wlroots_subprojects_to_download)
   run_logged_command "$wlroots_log_path" env \
     CC="$(llvm_clang_bin)" \
     CXX="$(llvm_clangxx_bin)" \
