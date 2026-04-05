@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 readonly SID_SUITE="sid"
-readonly TRIXIE_SUITE="trixie"
+readonly TRIXIE_BACKPORTS_SUITE="trixie-backports"
 readonly SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
 readonly SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
 readonly DEBIAN_ARCHIVE_KEYRING_PATH="/usr/share/keyrings/debian-archive-keyring.gpg"
@@ -342,28 +342,28 @@ install_requested_packages() {
   local -a sid_package_list=()
   local -a build_package_list=()
   local -a graphics_package_list=()
-  local -a trixie_gtk_runtime_package_list=()
-  local -a trixie_gtk_build_package_list=()
+  local -a backports_gtk_runtime_package_list=()
+  local -a backports_gtk_build_package_list=()
   local -a all_package_list=()
   local -a apt_args=()
   mapfile -t all_package_list < <(resolved_requested_packages)
   ((${#all_package_list[@]} > 0)) || die "resolved package set is empty"
   mapfile -t sid_package_list < <(resolved_sid_packages)
-  mapfile -t trixie_gtk_runtime_package_list < <(printf '%s\n' "${TRIXIE_GTK_RUNTIME_PACKAGES[@]}")
+  mapfile -t backports_gtk_runtime_package_list < <(printf '%s\n' "${TRIXIE_GTK_RUNTIME_PACKAGES[@]}")
   if [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]]; then
     mapfile -t build_package_list < <(printf '%s\n' "${SID_SOURCE_BUILD_PACKAGES[@]}")
-    mapfile -t trixie_gtk_build_package_list < <(printf '%s\n' "${TRIXIE_GTK_SOURCE_BUILD_PACKAGES[@]}")
+    mapfile -t backports_gtk_build_package_list < <(printf '%s\n' "${TRIXIE_GTK_SOURCE_BUILD_PACKAGES[@]}")
   fi
   mapfile -t graphics_package_list < <(resolved_graphics_packages)
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${sid_package_list[@]}"
-  log_info "installing GTK4 runtime package set from trixie to avoid broken sid libgtk-4-1 ${BROKEN_GTK4_RUNTIME_VERSION}"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$TRIXIE_SUITE" install --no-install-recommends "${apt_args[@]}" "${trixie_gtk_runtime_package_list[@]}"
+  log_info "installing GTK4 runtime package set from ${TRIXIE_BACKPORTS_SUITE} to avoid broken sid libgtk-4-1 ${BROKEN_GTK4_RUNTIME_VERSION}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$TRIXIE_BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${backports_gtk_runtime_package_list[@]}"
   if ((${#build_package_list[@]} > 0)); then
     log_info "installing source-build package set from sid"
     run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${build_package_list[@]}"
-    log_info "installing GTK4 source-build package set from trixie to match the managed GTK4 runtime"
-    run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$TRIXIE_SUITE" install --no-install-recommends "${apt_args[@]}" "${trixie_gtk_build_package_list[@]}"
+    log_info "installing GTK4 source-build package set from ${TRIXIE_BACKPORTS_SUITE} to match the managed GTK4 runtime"
+    run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$TRIXIE_BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${backports_gtk_build_package_list[@]}"
     mapfile -t build_package_list < <(llvm_upstream_packages)
     log_info "installing upstream LLVM toolchain packages"
     run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${build_package_list[@]}"
