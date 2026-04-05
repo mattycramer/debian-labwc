@@ -112,6 +112,7 @@ wlroots_meson_args() {
   cat <<'EOF'
 --buildtype=release
 --wrap-mode=nodownload
+--force-fallback-for=pixman
 -Db_ndebug=true
 -Ddefault_library=shared
 -Db_lto=true
