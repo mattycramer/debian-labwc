@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 readonly SID_SUITE="sid"
-readonly TRIXIE_BACKPORTS_SUITE="trixie-backports"
 readonly SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
 readonly SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
 readonly DEBIAN_ARCHIVE_KEYRING_PATH="/usr/share/keyrings/debian-archive-keyring.gpg"
@@ -212,6 +211,18 @@ readonly TRIXIE_GTK_SOURCE_BUILD_PACKAGES=(
   gir1.2-gtk-4.0
 )
 
+readonly GTK_WAYLAND_RUNTIME_PACKAGES=(
+  libwayland-client0
+  libwayland-server0
+  libwayland-cursor0
+  libwayland-egl1
+)
+
+readonly GTK_WAYLAND_SOURCE_BUILD_PACKAGES=(
+  libwayland-bin
+  libwayland-dev
+)
+
 readonly GRAPHICS_PACKAGES=(
   bash-completion
   libgl1-mesa-dri
@@ -241,6 +252,121 @@ retry_cmd() {
     fi
     sleep "$try"
     try=$((try + 1))
+  done
+}
+
+gtk_package_version_available() {
+  local package_name="$1"
+  local package_version="$2"
+
+  apt-cache madison "$package_name" | awk '{print $3}' | grep -Fx "$package_version" >/dev/null
+}
+
+gtk_resolved_version() {
+  local version=""
+  local candidate=""
+  local -a required_packages=()
+
+  if [[ -n "${LABWC_GTK_RESOLVED_VERSION:-}" ]]; then
+    printf '%s\n' "$LABWC_GTK_RESOLVED_VERSION"
+    return 0
+  fi
+
+  required_packages=("${TRIXIE_GTK_RUNTIME_PACKAGES[@]}")
+  if [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]]; then
+    required_packages+=("${TRIXIE_GTK_SOURCE_BUILD_PACKAGES[@]}")
+  fi
+
+  while IFS= read -r candidate; do
+    [[ -n "$candidate" ]] || continue
+    [[ "$candidate" != "$BROKEN_GTK4_RUNTIME_VERSION" ]] || continue
+
+    for version in "${required_packages[@]}"; do
+      gtk_package_version_available "$version" "$candidate" || continue 2
+    done
+
+    LABWC_GTK_RESOLVED_VERSION="$candidate"
+    printf '%s\n' "$LABWC_GTK_RESOLVED_VERSION"
+    return 0
+  done < <(apt-cache madison libgtk-4-1 | awk '{print $3}')
+
+  die "could not resolve a coherent non-broken GTK4 version for 03-labwc"
+}
+
+gtk_runtime_install_specs() {
+  local gtk_version="$1"
+  local package_name
+
+  [[ -n "$gtk_version" ]] || die "gtk runtime version must not be empty"
+  for package_name in "${TRIXIE_GTK_RUNTIME_PACKAGES[@]}"; do
+    gtk_package_version_available "$package_name" "$gtk_version" || {
+      die "GTK4 runtime package '$package_name' is not available at version '$gtk_version'"
+    }
+    printf '%s=%s\n' "$package_name" "$gtk_version"
+  done
+}
+
+gtk_source_build_install_specs() {
+  local gtk_version="$1"
+  local package_name
+
+  [[ -n "$gtk_version" ]] || die "gtk source-build version must not be empty"
+  for package_name in "${TRIXIE_GTK_SOURCE_BUILD_PACKAGES[@]}"; do
+    gtk_package_version_available "$package_name" "$gtk_version" || {
+      die "GTK4 source-build package '$package_name' is not available at version '$gtk_version'"
+    }
+    printf '%s=%s\n' "$package_name" "$gtk_version"
+  done
+}
+
+wayland_resolved_version() {
+  local package_name="libwayland-dev"
+  local candidate_version=""
+  local required_package=""
+
+  if [[ -n "${LABWC_WAYLAND_RESOLVED_VERSION:-}" ]]; then
+    printf '%s\n' "$LABWC_WAYLAND_RESOLVED_VERSION"
+    return 0
+  fi
+
+  candidate_version="$(apt-cache policy "$package_name" | awk '/Candidate:/ {print $2; exit}')"
+  [[ -n "$candidate_version" && "$candidate_version" != "(none)" ]] || {
+    die "could not resolve a candidate version for $package_name"
+  }
+
+  for required_package in "${GTK_WAYLAND_RUNTIME_PACKAGES[@]}" "${GTK_WAYLAND_SOURCE_BUILD_PACKAGES[@]}"; do
+    gtk_package_version_available "$required_package" "$candidate_version" || {
+      die "Wayland package '$required_package' is not available at version '$candidate_version'"
+    }
+  done
+
+  LABWC_WAYLAND_RESOLVED_VERSION="$candidate_version"
+  printf '%s\n' "$LABWC_WAYLAND_RESOLVED_VERSION"
+}
+
+wayland_runtime_install_specs() {
+  local wayland_version="$1"
+  local package_name
+
+  [[ -n "$wayland_version" ]] || die "wayland runtime version must not be empty"
+  for package_name in "${GTK_WAYLAND_RUNTIME_PACKAGES[@]}"; do
+    gtk_package_version_available "$package_name" "$wayland_version" || {
+      die "Wayland runtime package '$package_name' is not available at version '$wayland_version'"
+    }
+    printf '%s=%s\n' "$package_name" "$wayland_version"
+  done
+}
+
+wayland_source_build_install_specs() {
+  local wayland_version="$1"
+  local package_name
+
+  [[ -n "$wayland_version" ]] || die "wayland source-build version must not be empty"
+  for package_name in "${GTK_WAYLAND_SOURCE_BUILD_PACKAGES[@]}"; do
+    gtk_package_version_available "$package_name" "$wayland_version" || {
+      die "Wayland source-build package '$package_name' is not available at version '$wayland_version'"
+    }
+    printf '%s=%s\n' "$package_name" "$wayland_version"
   done
 }
 
@@ -343,6 +469,16 @@ require_sid_repository() {
   [[ -f "$SID_PREFERENCES_PATH" ]] || die "missing Debian sid preferences file: $SID_PREFERENCES_PATH; run 'make sid' in 00-system first"
 }
 
+resolved_sid_source_build_packages() {
+  local package_name
+  for package_name in "${SID_SOURCE_BUILD_PACKAGES[@]}"; do
+    if [[ "$package_name" == "libwayland-dev" ]]; then
+      continue
+    fi
+    printf '%s\n' "$package_name"
+  done
+}
+
 resolved_sid_packages() {
   local package_name
   for package_name in "${SID_RUNTIME_PACKAGES[@]}"; do
@@ -373,34 +509,49 @@ install_requested_packages() {
   local -a sid_package_list=()
   local -a build_package_list=()
   local -a graphics_package_list=()
-  local -a backports_gtk_runtime_package_list=()
-  local -a backports_gtk_build_package_list=()
+  local -a gtk_runtime_package_list=()
+  local -a gtk_build_package_list=()
+  local -a wayland_runtime_package_list=()
+  local -a wayland_build_package_list=()
   local -a all_package_list=()
   local -a apt_args=()
+  local gtk_version=""
+  local wayland_version=""
   mapfile -t all_package_list < <(resolved_requested_packages)
   ((${#all_package_list[@]} > 0)) || die "resolved package set is empty"
   mapfile -t sid_package_list < <(resolved_sid_packages)
-  mapfile -t backports_gtk_runtime_package_list < <(printf '%s\n' "${TRIXIE_GTK_RUNTIME_PACKAGES[@]}")
+  gtk_version="$(gtk_resolved_version)"
+  mapfile -t gtk_runtime_package_list < <(gtk_runtime_install_specs "$gtk_version")
   if [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]]; then
-    mapfile -t build_package_list < <(printf '%s\n' "${SID_SOURCE_BUILD_PACKAGES[@]}")
-    mapfile -t backports_gtk_build_package_list < <(printf '%s\n' "${TRIXIE_GTK_SOURCE_BUILD_PACKAGES[@]}")
+    mapfile -t build_package_list < <(resolved_sid_source_build_packages)
+    mapfile -t gtk_build_package_list < <(gtk_source_build_install_specs "$gtk_version")
+    wayland_version="$(wayland_resolved_version)"
+    mapfile -t wayland_runtime_package_list < <(wayland_runtime_install_specs "$wayland_version")
+    mapfile -t wayland_build_package_list < <(wayland_source_build_install_specs "$wayland_version")
   fi
   mapfile -t graphics_package_list < <(resolved_graphics_packages)
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${sid_package_list[@]}"
-  log_info "installing GTK4 runtime package set from ${TRIXIE_BACKPORTS_SUITE} to avoid broken sid libgtk-4-1 ${BROKEN_GTK4_RUNTIME_VERSION}"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$TRIXIE_BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${backports_gtk_runtime_package_list[@]}"
   if ((${#build_package_list[@]} > 0)); then
     log_info "installing source-build package set from sid"
     run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${build_package_list[@]}"
-    log_info "installing GTK4 source-build package set from ${TRIXIE_BACKPORTS_SUITE} to match the managed GTK4 runtime"
-    run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$TRIXIE_BACKPORTS_SUITE" install --no-install-recommends "${apt_args[@]}" "${backports_gtk_build_package_list[@]}"
     mapfile -t build_package_list < <(llvm_upstream_packages)
     log_info "installing upstream LLVM toolchain packages"
     run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${build_package_list[@]}"
   fi
   log_info "installing graphics package set from sid"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${graphics_package_list[@]}"
+  log_info "installing GTK4 runtime package set pinned to ${gtk_version} to avoid broken sid libgtk-4-1 ${BROKEN_GTK4_RUNTIME_VERSION}"
+  if ((${#wayland_runtime_package_list[@]} > 0)); then
+    log_info "installing coherent Wayland runtime/build package set pinned to ${wayland_version} to satisfy GTK4 exact-version dependencies"
+    run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --allow-downgrades --no-install-recommends "${apt_args[@]}" "${wayland_runtime_package_list[@]}" "${wayland_build_package_list[@]}"
+  fi
+  if ((${#gtk_build_package_list[@]} > 0)); then
+    log_info "installing GTK4 source-build package set pinned to ${gtk_version} to match the managed GTK4 runtime"
+    run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --allow-downgrades --no-install-recommends "${apt_args[@]}" "${gtk_runtime_package_list[@]}" "${gtk_build_package_list[@]}"
+  else
+    run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --allow-downgrades --no-install-recommends "${apt_args[@]}" "${gtk_runtime_package_list[@]}"
+  fi
 }
 
 remove_source_build_packages() {
