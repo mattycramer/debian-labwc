@@ -42,5 +42,5 @@ install_maintenance_packages() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
-    apt -t "$MAINTENANCE_APT_SUITE" install --no-install-recommends "${apt_args[@]}" "${MAINTENANCE_PACKAGES[@]}"
+    apt install --no-install-recommends "${apt_args[@]}" "${MAINTENANCE_PACKAGES[@]}"
 }

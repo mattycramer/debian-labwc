@@ -7,7 +7,6 @@ readonly CRYSTAL_DOCK_AUTOSTART_FRAGMENT_PATH_REL=".config/labwc/autostart.d/60-
 readonly CRYSTAL_DOCK_BIN_PATH="/usr/bin/crystal-dock"
 readonly CRYSTAL_DOCK_DESKTOP_PATH="/usr/share/applications/crystal-dock.desktop"
 readonly CRYSTAL_DOCK_DOWNLOAD_DIR="/tmp/crystal-dock"
-readonly CRYSTAL_DOCK_SID_SUITE="sid"
 
 readonly CRYSTAL_DOCK_BOOTSTRAP_PACKAGES=(
   ca-certificates
@@ -50,8 +49,8 @@ apt_update() {
 install_crystal_dock_dependencies() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$CRYSTAL_DOCK_SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_BOOTSTRAP_PACKAGES[@]}"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$CRYSTAL_DOCK_SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_RUNTIME_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_BOOTSTRAP_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_RUNTIME_PACKAGES[@]}"
 }
 
 install_crystal_dock_package() {
@@ -70,7 +69,7 @@ install_crystal_dock_package() {
   run_cmd chmod 0644 "$deb_path"
   printf '%s  %s\n' "$CRYSTAL_DOCK_DEB_SHA256" "$deb_path" | sha256sum --check --status || die "Crystal Dock deb sha256 mismatch"
   [[ "$(dpkg-deb -f "$deb_path" Package 2>/dev/null)" == "crystal-dock" ]] || die "downloaded package is not crystal-dock"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$CRYSTAL_DOCK_SID_SUITE" install --no-install-recommends "${apt_args[@]}" "$deb_path"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "$deb_path"
   run_cmd rm -f -- "$deb_path"
 }
 

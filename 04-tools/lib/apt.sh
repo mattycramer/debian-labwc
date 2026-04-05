@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-readonly SID_SUITE="sid"
 readonly NORMAL_BOOTSTRAP_PACKAGES=(
   apt-transport-https
   ca-certificates
@@ -15,7 +14,7 @@ readonly NORMAL_TOOLS_PACKAGES=(
   mullvad-browser-alpha
 )
 
-readonly SID_TOOLS_PACKAGES=(
+readonly ADDITIONAL_TOOLS_PACKAGES=(
   qutebrowser
   mpv
   remmina
@@ -65,7 +64,7 @@ apt_update() {
 install_repo_bootstrap() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${NORMAL_BOOTSTRAP_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${NORMAL_BOOTSTRAP_PACKAGES[@]}"
 }
 
 prepare_tools_download_path() {
@@ -155,7 +154,7 @@ Signed-By: /usr/share/keyrings/mullvad-keyring.gpg
 install_normal_tools() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}"
   remove_spotify_legacy_source_list
 }
 
@@ -168,13 +167,13 @@ install_spotify_client() {
     apt \
     -o apt-listchanges::frontend=none \
     -o apt-listchanges::no-network=true \
-    -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "$SPOTIFY_PACKAGE"
+    install --no-install-recommends "${apt_args[@]}" "$SPOTIFY_PACKAGE"
 }
 
-install_sid_tools() {
+install_additional_tools() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "${SID_TOOLS_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${ADDITIONAL_TOOLS_PACKAGES[@]}"
 }
 
 install_deb_url() {
@@ -186,7 +185,7 @@ install_deb_url() {
   mapfile -t apt_args < <(apt_yes_args)
   download_as_tools_user "$url" "$output_path"
   dpkg-deb -f "$output_path" Package >/dev/null 2>&1 || die "downloaded file is not a valid Debian package: $output_path"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install "${apt_args[@]}" "$output_path"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install "${apt_args[@]}" "$output_path"
   run_cmd rm -f "$output_path"
 }
 

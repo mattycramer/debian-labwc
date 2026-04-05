@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 
-readonly SID_SUITE="sid"
 readonly QBT_PACKAGES=(
   apparmor
   apparmor-utils
 )
-readonly QBT_SID_PACKAGES=(
+readonly QBT_RUNTIME_PACKAGES=(
   qbittorrent-nox
 )
 
@@ -42,7 +41,7 @@ install_qbittorrent_packages() {
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
     apt install --no-install-recommends -o DPkg::Lock::Timeout=60 "${apt_args[@]}" "${QBT_PACKAGES[@]}"
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
-    apt -t "$SID_SUITE" install --no-install-recommends -o DPkg::Lock::Timeout=60 "${apt_args[@]}" "${QBT_SID_PACKAGES[@]}"
+    apt install --no-install-recommends -o DPkg::Lock::Timeout=60 "${apt_args[@]}" "${QBT_RUNTIME_PACKAGES[@]}"
 }
 
 package_is_installed() {

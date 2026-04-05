@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-readonly SID_SUITE="sid"
 readonly BOOTSTRAP_PACKAGES=(
   ca-certificates
   curl
@@ -143,11 +142,11 @@ apt_update() {
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
-apt_get_install_sid() {
+apt_get_install_packages() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
-    apt-get -t "$SID_SUITE" install --no-install-recommends "${apt_args[@]}" "$@"
+    apt-get install --no-install-recommends "${apt_args[@]}" "$@"
 }
 
 prepare_security_download_path() {
@@ -177,9 +176,9 @@ write_text_file() {
 }
 
 install_bootstrap_packages() {
-  apt_get_install_sid "${BOOTSTRAP_PACKAGES[@]}"
-  apt_get_install_sid "${BOOTSTRAP_RUNTIME_PACKAGES[@]}"
-  apt_get_install_sid "${BOOTSTRAP_DEV_PACKAGES[@]}"
+  apt_get_install_packages "${BOOTSTRAP_PACKAGES[@]}"
+  apt_get_install_packages "${BOOTSTRAP_RUNTIME_PACKAGES[@]}"
+  apt_get_install_packages "${BOOTSTRAP_DEV_PACKAGES[@]}"
 }
 
 install_crowdsec_repository() {
@@ -194,7 +193,7 @@ install_crowdsec_repository() {
 }
 
 install_crowdsec_packages() {
-  apt_get_install_sid "${CROWDSEC_PACKAGES[@]}"
+  apt_get_install_packages "${CROWDSEC_PACKAGES[@]}"
 }
 
 resolve_nftables_release() {

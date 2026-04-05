@@ -61,7 +61,7 @@ phase_install() {
   apt_update
   install_normal_tools
   install_spotify_client
-  install_sid_tools
+  install_additional_tools
   install_deb_tools
   render_mpv_config
   finalize_tools_install

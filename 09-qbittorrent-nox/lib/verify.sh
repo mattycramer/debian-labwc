@@ -21,7 +21,7 @@ verify_packages() {
   for pkg in "${QBT_PACKAGES[@]}"; do
     package_is_installed "$pkg" || die "package '$pkg' is not installed"
   done
-  for pkg in "${QBT_SID_PACKAGES[@]}"; do
+  for pkg in "${QBT_RUNTIME_PACKAGES[@]}"; do
     package_is_installed "$pkg" || die "package '$pkg' is not installed"
   done
 }

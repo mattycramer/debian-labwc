@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-readonly SID_SUITE="sid"
-
 apt_yes_args() {
   if [[ "${ASSUME_YES:-1}" -eq 1 ]]; then
     printf '%s\n' "-y"
@@ -109,7 +107,7 @@ verify_nvidia_upstream_repository() {
 install_debian_prerequisite_packages() {
   local -a packages=()
   mapfile -t packages < <(resolved_debian_prerequisite_packages)
-  install_sid_package_group "sid prerequisite package set" "${packages[@]}"
+  install_debian_package_group "Debian prerequisite package set" "${packages[@]}"
 }
 
 verify_package_visible_from_origin() {
@@ -122,24 +120,23 @@ verify_package_visible_from_origin() {
   grep -F "$origin" <<<"$policy" >/dev/null || die "$package_name is not visible from $origin"
 }
 
-verify_package_visible_from_target_release() {
+verify_package_visible_to_apt() {
   local package_name="$1"
-  local suite="$2"
   local candidate=""
 
-  candidate="$(apt_target_candidate_version "$suite" "$package_name")"
-  [[ -n "$candidate" && "$candidate" != "(none)" ]] || die "$package_name is not available from apt target '$suite'; ensure 00-system has already configured the sid archive before running 02-nvidia"
+  candidate="$(apt_candidate_version "$package_name")"
+  [[ -n "$candidate" && "$candidate" != "(none)" ]] || die "$package_name is not available from apt; ensure the managed apt sources are configured before running 02-nvidia"
 }
 
-verify_sid_prerequisite_repository() {
-  verify_package_visible_from_target_release build-essential "$SID_SUITE"
-  verify_package_visible_from_target_release dkms "$SID_SUITE"
+verify_debian_prerequisite_repository() {
+  verify_package_visible_to_apt build-essential
+  verify_package_visible_to_apt dkms
   if [[ "$NVIDIA_INSTALL_SWITCHEROO_CONTROL" == "1" ]]; then
-    verify_package_visible_from_target_release switcheroo-control "$SID_SUITE"
+    verify_package_visible_to_apt switcheroo-control
   fi
 }
 
-install_sid_package_group() {
+install_debian_package_group() {
   local label="$1"
   shift
   local -a apt_args=()
@@ -149,7 +146,7 @@ install_sid_package_group() {
   fi
   mapfile -t apt_args < <(apt_yes_args)
   log_info "installing ${label}"
-  run_mutating_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt -t "$SID_SUITE" install -V --no-install-recommends "${apt_args[@]}" "${packages[@]}"
+  run_mutating_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install -V --no-install-recommends "${apt_args[@]}" "${packages[@]}"
 }
 
 install_optional_driver_pinning_package() {
