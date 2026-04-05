@@ -44,6 +44,13 @@ apt_yes_args() {
   fi
 }
 
+apt_target_args() {
+  local suite="${TOOLS_APT_TARGET_SUITE:-}"
+  [[ -z "$suite" ]] && return 0
+  [[ "$suite" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "TOOLS_APT_TARGET_SUITE contains unsupported characters: '$suite'"
+  printf '%s\n' "-t" "$suite"
+}
+
 detect_tools_target_user() {
   if [[ -n "${SUDO_USER:-}" ]] && [[ "${SUDO_USER:-}" != "root" ]] && id "${SUDO_USER:-}" >/dev/null 2>&1; then
     TOOLS_TARGET_USER="$SUDO_USER"
@@ -63,8 +70,10 @@ apt_update() {
 
 install_repo_bootstrap() {
   local -a apt_args=()
+  local -a target_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${NORMAL_BOOTSTRAP_PACKAGES[@]}"
+  mapfile -t target_args < <(apt_target_args)
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${NORMAL_BOOTSTRAP_PACKAGES[@]}"
 }
 
 prepare_tools_download_path() {
@@ -153,39 +162,47 @@ Signed-By: /usr/share/keyrings/mullvad-keyring.gpg
 
 install_normal_tools() {
   local -a apt_args=()
+  local -a target_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}"
+  mapfile -t target_args < <(apt_target_args)
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}"
   remove_spotify_legacy_source_list
 }
 
 install_spotify_client() {
   local -a apt_args=()
+  local -a target_args=()
   mapfile -t apt_args < <(apt_yes_args)
+  mapfile -t target_args < <(apt_target_args)
   run_cmd env \
     DEBIAN_FRONTEND=noninteractive \
     APT_LISTCHANGES_FRONTEND=none \
     apt \
     -o apt-listchanges::frontend=none \
     -o apt-listchanges::no-network=true \
-    install --no-install-recommends "${apt_args[@]}" "$SPOTIFY_PACKAGE"
+    install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "$SPOTIFY_PACKAGE"
 }
 
 install_additional_tools() {
   local -a apt_args=()
+  local -a target_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${ADDITIONAL_TOOLS_PACKAGES[@]}"
+  mapfile -t target_args < <(apt_target_args)
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${ADDITIONAL_TOOLS_PACKAGES[@]}"
 }
 
 install_deb_url() {
   local url="$1"
   local output_path="$2"
   local -a apt_args=()
+  local -a target_args=()
   [[ -n "$url" ]] || die "missing deb download url"
   [[ "$output_path" == *.deb ]] || die "deb output path must end in .deb: $output_path"
   mapfile -t apt_args < <(apt_yes_args)
+  mapfile -t target_args < <(apt_target_args)
   download_as_tools_user "$url" "$output_path"
   dpkg-deb -f "$output_path" Package >/dev/null 2>&1 || die "downloaded file is not a valid Debian package: $output_path"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install "${apt_args[@]}" "$output_path"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install "${target_args[@]}" "${apt_args[@]}" "$output_path"
   run_cmd rm -f "$output_path"
 }
 

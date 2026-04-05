@@ -6,6 +6,13 @@ apt_yes_args() {
   fi
 }
 
+apt_target_args() {
+  local suite="${NVIDIA_APT_TARGET_SUITE:-}"
+  [[ -z "$suite" ]] && return 0
+  [[ "$suite" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "NVIDIA_APT_TARGET_SUITE contains unsupported characters: '$suite'"
+  printf '%s\n' "-t" "$suite"
+}
+
 retry_mutating_cmd() {
   local attempts="$1"
   shift
@@ -80,13 +87,15 @@ install_package_group() {
   local label="$1"
   shift
   local -a apt_args=()
+  local -a target_args=()
   local -a packages=( "$@" )
   if ((${#packages[@]} == 0)); then
     return 0
   fi
   mapfile -t apt_args < <(apt_yes_args)
+  mapfile -t target_args < <(apt_target_args)
   log_info "installing ${label}"
-  run_mutating_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt-get install -V --no-install-recommends "${apt_args[@]}" "${packages[@]}"
+  run_mutating_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt-get install -V --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${packages[@]}"
 }
 
 verify_nvidia_upstream_repository() {
@@ -140,13 +149,15 @@ install_debian_package_group() {
   local label="$1"
   shift
   local -a apt_args=()
+  local -a target_args=()
   local -a packages=( "$@" )
   if ((${#packages[@]} == 0)); then
     return 0
   fi
   mapfile -t apt_args < <(apt_yes_args)
+  mapfile -t target_args < <(apt_target_args)
   log_info "installing ${label}"
-  run_mutating_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install -V --no-install-recommends "${apt_args[@]}" "${packages[@]}"
+  run_mutating_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install -V --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${packages[@]}"
 }
 
 install_optional_driver_pinning_package() {

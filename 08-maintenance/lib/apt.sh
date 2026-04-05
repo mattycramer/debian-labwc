@@ -34,13 +34,22 @@ apt_yes_args() {
   fi
 }
 
+apt_target_args() {
+  local suite="${MAINTENANCE_APT_TARGET_SUITE:-}"
+  [[ -z "$suite" ]] && return 0
+  [[ "$suite" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "MAINTENANCE_APT_TARGET_SUITE contains unsupported characters: '$suite'"
+  printf '%s\n' "-t" "$suite"
+}
+
 apt_update() {
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
 install_maintenance_packages() {
   local -a apt_args=()
+  local -a target_args=()
   mapfile -t apt_args < <(apt_yes_args)
+  mapfile -t target_args < <(apt_target_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
-    apt install --no-install-recommends "${apt_args[@]}" "${MAINTENANCE_PACKAGES[@]}"
+    apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${MAINTENANCE_PACKAGES[@]}"
 }

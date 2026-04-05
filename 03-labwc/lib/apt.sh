@@ -7,6 +7,7 @@ readonly LLVM_APT_BASE_URL="https://apt.llvm.org"
 readonly LLVM_APT_KEY_PATH="/etc/apt/keyrings/apt.llvm.org.asc"
 readonly LLVM_APT_SOURCES_PATH="/etc/apt/sources.list.d/llvm-toolchain.sources"
 readonly BROKEN_GTK4_RUNTIME_VERSION="4.22.2+ds-1"
+readonly NETWORK_MANAGER_APT_SUITE="sid"
 readonly SID_RUNTIME_PACKAGES=(
   labwc
   kanshi
@@ -87,8 +88,6 @@ readonly SID_RUNTIME_PACKAGES=(
   wev
   upower
   power-profiles-daemon
-  network-manager
-  network-manager-tui
   bluez
   fonts-font-awesome
   fonts-noto
@@ -210,6 +209,11 @@ readonly GTK_SOURCE_BUILD_PACKAGES=(
   gir1.2-gtk-4.0
 )
 
+readonly NETWORK_MANAGER_PACKAGES=(
+  network-manager
+  network-manager-tui
+)
+
 readonly GRAPHICS_PACKAGES=(
   bash-completion
   libgl1-mesa-dri
@@ -327,6 +331,13 @@ apt_yes_args() {
   fi
 }
 
+apt_target_args() {
+  local suite="${LABWC_APT_TARGET_SUITE:-}"
+  [[ -z "$suite" ]] && return 0
+  [[ "$suite" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "LABWC_APT_TARGET_SUITE contains unsupported characters: '$suite'"
+  printf '%s\n' "-t" "$suite"
+}
+
 apt_update() {
   log_info "updating apt metadata"
   if [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]]; then
@@ -335,7 +346,7 @@ apt_update() {
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
-require_sid_repository() {
+require_managed_sid_repository() {
   [[ -f "$DEBIAN_ARCHIVE_KEYRING_PATH" ]] || die "missing Debian archive keyring: $DEBIAN_ARCHIVE_KEYRING_PATH"
   [[ -f "$SID_SOURCE_PATH" ]] || die "missing Debian sid source file: $SID_SOURCE_PATH; run 'make sid' in 00-system first"
   [[ -f "$SID_PREFERENCES_PATH" ]] || die "missing Debian sid preferences file: $SID_PREFERENCES_PATH; run 'make sid' in 00-system first"
@@ -358,6 +369,10 @@ resolved_graphics_packages() {
   fi
 }
 
+resolved_network_manager_packages() {
+  printf '%s\n' "${NETWORK_MANAGER_PACKAGES[@]}"
+}
+
 resolved_requested_packages() {
   resolved_runtime_packages
   if [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]]; then
@@ -371,9 +386,11 @@ install_requested_packages() {
   local -a runtime_package_list=()
   local -a build_package_list=()
   local -a graphics_package_list=()
+  local -a network_manager_package_list=()
   local -a gtk_runtime_package_list=()
   local -a gtk_build_package_list=()
   local -a apt_args=()
+  local -a target_args=()
   mapfile -t runtime_package_list < <(resolved_runtime_packages)
   if [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]]; then
     mapfile -t build_package_list < <(printf '%s\n' "${SID_SOURCE_BUILD_PACKAGES[@]}")
@@ -381,24 +398,28 @@ install_requested_packages() {
   fi
   mapfile -t gtk_runtime_package_list < <(printf '%s\n' "${GTK_RUNTIME_PACKAGES[@]}")
   mapfile -t graphics_package_list < <(resolved_graphics_packages)
+  mapfile -t network_manager_package_list < <(resolved_network_manager_packages)
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${runtime_package_list[@]}"
+  mapfile -t target_args < <(apt_target_args)
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${runtime_package_list[@]}"
   if ((${#build_package_list[@]} > 0)); then
     log_info "installing source-build package set with normal apt resolution"
-    run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${build_package_list[@]}"
+    run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${build_package_list[@]}"
     mapfile -t build_package_list < <(llvm_upstream_packages)
     log_info "installing upstream LLVM toolchain packages"
     run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${build_package_list[@]}"
   fi
   if ((${#gtk_build_package_list[@]} > 0)); then
     log_info "installing GTK4 runtime/build package set with normal apt resolution"
-    run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${gtk_runtime_package_list[@]}" "${gtk_build_package_list[@]}"
+    run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${gtk_runtime_package_list[@]}" "${gtk_build_package_list[@]}"
   else
     log_info "installing GTK4 runtime package set with normal apt resolution"
-    run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${gtk_runtime_package_list[@]}"
+    run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${gtk_runtime_package_list[@]}"
   fi
+  log_info "installing NetworkManager package set from ${NETWORK_MANAGER_APT_SUITE}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends -t "${NETWORK_MANAGER_APT_SUITE}" "${apt_args[@]}" "${network_manager_package_list[@]}"
   log_info "installing graphics package set with normal apt resolution"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${graphics_package_list[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${graphics_package_list[@]}"
 }
 
 remove_source_build_packages() {

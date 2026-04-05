@@ -30,6 +30,13 @@ apt_yes_args() {
   fi
 }
 
+apt_target_args() {
+  local suite="${QBT_APT_TARGET_SUITE:-}"
+  [[ -z "$suite" ]] && return 0
+  [[ "$suite" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "QBT_APT_TARGET_SUITE contains unsupported characters: '$suite'"
+  printf '%s\n' "-t" "$suite"
+}
+
 apt_update() {
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
     apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20 -o DPkg::Lock::Timeout=60
@@ -37,11 +44,13 @@ apt_update() {
 
 install_qbittorrent_packages() {
   local -a apt_args=()
+  local -a target_args=()
   mapfile -t apt_args < <(apt_yes_args)
+  mapfile -t target_args < <(apt_target_args)
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
-    apt install --no-install-recommends -o DPkg::Lock::Timeout=60 "${apt_args[@]}" "${QBT_PACKAGES[@]}"
+    apt install --no-install-recommends -o DPkg::Lock::Timeout=60 "${target_args[@]}" "${apt_args[@]}" "${QBT_PACKAGES[@]}"
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
-    apt install --no-install-recommends -o DPkg::Lock::Timeout=60 "${apt_args[@]}" "${QBT_RUNTIME_PACKAGES[@]}"
+    apt install --no-install-recommends -o DPkg::Lock::Timeout=60 "${target_args[@]}" "${apt_args[@]}" "${QBT_RUNTIME_PACKAGES[@]}"
 }
 
 package_is_installed() {

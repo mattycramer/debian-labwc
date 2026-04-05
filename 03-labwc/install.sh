@@ -371,7 +371,7 @@ phase_packages() {
   log_info "phase: packages"
   phase_doctor
   load_env_file
-  require_sid_repository
+  require_managed_sid_repository
   apt_update
   install_requested_packages
 }

@@ -29,6 +29,13 @@ apt_yes_args() {
   fi
 }
 
+apt_target_args() {
+  local suite="${CRYSTAL_DOCK_APT_TARGET_SUITE:-}"
+  [[ -z "$suite" ]] && return 0
+  [[ "$suite" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "CRYSTAL_DOCK_APT_TARGET_SUITE contains unsupported characters: '$suite'"
+  printf '%s\n' "-t" "$suite"
+}
+
 detect_target_user() {
   if [[ -n "${LABWC_TARGET_USER:-}" ]] && id "$LABWC_TARGET_USER" >/dev/null 2>&1; then
     DOCK_TARGET_USER="$LABWC_TARGET_USER"
@@ -48,15 +55,19 @@ apt_update() {
 
 install_crystal_dock_dependencies() {
   local -a apt_args=()
+  local -a target_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_BOOTSTRAP_PACKAGES[@]}"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${CRYSTAL_DOCK_RUNTIME_PACKAGES[@]}"
+  mapfile -t target_args < <(apt_target_args)
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${CRYSTAL_DOCK_BOOTSTRAP_PACKAGES[@]}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${CRYSTAL_DOCK_RUNTIME_PACKAGES[@]}"
 }
 
 install_crystal_dock_package() {
   local -a apt_args=()
+  local -a target_args=()
   local deb_name deb_path tmp_path
   mapfile -t apt_args < <(apt_yes_args)
+  mapfile -t target_args < <(apt_target_args)
   deb_name="${CRYSTAL_DOCK_DEB_URL##*/}"
   deb_path="${CRYSTAL_DOCK_DOWNLOAD_DIR}/${deb_name}"
   tmp_path="${deb_path}.part"
@@ -69,7 +80,7 @@ install_crystal_dock_package() {
   run_cmd chmod 0644 "$deb_path"
   printf '%s  %s\n' "$CRYSTAL_DOCK_DEB_SHA256" "$deb_path" | sha256sum --check --status || die "Crystal Dock deb sha256 mismatch"
   [[ "$(dpkg-deb -f "$deb_path" Package 2>/dev/null)" == "crystal-dock" ]] || die "downloaded package is not crystal-dock"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "$deb_path"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "$deb_path"
   run_cmd rm -f -- "$deb_path"
 }
 
