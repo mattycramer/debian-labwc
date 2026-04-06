@@ -8,7 +8,7 @@ help:
 	  '  doctor    Validate host prerequisites for the hardened qBittorrent-nox module' \
 	  '  detect    Capture the invoking user into .env and record torrent mount metadata when available' \
 	  '  install   Run doctor, detect, packages, render, enable, and verify' \
-	  '  packages  Install qBittorrent-nox and AppArmor tooling' \
+	  '  packages  Install qBittorrent-nox and AppArmor tooling from DEBIAN_SUITE' \
 	  '  render    Render the managed qBittorrent config, root-mount guard, mount-driven systemd unit, and AppArmor profile' \
 	  '  enable    Use the existing hardened torrent account, load AppArmor, and enable the mount-driven service' \
 	  '  verify    Verify package state, service hardening, and AppArmor enforcement with disconnected-drive tolerance' \

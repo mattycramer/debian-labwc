@@ -78,10 +78,12 @@ install_keepsecret() {
     cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
       -D CMAKE_BUILD_TYPE=Release \
       -D CMAKE_INSTALL_PREFIX=/usr/local \
+      -D CMAKE_POSITION_INDEPENDENT_CODE=ON \
       -D CMAKE_C_FLAGS="$cflags" \
       -D CMAKE_CXX_FLAGS="$cxxflags" \
       -D CMAKE_EXE_LINKER_FLAGS="$ldflags" \
       -D CMAKE_SHARED_LINKER_FLAGS="$ldflags" \
+      -D CMAKE_MODULE_LINKER_FLAGS="$ldflags" \
       -D CMAKE_PREFIX_PATH="$cmake_prefix_arg" \
       -D ECM_DIR="$ecm_dir" \
       -D CMAKE_INTERPROCEDURAL_OPTIMIZATION=ON
@@ -98,8 +100,8 @@ KIRIGAMI_REQUIRED_QT_VERSION="$KIRIGAMI_REQUIRED_QT_VERSION"
 ECM_REPO_URL="$ECM_REPO_URL"
 ECM_REPO_COMMIT="$ECM_REPO_COMMIT"
 ECM_VERSION="$ECM_VERSION"
-LABWC_LLVM_UPSTREAM_MAJOR="$LABWC_LLVM_UPSTREAM_MAJOR"
-LABWC_LLVM_UPSTREAM_VERSION="$LABWC_LLVM_UPSTREAM_VERSION"
+KIRIGAMI_CC="$(llvm_clang_bin)"
+KIRIGAMI_CXX="$(llvm_clangxx_bin)"
 KIRIGAMI_BUILD_LOG="$(build_log_path "$KIRIGAMI_BUILD_LOG_NAME")"
 KIRIGAMI_INSTALLED_AT_UTC="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 EOF

@@ -8,13 +8,13 @@ help:
 	  '  NOTE:        Run make as a non-root user; do not use sudo make' \
 	  '  help         Show this message' \
 	  '  doctor       Validate platform assumptions and resolve the invoking user' \
-	  '  sid          Install /etc/apt/sources.list.d/sid.sources and /etc/apt/preferences.d/sid exactly as managed by 00-system' \
+	  '  sid          Install the managed Debian archive files: sid.sources with deb+deb-src, trixie-backports.sources with deb+deb-src, and /etc/apt/preferences.d/sid' \
 	  '  mounts       Install four device-gated top-level g-drive mount/watch units from mounts.conf' \
 	  '  permissions  Create the hardened torrent account, add the invoking user to torrent, and repair required path ownership/modes including invoke-user write access on /pool/builds and /pool/cache' \
 	  '  secureboot   Install Secure Boot dependencies, manage the Labwc MOK, install the DKMS framework drop-in, zz- kernel hooks, the custom module source root, and the sign-module helper' \
 	  '  sudoers      Install the hardened invoking-user policy and read-only helper wrappers under /etc/sudoers.d' \
 	  '  install      Run doctor, sid, permissions, mounts, secureboot, sudoers, and verify' \
-	  '  verify       Check the managed sid archive files, generated mount units, Secure Boot state, sudoers, required path permissions, and invoke-user write access on /pool/builds and /pool/cache' \
+	  '  verify       Check the managed sid/backports archive files, generated mount units, Secure Boot state, sudoers, required path permissions, and invoke-user write access on /pool/builds and /pool/cache' \
 	  '  print-env    Print resolved target user/path state' \
 	  '  nuke         Remove generated Secure Boot state, scoped module hooks/helpers, mount units, and sudoers policy; directory permissions stay in place'
 

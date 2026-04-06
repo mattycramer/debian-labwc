@@ -95,10 +95,12 @@ install_labwc_tweaks() {
     cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
       -D CMAKE_BUILD_TYPE=Release \
       -D CMAKE_INSTALL_PREFIX=/usr \
+      -D CMAKE_POSITION_INDEPENDENT_CODE=ON \
       -D CMAKE_C_FLAGS="$cflags" \
       -D CMAKE_CXX_FLAGS="$cxxflags" \
       -D CMAKE_EXE_LINKER_FLAGS="$ldflags" \
       -D CMAKE_SHARED_LINKER_FLAGS="$ldflags" \
+      -D CMAKE_MODULE_LINKER_FLAGS="$ldflags" \
       -D CMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
       -W no-dev
   run_logged_command "$log_path" cmake --build "$build_dir" --verbose

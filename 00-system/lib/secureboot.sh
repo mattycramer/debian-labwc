@@ -103,6 +103,7 @@ ensure_secure_boot_packages() {
       -V \
       --no-install-recommends \
       -o DPkg::Lock::Timeout=60 \
+      -t "$SYSTEM_BACKPORTS_SUITE" \
       "${missing_packages[@]}"
 }
 

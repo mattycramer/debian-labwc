@@ -6,10 +6,16 @@ apt_yes_args() {
   fi
 }
 
+debian_suite_value() {
+  local suite="${DEBIAN_SUITE:-}"
+  [[ -n "$suite" ]] || die "DEBIAN_SUITE must be set in ${ENV_FILE:-02-nvidia/.env}"
+  [[ "$suite" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "DEBIAN_SUITE contains unsupported characters: '$suite'"
+  printf '%s\n' "$suite"
+}
+
 apt_target_args() {
-  local suite="${NVIDIA_APT_TARGET_SUITE:-}"
-  [[ -z "$suite" ]] && return 0
-  [[ "$suite" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "NVIDIA_APT_TARGET_SUITE contains unsupported characters: '$suite'"
+  local suite=""
+  suite="$(debian_suite_value)"
   printf '%s\n' "-t" "$suite"
 }
 
@@ -133,8 +139,8 @@ verify_package_visible_to_apt() {
   local package_name="$1"
   local candidate=""
 
-  candidate="$(apt_candidate_version "$package_name")"
-  [[ -n "$candidate" && "$candidate" != "(none)" ]] || die "$package_name is not available from apt; ensure the managed apt sources are configured before running 02-nvidia"
+  candidate="$(apt_target_candidate_version "$(debian_suite_value)" "$package_name")"
+  [[ -n "$candidate" && "$candidate" != "(none)" ]] || die "$package_name is not available from the ${DEBIAN_SUITE} target release; ensure the managed apt sources are configured before running 02-nvidia"
 }
 
 verify_debian_prerequisite_repository() {

@@ -19,10 +19,10 @@ verify_safe_gtk_runtime() {
   [[ -n "$gtk_common_version" ]] || die "libgtk-4-common is not installed"
 
   [[ "$gtk_runtime_version" != "$BROKEN_GTK4_RUNTIME_VERSION" ]] || {
-    die "libgtk-4-1 ${BROKEN_GTK4_RUNTIME_VERSION} is installed; this sid GTK4 build is known to segfault ReGreet on affected hosts"
+    die "libgtk-4-1 ${BROKEN_GTK4_RUNTIME_VERSION} is installed; this GTK4 build is known to segfault ReGreet on affected hosts"
   }
   [[ "$gtk_common_version" != "$BROKEN_GTK4_RUNTIME_VERSION" ]] || {
-    die "libgtk-4-common ${BROKEN_GTK4_RUNTIME_VERSION} is installed; this sid GTK4 build is known to segfault ReGreet on affected hosts"
+    die "libgtk-4-common ${BROKEN_GTK4_RUNTIME_VERSION} is installed; this GTK4 build is known to segfault ReGreet on affected hosts"
   }
 }
 
@@ -67,25 +67,21 @@ verify_regreet_install() {
   "$(regreet_binary_path)" --version >/dev/null 2>&1 || die "regreet --version failed"
 }
 
-verify_wlroots_install() {
-  local provenance_path="$WLROOTS_PROVENANCE_PATH"
+verify_wlroots_dependency() {
+  local provenance_path="$LABWC_MANAGED_PROVENANCE_PATH"
   local required_dep actual_version
 
   [[ "${LABWC_INSTALL_METHOD:-}" == "source" ]] || return 0
 
   require_file "$provenance_path"
-  grep -F "WLROOTS_REQUESTED_REPO_URL=\"$WLROOTS_REPO_URL\"" "$provenance_path" >/dev/null || {
-    die "wlroots provenance does not record the requested repo URL"
-  }
-  grep -F "WLROOTS_REQUESTED_COMMIT_SHA=\"$WLROOTS_COMMIT_SHA\"" "$provenance_path" >/dev/null || {
-    die "wlroots provenance does not record the requested commit"
-  }
-
-  required_dep="$(awk -F= '/^WLROOTS_REQUIRED_DEPENDENCY=/{gsub(/"/,"",$2); print $2; exit}' "$provenance_path")"
-  [[ -n "$required_dep" ]] || die "wlroots provenance does not record the required labwc dependency name"
+  required_dep="$(awk -F= '/^LABWC_RESOLVED_WLROOTS_DEPENDENCY=/{gsub(/"/,"",$2); print $2; exit}' "$provenance_path")"
+  [[ -n "$required_dep" ]] || die "labwc provenance does not record the resolved wlroots dependency name"
   pkg-config --exists "$required_dep" || die "pkg-config cannot resolve installed wlroots dependency '$required_dep'"
   actual_version="$(pkg-config --modversion "$required_dep" 2>/dev/null || true)"
   [[ -n "$actual_version" ]] || die "pkg-config did not return a wlroots version for '$required_dep'"
+  grep -F "LABWC_RESOLVED_WLROOTS_VERSION=\"$actual_version\"" "$provenance_path" >/dev/null || {
+    die "labwc provenance does not record the installed wlroots dependency version"
+  }
 }
 
 verify_labwc_compositor_install() {
@@ -95,11 +91,11 @@ verify_labwc_compositor_install() {
     binary_path="$(managed_labwc_binary_path)"
     require_file "$binary_path"
     require_file "$LABWC_MANAGED_PROVENANCE_PATH"
-    grep -F "LABWC_REPO_URL=\"$LABWC_REPO_URL\"" "$LABWC_MANAGED_PROVENANCE_PATH" >/dev/null || {
-      die "labwc provenance does not record the expected repo URL"
+    grep -F "LABWC_SOURCE_PACKAGE=\"$LABWC_SOURCE_PACKAGE\"" "$LABWC_MANAGED_PROVENANCE_PATH" >/dev/null || {
+      die "labwc provenance does not record the Debian source package name"
     }
-    grep -F "LABWC_COMMIT_SHA=\"$LABWC_COMMIT_SHA\"" "$LABWC_MANAGED_PROVENANCE_PATH" >/dev/null || {
-      die "labwc provenance does not record the expected commit"
+    grep -F "LABWC_SOURCE_SUITE=\"$DEBIAN_SUITE\"" "$LABWC_MANAGED_PROVENANCE_PATH" >/dev/null || {
+      die "labwc provenance does not record the Debian source suite"
     }
     assert_binary_dependencies "$binary_path" "labwc"
     "$binary_path" --version >/dev/null 2>&1 || die "labwc --version failed"
@@ -455,7 +451,7 @@ verify_shell_and_units() {
 
 verify_install() {
   verify_safe_gtk_runtime
-  verify_wlroots_install
+  verify_wlroots_dependency
   verify_labwc_compositor_install
   verify_regreet_install
   verify_labwc_tweaks_install

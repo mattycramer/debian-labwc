@@ -44,10 +44,16 @@ apt_yes_args() {
   fi
 }
 
+debian_suite_value() {
+  local suite="${DEBIAN_SUITE:-}"
+  [[ -n "$suite" ]] || die "DEBIAN_SUITE must be set in ${ENV_FILE:-04-tools/.env}"
+  [[ "$suite" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "DEBIAN_SUITE contains unsupported characters: '$suite'"
+  printf '%s\n' "$suite"
+}
+
 apt_target_args() {
-  local suite="${TOOLS_APT_TARGET_SUITE:-}"
-  [[ -z "$suite" ]] && return 0
-  [[ "$suite" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "TOOLS_APT_TARGET_SUITE contains unsupported characters: '$suite'"
+  local suite=""
+  suite="$(debian_suite_value)"
   printf '%s\n' "-t" "$suite"
 }
 
@@ -391,7 +397,7 @@ package_pattern_installed() {
 
 verify_tools_install() {
   local pkg
-  for pkg in "${NORMAL_TOOLS_PACKAGES[@]}" "${SID_TOOLS_PACKAGES[@]}"; do
+  for pkg in "${NORMAL_TOOLS_PACKAGES[@]}" "${ADDITIONAL_TOOLS_PACKAGES[@]}"; do
     package_is_installed "$pkg" || die "package '$pkg' is not installed"
   done
   package_is_installed "$SPOTIFY_PACKAGE" || die "package '$SPOTIFY_PACKAGE' is not installed"
@@ -447,7 +453,7 @@ verify_tools_install() {
 remove_tools_install() {
   local -a apt_args=()
   mapfile -t apt_args < <(apt_yes_args)
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${SID_TOOLS_PACKAGES[@]}" "$SPOTIFY_PACKAGE" thorium-browser bitwarden obsidian filen || true
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt remove "${apt_args[@]}" "${NORMAL_TOOLS_PACKAGES[@]}" "${ADDITIONAL_TOOLS_PACKAGES[@]}" "$SPOTIFY_PACKAGE" thorium-browser bitwarden obsidian filen || true
   run_cmd rm -f /etc/apt/sources.list.d/vscode.sources /etc/apt/sources.list.d/vscode.list /etc/apt/sources.list.d/thorium.sources /etc/apt/sources.list.d/thorium.list /etc/apt/sources.list.d/mullvad.sources /etc/apt/sources.list.d/mullvad.list "$SPOTIFY_SOURCES_PATH"
   remove_spotify_legacy_source_list
   run_cmd rm -f /usr/share/keyrings/microsoft.gpg /usr/share/keyrings/mullvad-keyring.asc /usr/share/keyrings/mullvad-keyring.gpg "$SPOTIFY_KEYRING_PATH"

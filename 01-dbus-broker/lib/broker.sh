@@ -85,7 +85,7 @@ normalize_sha256_value() {
 }
 
 native_cflags() {
-  printf '%s\n' "-O3 -march=native -mtune=native -pipe -fno-plt -DNDEBUG -flto=thin"
+  printf '%s\n' "-O3 -march=native -mtune=native -pipe -fno-plt -fstack-protector-strong -fstack-clash-protection -D_FORTIFY_SOURCE=3 -Wformat -Werror=format-security -DNDEBUG -flto=thin"
 }
 
 native_cxxflags() {
@@ -93,11 +93,11 @@ native_cxxflags() {
 }
 
 native_ldflags() {
-  printf '%s\n' "-flto=thin -Wl,-O2 -Wl,--as-needed -fuse-ld=lld"
+  printf '%s\n' "-flto=thin -Wl,-O2 -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -fuse-ld=lld"
 }
 
 native_rustflags() {
-  printf '%s\n' "-C linker=clang -C link-arg=-fuse-ld=lld -C target-cpu=native -C opt-level=3 -C codegen-units=1 -C lto=thin -C strip=symbols"
+  printf '%s\n' "-C linker=clang -C link-arg=-fuse-ld=lld -C link-arg=-Wl,-z,relro -C link-arg=-Wl,-z,now -C link-arg=-pie -C relocation-model=pie -C target-cpu=native -C opt-level=3 -C codegen-units=1 -C lto=thin -C strip=symbols"
 }
 
 verify_file_sha256() {

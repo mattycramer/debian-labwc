@@ -4,7 +4,7 @@ help:
 	@printf '%s\n' \
 	  '05-dev targets:' \
 	  '  doctor    Validate host prerequisites' \
-	  '  install   Install dev packages, Node.js 25+, and pnpm' \
+	  '  install   Install DEBIAN_SUITE dev packages, Node.js 25+, and pnpm' \
 	  '  verify    Verify installed packages and managed binaries' \
 	  '  nuke      Remove managed dev packages and Node.js runtime' \
 	  '  print-env Show the effective managed environment values'

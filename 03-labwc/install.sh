@@ -164,7 +164,7 @@ prompt_install_method() {
 
   if [[ -r /dev/tty && -w /dev/tty ]]; then
     while true; do
-      printf '%s' "Do you want to compile and install wlroots, labwc, keepsecret, labwc-tweaks, and regreet from source? [Y/n] " >/dev/tty
+      printf '%s' "Do you want to compile wlroots/labwc from Debian source packages and build keepsecret, labwc-tweaks, and regreet from source? [Y/n] " >/dev/tty
       IFS= read -r answer </dev/tty || die "LABWC_INSTALL_METHOD is unset in $ENV_FILE and the terminal prompt could not be read from /dev/tty"
       case "${answer:-Y}" in
         Y|y|yes|YES)
@@ -184,7 +184,7 @@ prompt_install_method() {
 
   if [[ -t 0 && -t 1 ]]; then
     while true; do
-      IFS= read -r -p "Do you want to compile and install wlroots, labwc, keepsecret, labwc-tweaks, and regreet from source? [Y/n] " answer
+      IFS= read -r -p "Do you want to compile wlroots/labwc from Debian source packages and build keepsecret, labwc-tweaks, and regreet from source? [Y/n] " answer
       case "${answer:-Y}" in
         Y|y|yes|YES)
           printf '%s\n' "source"
@@ -342,6 +342,7 @@ phase_doctor() {
   require_command systemd-analyze
   require_command useradd
   require_command usermod
+  require_command find
 }
 
 phase_source_build_doctor() {
@@ -373,7 +374,7 @@ phase_packages() {
   log_info "phase: packages"
   phase_doctor
   load_env_file
-  require_managed_sid_repository
+  require_managed_debian_archives
   apt_update
   install_requested_packages
 }
@@ -407,6 +408,7 @@ phase_build_sources() {
   phase_doctor
   load_env_file
   if install_method_is_source; then
+    install_debian_source_build_dependencies
     phase_source_build_doctor
     install_labwc_stack_from_source
     install_regreet_binary

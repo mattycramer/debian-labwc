@@ -26,18 +26,20 @@ verify_packages() {
   done
 }
 
-verify_qbittorrent_sid_origin() {
+verify_qbittorrent_suite_origin() {
   local installed_version
+  local suite="${DEBIAN_SUITE:-}"
+  [[ -n "$suite" ]] || die "DEBIAN_SUITE is not set; rerun the detect or package phase"
   installed_version="$(apt-cache policy qbittorrent-nox | awk '/^[[:space:]]*Installed: /{print $2; exit}')"
   [[ -n "$installed_version" ]] || die "could not determine the installed qbittorrent-nox version"
   [[ "$installed_version" != "(none)" ]] || die "qbittorrent-nox is not installed"
 
-  apt-cache policy qbittorrent-nox | awk -v version="$installed_version" '
+  apt-cache policy qbittorrent-nox | awk -v version="$installed_version" -v suite="$suite" '
     $1 == "***" && $2 == version {
       in_installed = 1
       next
     }
-    in_installed && /sid/ {
+    in_installed && index($0, suite) {
       found = 1
       exit
     }
@@ -47,7 +49,7 @@ verify_qbittorrent_sid_origin() {
     END {
       exit found ? 0 : 1
     }
-  ' || die "installed qbittorrent-nox version '$installed_version' does not resolve through a sid policy stanza"
+  ' || die "installed qbittorrent-nox version '$installed_version' does not resolve through a ${suite} policy stanza"
 }
 
 verify_detection_state() {
@@ -184,7 +186,7 @@ verify_apparmor_profile() {
 
 verify_install() {
   verify_packages
-  verify_qbittorrent_sid_origin
+  verify_qbittorrent_suite_origin
   verify_detection_state
   verify_mounts
   verify_service_account

@@ -4,6 +4,23 @@ path_state() {
   stat -c '%U:%G:%a' "$1"
 }
 
+assert_file_content_matches() {
+  local path="$1"
+  local generator="$2"
+  local actual expected
+
+  require_file "$path"
+  actual="$(cat "$path")"
+  expected="$("$generator")"
+  [[ "$actual" == "$expected" ]] || die "managed file content drifted for $path"
+}
+
+verify_managed_archive_files() {
+  assert_file_content_matches "$SID_SOURCE_PATH" managed_sid_source_content
+  assert_file_content_matches "$BACKPORTS_SOURCE_PATH" managed_backports_source_content
+  assert_file_content_matches "$SID_PREFERENCES_PATH" managed_sid_preferences_content
+}
+
 assert_directory_state() {
   local path="$1"
   local owner="$2"
@@ -118,6 +135,7 @@ verify_mount_targets() {
 }
 
 verify_install() {
+  verify_managed_archive_files
   verify_managed_mount_units
   verify_managed_secure_boot
   verify_managed_sudoers

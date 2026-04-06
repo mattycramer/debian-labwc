@@ -8,7 +8,7 @@ help:
 	  '  doctor    Validate host prerequisites for the selected source/artifact dbus-broker deployment on Debian trixie' \
 	  '  detect    Detect invoking user and current system/user dbus.service fragments into .env' \
 	  '  install   Stage dbus-broker for a fresh system, then reboot before installing 03-labwc; runs doctor, detect, packages, render, enable, verify' \
-	  '  packages  Install runtime packages and only the selected source-build dependencies with normal apt resolution' \
+	  '  packages  Install runtime packages and only the selected source-build dependencies with apt -t ${DEBIAN_SUITE}' \
 	  '  render    Build pinned dbus-broker sources or install the pinned release artifact, then render unit overrides and D-Bus compatibility aliases' \
 	  '  enable    Reload systemd and stage the managed broker units for next reboot/login without restarting the current buses' \
 	  '  verify    Verify the selected source/artifact provenance, installed files, unit overrides, compatibility aliases, and broker-backed or staged runtime state' \

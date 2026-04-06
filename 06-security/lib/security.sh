@@ -138,10 +138,16 @@ apt_yes_args() {
   fi
 }
 
+debian_suite_value() {
+  local suite="${DEBIAN_SUITE:-}"
+  [[ -n "$suite" ]] || die "DEBIAN_SUITE must be set in ${ENV_FILE:-06-security/.env}"
+  [[ "$suite" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "DEBIAN_SUITE contains unsupported characters: '$suite'"
+  printf '%s\n' "$suite"
+}
+
 apt_target_args() {
-  local suite="${SECURITY_APT_TARGET_SUITE:-}"
-  [[ -z "$suite" ]] && return 0
-  [[ "$suite" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "SECURITY_APT_TARGET_SUITE contains unsupported characters: '$suite'"
+  local suite=""
+  suite="$(debian_suite_value)"
   printf '%s\n' "-t" "$suite"
 }
 

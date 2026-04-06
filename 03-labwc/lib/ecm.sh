@@ -53,10 +53,12 @@ build_ecm_prefix() {
     cmake -S "$repo_dir" -B "$build_dir" -G Ninja \
       -D CMAKE_BUILD_TYPE=Release \
       -D CMAKE_INSTALL_PREFIX="$prefix_dir" \
+      -D CMAKE_POSITION_INDEPENDENT_CODE=ON \
       -D CMAKE_C_FLAGS="$cflags" \
       -D CMAKE_CXX_FLAGS="$cxxflags" \
       -D CMAKE_EXE_LINKER_FLAGS="$ldflags" \
       -D CMAKE_SHARED_LINKER_FLAGS="$ldflags" \
+      -D CMAKE_MODULE_LINKER_FLAGS="$ldflags" \
       -D CMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
       -D BUILD_TESTING=OFF \
       -W no-dev

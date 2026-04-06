@@ -420,6 +420,62 @@ ensure_source_state_dir() {
   run_cmd install -d -m 0755 "$LABWC_SOURCE_BUILD_STATE_DIR"
 }
 
+debian_source_tree_path() {
+  local parent_dir="$1"
+  local source_package="$2"
+  local -a matches=()
+  local path=""
+
+  while IFS= read -r path; do
+    [[ -n "$path" ]] || continue
+    matches+=("$path")
+  done < <(find "$parent_dir" -mindepth 1 -maxdepth 1 -type d -name "${source_package}-*" | LC_ALL=C sort)
+
+  ((${#matches[@]} == 1)) || die "expected exactly one extracted Debian source tree for ${source_package} under ${parent_dir}, found ${#matches[@]}"
+  require_file "${matches[0]}/debian/changelog"
+  printf '%s\n' "${matches[0]}"
+}
+
+debian_source_version() {
+  local source_dir="$1"
+  require_file "$source_dir/debian/changelog"
+  dpkg-parsechangelog -l "$source_dir/debian/changelog" -S Version
+}
+
+fetch_debian_source_checkout() {
+  local component_name="$1"
+  local source_package="$2"
+  local suite="$3"
+  local log_path="${4:-}"
+  local work_root source_parent source_dir
+
+  require_safe_token "Debian source package" "$source_package"
+  require_safe_token "Debian suite" "$suite"
+
+  work_root="$(prepare_persistent_component_work_root "$component_name")"
+  source_parent="$work_root/source"
+  run_cmd rm -rf -- "$source_parent" "$work_root/build" "$work_root/stage"
+  run_cmd install -d -m 0755 "$source_parent"
+
+  if [[ -n "$log_path" ]]; then
+    run_logged_command "$log_path" bash -lc '
+      set -euo pipefail
+      cd "$1"
+      exec apt source -t "$2" "$3"
+    ' bash "$source_parent" "$suite" "$source_package"
+  else
+    run_cmd bash -lc '
+      set -euo pipefail
+      cd "$1"
+      exec apt source -t "$2" "$3"
+    ' bash "$source_parent" "$suite" "$source_package"
+  fi
+
+  source_dir="$(debian_source_tree_path "$source_parent" "$source_package")"
+  [[ "$source_dir" == "$source_parent/"* ]] || die "unexpected Debian source tree path for ${source_package}: ${source_dir}"
+  printf '%s\n' "$work_root"
+}
+
 remove_persistent_build_workspace() {
   local component_name="$1"
   local work_root=""
@@ -432,7 +488,7 @@ remove_persistent_build_workspace() {
 }
 
 native_cflags() {
-  printf '%s\n' "-O3 -march=native -mtune=native -pipe -fno-plt -DNDEBUG -flto=thin"
+  printf '%s\n' "-O3 -march=native -mtune=native -pipe -fno-plt -fstack-protector-strong -fstack-clash-protection -D_FORTIFY_SOURCE=3 -Wformat -Werror=format-security -DNDEBUG -flto=thin"
 }
 
 native_cxxflags() {
@@ -440,11 +496,11 @@ native_cxxflags() {
 }
 
 native_ldflags() {
-  printf '%s\n' "-flto=thin -Wl,-O2 -Wl,--as-needed -fuse-ld=lld"
+  printf '%s\n' "-flto=thin -Wl,-O2 -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -fuse-ld=lld"
 }
 
 native_rustflags() {
-  printf '%s\n' "-C linker=$(llvm_clang_bin) -C link-arg=-fuse-ld=lld -C target-cpu=native -C opt-level=3 -C codegen-units=1 -C lto=thin -C strip=symbols"
+  printf '%s\n' "-C linker=$(llvm_clang_bin) -C link-arg=-fuse-ld=lld -C link-arg=-Wl,-z,relro -C link-arg=-Wl,-z,now -C link-arg=-pie -C relocation-model=pie -C target-cpu=native -C opt-level=3 -C codegen-units=1 -C lto=thin -C strip=symbols"
 }
 
 rust_toolchain_bin_dir() {

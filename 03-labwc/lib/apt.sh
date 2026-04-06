@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
 readonly SID_SOURCE_PATH="/etc/apt/sources.list.d/sid.sources"
+readonly BACKPORTS_SOURCE_PATH="/etc/apt/sources.list.d/trixie-backports.sources"
 readonly SID_PREFERENCES_PATH="/etc/apt/preferences.d/sid"
 readonly DEBIAN_ARCHIVE_KEYRING_PATH="/usr/share/keyrings/debian-archive-keyring.gpg"
 readonly LLVM_APT_BASE_URL="https://apt.llvm.org"
 readonly LLVM_APT_KEY_PATH="/etc/apt/keyrings/apt.llvm.org.asc"
 readonly LLVM_APT_SOURCES_PATH="/etc/apt/sources.list.d/llvm-toolchain.sources"
 readonly BROKEN_GTK4_RUNTIME_VERSION="4.22.2+ds-1"
-readonly NETWORK_MANAGER_APT_SUITE="sid"
-readonly SID_RUNTIME_PACKAGES=(
+readonly LABWC_RUNTIME_PACKAGES=(
   labwc
   kanshi
   waybar
@@ -133,8 +133,9 @@ readonly SID_RUNTIME_PACKAGES=(
   tar
   )
 
-readonly SID_SOURCE_BUILD_PACKAGES=(
+readonly LABWC_SOURCE_BUILD_PACKAGES=(
   build-essential
+  dpkg-dev
   appstream
   pkg-config
   pkgconf
@@ -256,6 +257,14 @@ llvm_upstream_candidate_majors() {
   printf '%s\n' 23 22 21 20
 }
 
+llvm_clang_bin() {
+  printf '%s\n' "clang-$(llvm_upstream_major)"
+}
+
+llvm_clangxx_bin() {
+  printf '%s\n' "clang++-$(llvm_upstream_major)"
+}
+
 llvm_upstream_major() {
   local codename major code url
 
@@ -282,14 +291,6 @@ llvm_upstream_major() {
   done < <(llvm_upstream_candidate_majors)
 
   die "could not determine a published LLVM upstream major for ${codename}"
-}
-
-llvm_clang_bin() {
-  printf '%s\n' "clang-$(llvm_upstream_major)"
-}
-
-llvm_clangxx_bin() {
-  printf '%s\n' "clang++-$(llvm_upstream_major)"
 }
 
 llvm_upstream_packages() {
@@ -333,10 +334,16 @@ apt_yes_args() {
   fi
 }
 
+debian_suite_value() {
+  local suite="${DEBIAN_SUITE:-}"
+  [[ -n "$suite" ]] || die "DEBIAN_SUITE must be set in ${ENV_FILE:-03-labwc/.env}"
+  [[ "$suite" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "DEBIAN_SUITE contains unsupported characters: '$suite'"
+  printf '%s\n' "$suite"
+}
+
 apt_target_args() {
-  local suite="${LABWC_APT_TARGET_SUITE:-}"
-  [[ -z "$suite" ]] && return 0
-  [[ "$suite" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || die "LABWC_APT_TARGET_SUITE contains unsupported characters: '$suite'"
+  local suite=""
+  suite="$(debian_suite_value)"
   printf '%s\n' "-t" "$suite"
 }
 
@@ -348,15 +355,16 @@ apt_update() {
   retry_cmd 3 env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt update -o Acquire::Retries=3 -o Acquire::http::Timeout=20
 }
 
-require_managed_sid_repository() {
+require_managed_debian_archives() {
   [[ -f "$DEBIAN_ARCHIVE_KEYRING_PATH" ]] || die "missing Debian archive keyring: $DEBIAN_ARCHIVE_KEYRING_PATH"
   [[ -f "$SID_SOURCE_PATH" ]] || die "missing Debian sid source file: $SID_SOURCE_PATH; run 'make sid' in 00-system first"
+  [[ -f "$BACKPORTS_SOURCE_PATH" ]] || die "missing Debian backports source file: $BACKPORTS_SOURCE_PATH; run 'make sid' in 00-system first"
   [[ -f "$SID_PREFERENCES_PATH" ]] || die "missing Debian sid preferences file: $SID_PREFERENCES_PATH; run 'make sid' in 00-system first"
 }
 
 resolved_runtime_packages() {
   local package_name
-  for package_name in "${SID_RUNTIME_PACKAGES[@]}"; do
+  for package_name in "${LABWC_RUNTIME_PACKAGES[@]}"; do
     if [[ "$package_name" == "labwc" && "${LABWC_INSTALL_METHOD:-artifact}" == "source" ]]; then
       continue
     fi
@@ -378,13 +386,15 @@ resolved_network_manager_packages() {
 resolved_requested_packages() {
   resolved_runtime_packages
   if [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]]; then
-    printf '%s\n' "${SID_SOURCE_BUILD_PACKAGES[@]}"
+    printf '%s\n' "${LABWC_SOURCE_BUILD_PACKAGES[@]}"
   fi
   resolved_graphics_packages
 }
 
 install_requested_packages() {
-  log_info "installing managed package set with normal apt resolution"
+  local suite=""
+  suite="$(debian_suite_value)"
+  log_info "installing managed package set from ${suite}"
   local -a runtime_package_list=()
   local -a build_package_list=()
   local -a graphics_package_list=()
@@ -395,7 +405,7 @@ install_requested_packages() {
   local -a target_args=()
   mapfile -t runtime_package_list < <(resolved_runtime_packages)
   if [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]]; then
-    mapfile -t build_package_list < <(printf '%s\n' "${SID_SOURCE_BUILD_PACKAGES[@]}")
+    mapfile -t build_package_list < <(printf '%s\n' "${LABWC_SOURCE_BUILD_PACKAGES[@]}")
     mapfile -t gtk_build_package_list < <(printf '%s\n' "${GTK_SOURCE_BUILD_PACKAGES[@]}")
   fi
   mapfile -t gtk_runtime_package_list < <(printf '%s\n' "${GTK_RUNTIME_PACKAGES[@]}")
@@ -405,23 +415,38 @@ install_requested_packages() {
   mapfile -t target_args < <(apt_target_args)
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${runtime_package_list[@]}"
   if ((${#build_package_list[@]} > 0)); then
-    log_info "installing source-build package set with normal apt resolution"
+    log_info "installing source-build support package set from ${suite}"
     run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${build_package_list[@]}"
     mapfile -t build_package_list < <(llvm_upstream_packages)
     log_info "installing upstream LLVM toolchain packages"
     run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${apt_args[@]}" "${build_package_list[@]}"
   fi
   if ((${#gtk_build_package_list[@]} > 0)); then
-    log_info "installing GTK4 runtime/build package set with normal apt resolution"
+    log_info "installing GTK4 runtime/build package set from ${suite}"
     run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${gtk_runtime_package_list[@]}" "${gtk_build_package_list[@]}"
   else
-    log_info "installing GTK4 runtime package set with normal apt resolution"
+    log_info "installing GTK4 runtime package set from ${suite}"
     run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${gtk_runtime_package_list[@]}"
   fi
-  log_info "installing NetworkManager package set from ${NETWORK_MANAGER_APT_SUITE}"
-  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends -t "${NETWORK_MANAGER_APT_SUITE}" "${apt_args[@]}" "${network_manager_package_list[@]}"
-  log_info "installing graphics package set with normal apt resolution"
+  log_info "installing NetworkManager package set from ${suite}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${network_manager_package_list[@]}"
+  log_info "installing graphics package set from ${suite}"
   run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none apt install --no-install-recommends "${target_args[@]}" "${apt_args[@]}" "${graphics_package_list[@]}"
+}
+
+install_debian_source_build_dependencies() {
+  local -a apt_args=()
+  local -a target_args=()
+  local suite=""
+
+  [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]] || return 0
+  suite="$(debian_suite_value)"
+  mapfile -t apt_args < <(apt_yes_args)
+  mapfile -t target_args < <(apt_target_args)
+  log_info "installing Debian source build-dependencies for ${LABWC_SOURCE_PACKAGE} from ${suite}"
+  run_cmd env DEBIAN_FRONTEND=noninteractive APT_LISTCHANGES_FRONTEND=none \
+    apt-get build-dep -o DPkg::Lock::Timeout=60 "${target_args[@]}" "${apt_args[@]}" \
+    "${LABWC_SOURCE_PACKAGE}"
 }
 
 remove_source_build_packages() {
@@ -432,7 +457,7 @@ remove_source_build_packages() {
   [[ "${LABWC_INSTALL_METHOD:-source}" == "source" ]] || return 0
   [[ "${LABWC_PURGE_BUILD_DEPS:-1}" == "1" ]] || return 0
   mapfile -t apt_args < <(apt_yes_args)
-  for package_name in "${SID_SOURCE_BUILD_PACKAGES[@]}"; do
+  for package_name in "${LABWC_SOURCE_BUILD_PACKAGES[@]}"; do
     [[ "$package_name" == *-dev ]] || continue
     cleanup_package_list+=("$package_name")
   done

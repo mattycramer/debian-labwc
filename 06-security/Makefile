@@ -4,7 +4,7 @@ help:
 	@printf '%s\n' \
 	  '06-security targets:' \
 	  '  doctor    Validate host prerequisites' \
-	  '  install   Install and configure nftables, CrowdSec, and AIDE' \
+	  '  install   Install DEBIAN_SUITE bootstrap packages, then configure nftables, CrowdSec, and AIDE' \
 	  '  verify    Verify versions, files, and enabled services' \
 	  '  nuke      Remove managed security configs and packages' \
 	  '  print-env Show the effective managed environment values'

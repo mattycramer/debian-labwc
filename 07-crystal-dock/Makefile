@@ -6,7 +6,7 @@ help:
 	@printf '%s\n' \
 	  '07-crystal-dock targets:' \
 	  '  doctor    Validate host prerequisites for Crystal Dock install' \
-	  '  install   Install Crystal Dock, render Labwc config, and wire autostart' \
+	  '  install   Install DEBIAN_SUITE runtime dependencies, then install Crystal Dock, render Labwc config, and wire autostart' \
 	  '  render    Re-render the managed Crystal Dock config and Labwc hook' \
 	  '  verify    Verify installed package and managed files' \
 	  '  nuke      Remove Crystal Dock package, wrapper, and managed config' \

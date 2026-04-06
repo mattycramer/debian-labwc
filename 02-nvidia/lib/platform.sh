@@ -72,6 +72,7 @@ resolve_nvidia_repo_distro() {
 }
 
 validate_config() {
+  require_regex_match "DEBIAN_SUITE" "$DEBIAN_SUITE" '^[A-Za-z0-9][A-Za-z0-9._-]*$'
   require_boolean_setting "NVIDIA_INSTALL" "$NVIDIA_INSTALL"
   require_value_in_set "NVIDIA_UPSTREAM_DISTRO" "$NVIDIA_UPSTREAM_DISTRO" auto debian12 debian13
   require_value_in_set "NVIDIA_KERNEL_MODULE_FLAVOR" "$NVIDIA_KERNEL_MODULE_FLAVOR" proprietary open
@@ -129,6 +130,7 @@ log_platform_summary() {
 
 print_resolved_config() {
   cat <<EOF
+DEBIAN_SUITE=${DEBIAN_SUITE}
 NVIDIA_INSTALL=${NVIDIA_INSTALL}
 NVIDIA_UPSTREAM_DISTRO=${NVIDIA_UPSTREAM_DISTRO}
 NVIDIA_REPO_DISTRO=${NVIDIA_REPO_DISTRO}

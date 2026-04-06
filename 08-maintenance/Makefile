@@ -8,7 +8,7 @@ help:
 	  '  doctor      Validate host prerequisites for Btrfs maintenance and GRUB snapshot wiring' \
 	  '  detect      Detect the root Btrfs filesystem, mounted Btrfs sources, and Btrfs mountpoints into .env' \
 	  '  install     Run doctor, detect, package install, render, enable, and verify' \
-	  '  packages    Install the required maintenance packages' \
+	  '  packages    Install the required maintenance packages from DEBIAN_SUITE' \
 	  '  render      Render Timeshift, grub-btrfs, and btrfsmaintenance configuration' \
 	  '  enable      Install grub-btrfs, update GRUB, and enable timers/services' \
 	  '  verify      Verify installed files, schedules, and GRUB integration' \
